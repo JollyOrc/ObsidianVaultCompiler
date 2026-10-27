@@ -1,0 +1,32 @@
+{
+  "name": "obsidian-vault-compiler",
+  "version": "0.16.1",
+  "description": "Obsidian community plugin for compiling a vault into one markdown file",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "typecheck": "tsc -noEmit -skipLibCheck",
+    "lint": "eslint .",
+    "test:unit": "node --loader ../txt-loader.mjs --experimental-strip-types --test '../tests/unit/*.test.ts' '../tests/fuzz/*.test.ts'",
+    "test:integration": "node --loader ../txt-loader.mjs --experimental-strip-types --test '../tests/integration/*.test.ts' '../tests/sanity/*.test.ts'",
+    "test": "npm run test:unit && npm run test:integration",
+    "build": "npm run typecheck && npm run lint && npm test && node esbuild.config.mjs production && npm run deploy && npm run release",
+    "deploy": "node deploy.mjs",
+    "release": "node release.mjs",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": [],
+  "license": "Unlicense",
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.15.17",
+    "esbuild": "0.25.5",
+    "eslint": "^9.39.4",
+    "eslint-plugin-obsidianmd": "^0.4.0",
+    "globals": "^17.6.0",
+    "obsidian": "latest",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.1"
+  }
+}
