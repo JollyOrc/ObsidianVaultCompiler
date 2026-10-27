@@ -7,7 +7,9 @@ imports every linked note in order (recursively), copies images and other
 files once, turns links between notes into anchor links, and draws hex maps
 of the Text Mapper community plugin as PNG images.
 
-This has been completely written by LLMs, mostly Claude Code.
+This plugin was created as an excercise to learn how to use AI agents for 
+coding. None of the code was written by hand. I am not a developer - use this
+at your own discretion.
 
 ## Features
 
