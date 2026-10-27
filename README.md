@@ -7,6 +7,8 @@ imports every linked note in order (recursively), copies images and other
 files once, turns links between notes into anchor links, and draws hex maps
 of the Text Mapper community plugin as PNG images.
 
+This has been completely written by LLMs, mostly Claude Code.
+
 ## Features
 
 - **Table-of-contents compilation:** any list made only of links to notes
