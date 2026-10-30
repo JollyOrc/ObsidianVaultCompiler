@@ -233,7 +233,7 @@ describe('resolveLinkWithObsidianCache — custom resolver delegation', () => {
 //
 // Obsidian URL-encodes spaces in heading anchors when it writes wikilinks,
 // so any heading with spaces generates a %20-encoded fragment in the raw
-// link text, e.g. ![[file.md#Body%20Magic]].  The options.resolve branch of
+// link text, e.g. ![[file.md#Leaf%20Craft]].  The options.resolve branch of
 // resolve() must decode the anchor fragment before returning it — otherwise
 // it is compared against heading text verbatim and can never match.
 //
@@ -256,12 +256,12 @@ describe('URL-encoded anchors — options.resolve path (regression for v0.6.2 bu
 
   it('wiki embed: %20-encoded anchor resolves to the correct section via options.resolve', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nSpell content here.\n\n## Other\n\nOther content.',
-      'index.md': '![[notes.md#Body%20Magic]]',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nSpell content here.\n\n## Other\n\nOther content.',
+      'index.md': '![[notes.md#Leaf%20Craft]]',
     };
     const result = new InMemoryVaultCompiler(files, { resolve: makeResolver(files) })
       .compile('index.md');
-    assert.ok(result.content.includes('Body Magic'), 'heading preserved');
+    assert.ok(result.content.includes('Leaf Craft'), 'heading preserved');
     assert.ok(result.content.includes('Spell content here'), 'section body included');
     assert.ok(!result.content.includes('Other content'), 'other section excluded');
     assert.strictEqual(result.warnings.length, 0, 'no warnings');
@@ -269,8 +269,8 @@ describe('URL-encoded anchors — options.resolve path (regression for v0.6.2 bu
 
   it('wiki embed: %20-encoded anchor does not produce a missing-anchor warning via options.resolve', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nContent.',
-      'index.md': '![[notes.md#Body%20Magic]]',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nContent.',
+      'index.md': '![[notes.md#Leaf%20Craft]]',
     };
     const result = new InMemoryVaultCompiler(files, { resolve: makeResolver(files) })
       .compile('index.md');
@@ -279,12 +279,12 @@ describe('URL-encoded anchors — options.resolve path (regression for v0.6.2 bu
 
   it('markdown embed: %20-encoded anchor resolves to the correct section via options.resolve', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nSpell content here.\n\n## Other\n\nOther content.',
-      'index.md': '![](notes.md#Body%20Magic)',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nSpell content here.\n\n## Other\n\nOther content.',
+      'index.md': '![](notes.md#Leaf%20Craft)',
     };
     const result = new InMemoryVaultCompiler(files, { resolve: makeResolver(files) })
       .compile('index.md');
-    assert.ok(result.content.includes('Body Magic'), 'heading preserved');
+    assert.ok(result.content.includes('Leaf Craft'), 'heading preserved');
     assert.ok(result.content.includes('Spell content here'), 'section body included');
     assert.ok(!result.content.includes('Other content'), 'other section excluded');
     assert.strictEqual(result.warnings.length, 0, 'no warnings');

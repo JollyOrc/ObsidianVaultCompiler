@@ -17,7 +17,7 @@ import {
   type OutputLocationRequest,
 } from '../../plugin/src/output-location.ts';
 
-const VAULT_ROOT = '/Users/user/Vault';
+const VAULT_ROOT = '/Users/user/Rovers';
 
 /** The request the plugin builds on the desktop app, with overrides. */
 function request(overrides: Partial<OutputLocationRequest>): OutputLocationRequest {
@@ -63,12 +63,12 @@ describe('US-0.3 AC-OL-1 — vault-relative folder', () => {
 
 describe('US-0.3 AC-OL-2 — absolute folder outside the vault', () => {
   it('the 2026-10-27 case: /Users/user/Desktop writes on the Desktop, not into the vault', () => {
-    const location = resolveOk({ folder: '/Users/user/Desktop', file: 'My Book.md' });
+    const location = resolveOk({ folder: '/Users/user/Desktop', file: 'Rovers of Emberdale.md' });
     assert.equal(location.kind, 'outside');
     assert.equal(location.folder, '/Users/user/Desktop');
-    assert.equal(location.outputPath, '/Users/user/Desktop/My Book.md');
+    assert.equal(location.outputPath, '/Users/user/Desktop/Rovers of Emberdale.md');
     assert.equal(location.assetsFolder, '/Users/user/Desktop/assets');
-    assert.notEqual(location.outputPath, 'Users/user/Desktop/My Book.md');
+    assert.notEqual(location.outputPath, 'Users/user/Desktop/Rovers of Emberdale.md');
   });
 
   it('a trailing separator is dropped', () => {
@@ -78,7 +78,7 @@ describe('US-0.3 AC-OL-2 — absolute folder outside the vault', () => {
 
   it('Windows drive paths with either separator and UNC paths are outside', () => {
     for (const folder of ['C:\\Users\\me\\Desktop', 'C:/Users/me/Desktop', '\\\\server\\share\\out']) {
-      const location = resolveOk({ folder, vaultRoot: 'D:\\Vaults\\Vault' });
+      const location = resolveOk({ folder, vaultRoot: 'D:\\Vaults\\Rovers' });
       assert.equal(location.kind, 'outside', folder);
       assert.equal(location.outputPath, `${folder}/Book.md`);
     }
@@ -130,9 +130,9 @@ describe('US-0.3 AC-OL-3 — absolute folder inside the vault', () => {
   });
 
   it('a sibling whose name starts with the vault name is outside, not " Backup/out"', () => {
-    const location = resolveOk({ folder: '/Users/user/Vault Backup/out' });
+    const location = resolveOk({ folder: '/Users/user/Rovers Backup/out' });
     assert.equal(location.kind, 'outside');
-    assert.equal(location.outputPath, '/Users/user/Vault Backup/out/Book.md');
+    assert.equal(location.outputPath, '/Users/user/Rovers Backup/out/Book.md');
   });
 
   it('an absolute folder in the config folder is still refused', () => {
@@ -141,10 +141,10 @@ describe('US-0.3 AC-OL-3 — absolute folder inside the vault', () => {
   });
 
   it('vaultRelativeFromAbsolute handles both separators and trailing ones', () => {
-    assert.equal(vaultRelativeFromAbsolute('/v/Vault/', '/v/Vault'), '');
-    assert.equal(vaultRelativeFromAbsolute('/v/Vault/A/B', '/v/Vault/'), 'A/B');
-    assert.equal(vaultRelativeFromAbsolute('/v/VaultX', '/v/Vault'), null);
-    assert.equal(vaultRelativeFromAbsolute('D:\\V\\Vault\\Out', 'D:\\V\\Vault'), 'Out');
+    assert.equal(vaultRelativeFromAbsolute('/v/Rovers/', '/v/Rovers'), '');
+    assert.equal(vaultRelativeFromAbsolute('/v/Rovers/A/B', '/v/Rovers/'), 'A/B');
+    assert.equal(vaultRelativeFromAbsolute('/v/RoversX', '/v/Rovers'), null);
+    assert.equal(vaultRelativeFromAbsolute('D:\\V\\Rovers\\Out', 'D:\\V\\Rovers'), 'Out');
   });
 });
 

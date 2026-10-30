@@ -60,7 +60,7 @@ function location(folder: string, file: string, folderExists = () => true): Outp
     file,
     startingFile: 'index2compile.md',
     configDir: '.obsidian',
-    vaultRoot: '/Users/user/Vault',
+    vaultRoot: '/Users/user/Rovers',
     folderExists,
   });
   if (!result.ok) throw new Error(result.reason);
@@ -196,7 +196,7 @@ describe('US-0.3 AC-OL-2 / US-8.1 AC-8.1-W — outside location with Node.js fs'
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ovc-outside-'));
     vault = new FakeVault();
-    writer = new OutputWriter(location(dir, 'My Book.md', p => fs.existsSync(p)), vault, fs);
+    writer = new OutputWriter(location(dir, 'Rovers of Emberdale.md', p => fs.existsSync(p)), vault, fs);
   });
   afterEach(() => {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -204,24 +204,24 @@ describe('US-0.3 AC-OL-2 / US-8.1 AC-8.1-W — outside location with Node.js fs'
 
   it('writes the output, assets and warnings into the folder and makes no vault call', async () => {
     await writer.ensureFolder(`${dir}/assets`);
-    await writer.writeText(`${dir}/My Book.md`, '# Vault');
+    await writer.writeText(`${dir}/Rovers of Emberdale.md`, '# Rovers');
     await writer.writeText(`${dir}/warnings_20261027_1106.md`, '# Compilation warnings');
     await writer.writeBinaryIfAbsent(`${dir}/assets/map.png`, BYTES);
     await writer.writeBinaryIfAbsent(`${dir}/assets/textmapper/1a2b_0001.png`, BYTES);
 
     assert.deepEqual(vault.writes, []);
-    assert.equal(fs.readFileSync(path.join(dir, 'My Book.md'), 'utf8'), '# Vault');
+    assert.equal(fs.readFileSync(path.join(dir, 'Rovers of Emberdale.md'), 'utf8'), '# Rovers');
     assert.ok(fs.existsSync(path.join(dir, 'warnings_20261027_1106.md')));
     assert.deepEqual([...fs.readFileSync(path.join(dir, 'assets', 'map.png'))], [1, 2, 3]);
     assert.deepEqual([...fs.readFileSync(path.join(dir, 'assets', 'textmapper', '1a2b_0001.png'))], [1, 2, 3]);
-    assert.deepEqual(fs.readdirSync(dir).sort(), ['My Book.md', 'assets', 'warnings_20261027_1106.md']);
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['Rovers of Emberdale.md', 'assets', 'warnings_20261027_1106.md']);
   });
 
   it('overwrites the output file and reports that it exists', async () => {
-    fs.writeFileSync(path.join(dir, 'My Book.md'), 'old');
-    assert.equal(writer.exists(`${dir}/My Book.md`), true);
-    await writer.writeText(`${dir}/My Book.md`, 'new');
-    assert.equal(fs.readFileSync(path.join(dir, 'My Book.md'), 'utf8'), 'new');
+    fs.writeFileSync(path.join(dir, 'Rovers of Emberdale.md'), 'old');
+    assert.equal(writer.exists(`${dir}/Rovers of Emberdale.md`), true);
+    await writer.writeText(`${dir}/Rovers of Emberdale.md`, 'new');
+    assert.equal(fs.readFileSync(path.join(dir, 'Rovers of Emberdale.md'), 'utf8'), 'new');
   });
 
   it('keeps an existing asset', async () => {
@@ -235,8 +235,8 @@ describe('US-0.3 AC-OL-2 / US-8.1 AC-8.1-W — outside location with Node.js fs'
     for (const p of [
       `${dir}/other.md`,
       `${dir}/assets/../../escape.md`,
-      `${dir}-sibling/My Book.md`,
-      'My Book.md',
+      `${dir}-sibling/Rovers of Emberdale.md`,
+      'Rovers of Emberdale.md',
     ]) {
       await refused(writer.writeText(p, 'x'), p);
     }
@@ -247,14 +247,14 @@ describe('US-0.3 AC-OL-2 / US-8.1 AC-8.1-W — outside location with Node.js fs'
   });
 
   it('isOutputPath is false for every vault path, so the vault check sees any new vault file (AC-8.1-V)', () => {
-    assert.equal(writer.isOutputPath('Users/user/Desktop/My Book.md'), false);
-    assert.equal(writer.isOutputPath('My Book.md'), false);
+    assert.equal(writer.isOutputPath('Users/user/Desktop/Rovers of Emberdale.md'), false);
+    assert.equal(writer.isOutputPath('Rovers of Emberdale.md'), false);
     assert.equal(writer.isOutputPath('assets/map.png'), false);
   });
 
   it('without fs (mobile) every outside write is refused', async () => {
     const noFs = new OutputWriter(writer.location, vault, null);
-    await assert.rejects(noFs.writeText(`${dir}/My Book.md`, 'x'), /needs the desktop app/);
+    await assert.rejects(noFs.writeText(`${dir}/Rovers of Emberdale.md`, 'x'), /needs the desktop app/);
     assert.deepEqual(fs.readdirSync(dir), []);
   });
 });

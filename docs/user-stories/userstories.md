@@ -111,7 +111,7 @@ entry point
 
 Found 2026-10-27: the output folder `/Users/user/Desktop`, chosen with
 `Browse`, was taken as a vault-relative path. The compile wrote
-`<vault>/Users/user/Desktop/My Book.md`, its `assets/` and a
+`<vault>/Users/user/Desktop/Rovers of Emberdale.md`, its `assets/` and a
 warnings file **into the vault**. The rules below apply to every way a folder
 or filename reaches a compile: the settings fields, `Browse`, and the
 export-path prompt (US-7.3). They are checked when `Compile` runs, before
@@ -134,19 +134,19 @@ anything is read, confirmed or written. A refusal shows the notice
   The folder must already exist; it is never created.
   | Folder | Filename | Writes |
   |---|---|---|
-  | `/Users/user/Desktop` | `My Book.md` | `/Users/user/Desktop/My Book.md`, `/Users/user/Desktop/assets/…`, `/Users/user/Desktop/warnings_20261027_1106.md` |
+  | `/Users/user/Desktop` | `Rovers of Emberdale.md` | `/Users/user/Desktop/Rovers of Emberdale.md`, `/Users/user/Desktop/assets/…`, `/Users/user/Desktop/warnings_20261027_1106.md` |
   | `/Users/user/Desktp` (does not exist) | `Book.md` | nothing; reason `Output folder "/Users/user/Desktp" does not exist.` |
   | `/Users/user/Desktop` on Obsidian mobile | `Book.md` | nothing; reason `Output folder "/Users/user/Desktop" is outside the vault; writing outside the vault needs the desktop app.` |
 - **AC-OL-3 Absolute folder inside the vault.** An absolute folder that is the
   vault root or lies under it is turned into the vault-relative folder and
   then follows AC-OL-1. "Under" means the vault root followed by a path
   separator: a sibling folder whose name only starts with the vault's name is
-  outside. Example with the vault root `/Users/user/Vault`:
+  outside. Example with the vault root `/Users/user/Rovers`:
   | Folder | Treated as |
   |---|---|
-  | `/Users/user/Vault` | vault-relative (empty, the vault root) |
-  | `/Users/user/Vault/Exports` | vault-relative `Exports` |
-  | `/Users/user/Vault Backup/out` | outside the vault (AC-OL-2), not ` Backup/out` |
+  | `/Users/user/Rovers` | vault-relative (empty, the vault root) |
+  | `/Users/user/Rovers/Exports` | vault-relative `Exports` |
+  | `/Users/user/Rovers Backup/out` | outside the vault (AC-OL-2), not ` Backup/out` |
 - **AC-OL-4 Refused folders.** These folders are refused with the reason shown:
   | Folder | Reason |
   |---|---|
@@ -216,8 +216,8 @@ into the master file at the correct location
   not included. This mirrors Obsidian's native section-embed behaviour, and
   applies equally regardless of which embed syntax is used.
   - Heading anchors are matched after URL-decoding. Obsidian writes
-    percent-encoded anchors (e.g. `#Body%20Magic` for a heading named
-    `Body Magic`); the compiler decodes these before comparing against heading
+    percent-encoded anchors (e.g. `#Leaf%20Craft` for a heading named
+    `Leaf Craft`); the compiler decodes these before comparing against heading
     text, so encoded and unencoded anchors resolve to the same section.
   - If the named heading exists, the auto-heading injection (US-6.1) for that
     file is **suppressed**, because the embed already begins with the target
@@ -287,7 +287,7 @@ Definitions:
 - **AC-6 Same note twice.** A note listed in two ToCs is imported twice, as
   today (e.g. spells of two schools). Notes that only want to point at other
   notes write the links in a sentence, not as a list (the user rewrites the
-  glossary entries `Skilltree Branch` and `Reflex Skills`, decided
+  glossary entries `Talentweb Strand` and `Swift Talents`, decided
   2026-10-27).
 
 ## Epic 2 — Asset handling and deduplication
@@ -408,7 +408,7 @@ already installed in my vault as its rendering engine
 
 *(Rewritten 2026-10-27: the compiler used the npm package `text-mapper`
 0.1.10, whose maps had a cream background, no hex outlines, a serif font and
-labels like `Ice Armour|Ice Armour`.)*
+labels like `Fog Mantle|Fog Mantle`.)*
 
 Behaviour of the plugin (Text Mapper v1.1.0, plugin id `text-mapper`, MIT) read
 from its `main.js` and `src/` on 2026-10-27; **not yet measured in Obsidian**
@@ -437,9 +437,9 @@ from its `main.js` and `src/` on 2026-10-27; **not yet measured in Obsidian**
   failure (US-4.1 placeholder plus warning).
 - **AC-3 Same drawing as in Obsidian.** Everything the plugin draws is kept:
   hex fills, black outlines, path outlines, coordinates as `0402`, labels.
-  Example — the Elemental Magic map (`0403 elementalmagic "Ice Armour|Ice Armour "`)
-  shows hex `0403` with a black outline, the label `Ice Armour` (not
-  `Ice Armour|Ice Armour`) and the green, pink and orange path outlines.
+  Example — the Seasonal Charms map (`0403 seasonalcharms "Fog Mantle|Fog Mantle "`)
+  shows hex `0403` with a black outline, the label `Fog Mantle` (not
+  `Fog Mantle|Fog Mantle`) and the green, pink and orange path outlines.
 - **AC-4 Two changes on purpose.** Before drawing the PNG:
   - the plugin's background `<rect>` (the first `rect` child of the `<svg>`
     whose `fill` is `white` and whose `x`, `y`, `width`, `height` equal the
@@ -585,7 +585,7 @@ Obsidian itself draws the maps in Inter. Measured in Obsidian's console.)*
 **As a** vault owner  
 **I want** compiled maps without hex numbers, with each label centred in its
 hex and broken into lines where it would not fit  
-**So that** labels like "Limb Regeneration" stay inside their hex in print.
+**So that** labels like "Moss Germinations" stay inside their hex in print.
 
 *(Written 2026-10-27; decisions OD-L1 to OD-L3 taken the same day, see the
 end of the story.)*
@@ -629,21 +629,21 @@ confirmed in Obsidian by M15 the same day):
   both the glow and the label text, so the white glow stays behind every line.
   - `W` = 80 % of the hex width at its centre: 160 for flat-top hexes, 138.6
     for pointy-top (OD-L3).
-  - Measured widths (example, at 20pt) `Limb` 55, `Regeneration` 150,
-    `Limb Regeneration` 212: two lines, `Limb` / `Regeneration`.
-  - `Ice Crystal`, 135 wide: one line, unchanged apart from AC-2.
-  - `Above the Elements` with `Above the` 120 and `Above the Elements` 230:
-    `Above the` / `Elements`.
+  - Measured widths (example, at 20pt) `Moss` 55, `Germinations` 150,
+    `Moss Germinations` 212: two lines, `Moss` / `Germinations`.
+  - `Fog Lantern`, 135 wide: one line, unchanged apart from AC-2.
+  - `Under the Brambles` with `Under the` 120 and `Under the Brambles` 230:
+    `Under the` / `Brambles`.
 - **AC-4 A word wider than `W` is hyphenated** (OD-L2). Its first part is the
   longest prefix that fits on a line of its own — measured with the hyphen it
   gets — keeping at least 2 characters on each side; the rest of the word
   carries on as the next word (and is split again if still too wide).
   - If the word already contains `-` or `&` and the part up to and including
     it fits, it breaks there instead, without adding a hyphen.
-  - `Inconvenience` with widths `Inconveni-` 150 and `Inconvenie-` 162 →
-    `Inconveni-` / `ence`.
-  - `Repair&Manipulate` with `Repair&` 105 → `Repair&` / `Manipulate`.
-  - `Regeneration` at 150 fits whole and is not hyphenated.
+  - `Unpredictable` with widths `Unpredict-` 150 and `Unpredicta-` 162 →
+    `Unpredict-` / `able`.
+  - `Polish&Transplant` with `Polish&` 105 → `Polish&` / `Transplant`.
+  - `Germinations` at 150 fits whole and is not hyphenated.
   - A word whose first 2 characters plus a hyphen are already wider than `W`
     (only possible with a huge label size) is left whole, and the compile
     warns once per map.
@@ -669,8 +669,8 @@ confirmed in Obsidian by M15 the same day):
   not always on).
 - **OD-L2:** a word wider than a line is hyphenated (not left as is, not
   shrunk). The break after an existing `-` or `&` is a refinement added when
-  writing the rule; the vault's longest map words are `Repair&Manipulate`,
-  `Inconvenience`, `Intimidating`, `Amdidextrous`, `Regeneration`.
+  writing the rule; the vault's longest map words are `Polish&Transplant`,
+  `Unpredictable`, `Exasperating`, `Overgenerous`, `Germinations`.
 - **OD-L3:** `W` = 80 % of the hex width at its centre, line height 1.2 × font
   size, fixed (not settings); to be checked by eye in M15.
 
@@ -706,16 +706,16 @@ compiled output
 items or `---` rules in the rulebook.
 
 Measured on 2026-10-27 with v0.12.0: an embedded note
-`---` / `tags:` / `  - ElementalMagic` / `  - Wizardry` / `---` / `Spell text.`
-compiled (toggle on) to `# Ice Crystal` followed by the raw YAML lines. The note
+`---` / `tags:` / `  - SeasonalCharms` / `  - Wizardry` / `---` / `Spell text.`
+compiled (toggle on) to `# Fog Lantern` followed by the raw YAML lines. The note
 counted as a preamble file, so its title went above the `---`. In the example
 vault 93 frontmatter blocks (all `tags:` on spell notes) leaked into the
 compiled rulebook with either toggle value, adding 186 `---` lines.
 
 **Decision (user, 2026-10-27, measured before it was offered, SCAR-020):** all
 frontmatter is dropped; no field (not even `tags`) is carried into the output.
-Two other options were measured and declined: a `#BodyMagic #LifeMagic` tag line
-under the title, and an italic `*Tags: BodyMagic, LifeMagic*` line.
+Two other options were measured and declined: a `#LeafCraft #LifeMagic` tag line
+under the title, and an italic `*Tags: LeafCraft, LifeMagic*` line.
 
 **Definition.** A note has frontmatter when its **first line** is `---`
 (trailing spaces or tabs allowed) and a later line is `---` (trailing spaces or
@@ -736,12 +736,12 @@ closing `...`, a byte-order mark, trailing whitespace). The plugin's
   (US-6.1, US-6.3 to US-6.5) and section extraction (US-6.3 AC-7). Applies to
   the root file and to every embedded note, with "Normalise headings" on and
   off.
-- **AC-2 Preamble note.** Root `![[Ice Crystal.md]]`; `Ice Crystal.md` =
-  `---` / `tags:` / `  - ElementalMagic` / `  - Wizardry` / `---` /
+- **AC-2 Preamble note.** Root `![[Fog Lantern.md]]`; `Fog Lantern.md` =
+  `---` / `tags:` / `  - SeasonalCharms` / `  - Wizardry` / `---` /
   `Spell text.`
-  - On → `# Ice Crystal`, `Spell text.`
-  - Off → `## Ice Crystal`, `Spell text.`
-  - Neither output contains `tags:`, `ElementalMagic` or `---`.
+  - On → `# Fog Lantern`, `Spell text.`
+  - Off → `## Fog Lantern`, `Spell text.`
+  - Neither output contains `tags:`, `SeasonalCharms` or `---`.
 - **AC-3 Heading-first note after its frontmatter (US-6.3 AC-6, US-6.1 AC-4).**
   The first heading *after* the frontmatter is the one the title replaces.
   Root `![[1.2 Combat.md]]`; `1.2 Combat.md` = `---` / `tags: [rules]` /
@@ -759,13 +759,13 @@ closing `...`, a byte-order mark, trailing whitespace). The plugin's
   - On → `# B`, `Content`; no `# A`. (Without AC-1, `A.md` was a preamble
     file: `# A`, `## B`.)
   - Off → `## A`, `## B`, `Content`.
-- **AC-6 Section embed (US-6.3 AC-7).** Root `![[M.md#Body Magic]]`; `M.md` =
-  `---` / `tags: [magic]` / `---` / `# Magic` / `## Body Magic` / `### Spells`.
-  - On → `# Body Magic`, `## Spells`.
-  - Off → `## Body Magic`, `### Spells` (as written).
+- **AC-6 Section embed (US-6.3 AC-7).** Root `![[M.md#Leaf Craft]]`; `M.md` =
+  `---` / `tags: [magic]` / `---` / `# Magic` / `## Leaf Craft` / `### Spells`.
+  - On → `# Leaf Craft`, `## Spells`.
+  - Off → `## Leaf Craft`, `### Spells` (as written).
   - A YAML comment with the anchor's text is not the section: with `M.md` =
-    `---` / `# Body Magic` / `tags: [magic]` / `---` / `# Magic` /
-    `## Body Magic` / `### Spells`, the output is the same as above and has no
+    `---` / `# Leaf Craft` / `tags: [magic]` / `---` / `# Magic` /
+    `## Leaf Craft` / `### Spells`, the output is the same as above and has no
     `tags:`. (Without AC-1 the section started at the comment and took the
     YAML lines with it.)
 - **AC-7 Root file (US-6.3 AC-5).** `index.md` = `---` / `title: Rulebook` /
@@ -909,17 +909,17 @@ the compiler at v0.11.0 (2026-10-27).
   relative levels (OD-1).
   - `1.2 Combat.md` = `# Fighting` / `## Rounds` → `## Combat` / `### Rounds`
    .
-  - `1.3.2 Magic.md` = `# Magic` / `## Body Magic` / `### Spells` → `### Magic` /
-    `#### Body Magic` / `##### Spells`.
+  - `1.3.2 Magic.md` = `# Magic` / `## Leaf Craft` / `### Spells` → `### Magic` /
+    `#### Leaf Craft` / `##### Spells`.
   - `1.2 Multi.md` = `# First` / `# Second` → `## Multi` / `## Second`.
 - **AC-7 Section embeds.** For `![[file.md#Heading]]` and
   `![alt](file.md#Heading)` the target's prefix is not consulted and the
   section's heading text is kept. The section's shallowest heading lands at the
   AC-4 depth, moving up or down; the others keep their distance to it (OD-3).
-  - `1.2 Rules.md` = `# Rules` + `![[1.3.2 Magic.md#Body Magic]]` →
-    `## Rules`, `### Body Magic`, `#### Spells`.
-  - Root `![[M.md#Body Magic]]`, `M.md` = `# Magic` / `## Body Magic` /
-    `### Spells` → `# Body Magic`, `## Spells`.
+  - `1.2 Rules.md` = `# Rules` + `![[1.3.2 Magic.md#Leaf Craft]]` →
+    `## Rules`, `### Leaf Craft`, `#### Spells`.
+  - Root `![[M.md#Leaf Craft]]`, `M.md` = `# Magic` / `## Leaf Craft` /
+    `### Spells` → `# Leaf Craft`, `## Spells`.
 - **AC-8 Ceiling.** A heading that would go past h6 becomes h6, and a
   `WarningDetail` whose message contains `clamped` is recorded. No comment is
   written into the compiled output; the warning list and the warnings logfile
@@ -1128,10 +1128,10 @@ marked as not measured.
   links without a matching heading went from 68 to 23 (toggle on) and from 146
   to 22 (toggle off); the rest are KD-2.
 - **KD-2 Links written to a heading inside a note keep their raw target.**
-  Authors' links such as `[Grit](#Grit)` or
-  `[Fighting pool](#The%20Fighting%20and%20Success%20Pools)` are left as
+  Authors' links such as `[Zeal](#Zeal)` or
+  `[Brawling pool](#The%20Brawling%20and%20Fortune%20Pools)` are left as
   written, so they do not match the slugified anchor of the heading
-  (`#grit`). 23 such links in the example vault (2026-10-27). Not decided;
+  (`#zeal`). 23 such links in the example vault (2026-10-27). Not decided;
   touches US-2.3 and US-3.1. Tracked in [#83](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/83).
 
 ### US-6.6 Tidy empty lines in the compiled output

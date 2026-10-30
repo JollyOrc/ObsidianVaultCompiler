@@ -11,7 +11,7 @@ The compiler decides how to treat a note by its first non-empty line: a
 heading makes it heading-first, anything else makes it a preamble file, and
 a lone embed makes it a pass-through. Notes in Obsidian can start with a YAML
 frontmatter block between two `---` lines. The compiler did not know about it,
-so a spell note `---` / `tags:` / `  - BodyMagic` / `---` / `Spell text.`
+so a spell note `---` / `tags:` / `  - LeafCraft` / `---` / `Spell text.`
 counted as a preamble file, its title went above the `---`, and the YAML went
 into the rulebook as a rule, a line of text and a list (93 blocks in the example
 vault). Other rules read the same raw text: a YAML comment `# …` looked like a

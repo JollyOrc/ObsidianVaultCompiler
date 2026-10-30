@@ -4,8 +4,8 @@ import { InMemoryVaultCompiler } from "../../plugin/src/compiler.ts";
 
 describe("first-line cover asset", () => {
   const files = {
-    "index2compile.md": "![](Rulebook/Rulebook images/Artist/Cover Draft 1000.png)\n\n# The Rulebook\n- ![[A.md]]\n",
-    "Rulebook/Rulebook images/Artist/Cover Draft 1000.png": "",
+    "index2compile.md": "![](Rulebook/Rulebook images/Ilse Marten/Cover Draft 1000.png)\n\n# The Rulebook\n- ![[A.md]]\n",
+    "Rulebook/Rulebook images/Ilse Marten/Cover Draft 1000.png": "",
     "A.md": "# A\nHello from A.\n",
   };
 

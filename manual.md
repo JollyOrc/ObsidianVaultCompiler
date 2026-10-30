@@ -388,8 +388,8 @@ Some extra rules when the setting is on:
   another note (for example `Chapter A.md` contains only `![[Real Chapter]]`),
   the wrapper doesn't add an empty heading of its own; the embedded note
   appears directly in its place.
-- **Section embeds keep their heading text.** `![[Magic#Body Magic]]` shows
-  the heading **Body Magic**, moved to the right level.
+- **Section embeds keep their heading text.** `![[Magic#Leaf Craft]]` shows
+  the heading **Leaf Craft**, moved to the right level.
 - **Six levels at most.** Markdown has only six heading levels. Anything deeper
   is kept at level 6 and noted in the warnings file.
 - **Wrong order is corrected.** If a level-1 note is embedded inside a level-3
@@ -573,7 +573,7 @@ Try switching **Normalise headings** on, and number your file names (`1`,
 If two notes in the document have the same title (for example `1 Intro.md` and
 `2 Intro.md`, both titled *Intro*), links to the second may jump to the first.
 Give the notes different names. Also, links that you wrote by hand to a heading
-(like `[Grit](#Grit)`) are kept exactly as written and may not match the
+(like `[Zeal](#Zeal)`) are kept exactly as written and may not match the
 heading in the document.
 
 **Can I use it on my phone or tablet?**

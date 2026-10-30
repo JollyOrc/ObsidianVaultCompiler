@@ -29,7 +29,7 @@ const PLUGIN_SVG =
   '<rect x="-30" y="-40" width="600" height="700" fill="white"/>' +
   '<defs><g id="x"><rect x="-5" y="-5" width="10" height="10" fill="white"/></g></defs>' +
   '<g id="regions"><polygon fill="#9bf6ff" stroke="black" stroke-width="3" points="0,0 1,1"/></g>' +
-  '<g id="labels"><text x="10" y="20">Ice Armour</text></g>' +
+  '<g id="labels"><text x="10" y="20">Fog Mantle</text></g>' +
   '</svg>';
 
 describe('US-4.2 AC-4: prepareMapSvg', () => {
@@ -46,7 +46,7 @@ describe('US-4.2 AC-4: prepareMapSvg', () => {
   it('keeps hex fills, black outlines and labels unchanged', () => {
     const out = prepareMapSvg(PLUGIN_SVG, 'sans-serif');
     assert.match(out, /<polygon fill="#9bf6ff" stroke="black" stroke-width="3" points="0,0 1,1"\/>/);
-    assert.match(out, /<text x="10" y="20">Ice Armour<\/text>/);
+    assert.match(out, /<text x="10" y="20">Fog Mantle<\/text>/);
   });
 
   it('does not remove a first rect that does not cover the viewBox', () => {

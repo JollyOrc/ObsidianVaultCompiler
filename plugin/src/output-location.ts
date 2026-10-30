@@ -68,8 +68,8 @@ export function joinOutputPath(folder: string, name: string): string {
  * US-0.3 | AC-OL-3, AC-OL-7: Returns the vault-relative folder for an absolute
  * folder that is the vault root or lies under it, else `null`.
  *
- * "Under" needs a separator after the root, so `/v/Vault Backup` is not
- * under `/v/Vault`. Both separators are accepted on both sides.
+ * "Under" needs a separator after the root, so `/v/Rovers Backup` is not
+ * under `/v/Rovers`. Both separators are accepted on both sides.
  */
 export function vaultRelativeFromAbsolute(absolute: string, vaultRoot: string): string | null {
   const root = stripTrailingSeparators(vaultRoot.replace(/\\/g, '/'));

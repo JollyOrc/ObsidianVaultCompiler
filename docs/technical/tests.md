@@ -330,6 +330,32 @@ Required assertions:
 7. Control command fences are absent.
 8. Leading headings are replaced by filename-derived headings.
 
+### Smoke book (`tests/fixtures/basic-vault/Smoke/`, added 2026-10-30, #86)
+
+Synthetic notes for the manual checks in §6, M14 and M15, in a subfolder so
+the assertions above (which read the top-level files only) do not change.
+Every note name is unique in the vault (SCAR-012). Start note:
+`Smoke/Smoke book.md`.
+
+| Note | Case |
+|---|---|
+| `Smoke book.md` | root; ToC list mixing `[[…]]` and `[text](path)` items (US-1.3) |
+| `1 Basics.md`, `1.1 Moving.md` | numbered notes, heading-first (US-6.3) |
+| `1.2 Dueling.md` | first heading `# Brawling` differs from the title (US-6.3 AC-6) |
+| `1.3 Leaf Craft.md` | preamble note embedding two spells (US-6.4) |
+| `Spells/Rootbinder.md` | frontmatter, then text (US-5.2) |
+| `Spells/Fog Lantern.md` | frontmatter in front of a heading (US-5.2, SCAR-027) |
+| `2 Charms.md` | pass-through wrapper of `Seasonal Charms` (US-6.5) |
+| `Seasonal Charms.md` | flat-top map: long labels, `Polish&Transplant`, linked label `Rootbinder\|Mend a Bone`, green, pink and orange paths (US-4.2, US-4.8, US-4.9) |
+| `Appendix.md` | headingless; `[text](path)` ToC list, a section embed `![[1.1 Moving#Climbing]]` (US-1.2), `![[media.png]]` |
+| `Glossary of the Vale.md`, `Map key.md` | `Map key` holds a pointy-top map (`option horizontal`) |
+
+`tests/integration/smoke-vault.test.ts` compiles the smoke book with
+"Normalise headings" on and off and asserts the heading list, the
+pass-through, the absence of frontmatter and of ToC links, the two map
+references and the copied image (mutation-checked 2026-10-30: breaking the
+frontmatter or the pass-through in the fixture fails it).
+
 ## 6. Manual smoke tests in Obsidian
 
 Vault: `tests/fixtures/basic-vault/` (since 2026-10-30; the former example
@@ -340,7 +366,11 @@ test reads.
 
 1. Open the fixture vault in Obsidian with the plugin and the Text Mapper
    plugin (id `text-mapper`) enabled.
-2. Choose `index2compile.md` and run compilation.
+2. Compile `index2compile.md` (the command palette), then
+   `Smoke/Smoke book.md` (file menu → **Compile vault from this file**).
+   Note: the file menu currently saves the starting file to the settings
+   ([#81](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/81));
+   set it back to `index2compile.md` afterwards.
 3. Verify the master file opens without errors.
 4. Verify generated assets are visible to Obsidian.
 5. In plugin settings, disable TextMapper rendering and re-run compilation.
@@ -360,10 +390,10 @@ test reads.
    `../Exports` and `.obsidian` as the folder and confirm each compile is
    refused with its notice and writes nothing.
 10. Frontmatter (US-5.2, 2026-10-27): compile with "Normalise headings" on and
-   then off. In each output, search for `tags:` and for a line that is only
-   `---`: neither may come from a note's frontmatter. Check that a spell note,
-   e.g. *Bonesetter*, shows its title and then its text, with no tag list
-   between them.
+   then off, from `Smoke/Smoke book.md`. In each output, search for `tags:`
+   and for a line that is only `---`: neither may appear. Check that
+   *Rootbinder* shows its title and then `Mends a broken bone overnight.`,
+   and *Fog Lantern* one title only, with no tag list in between.
 
 ## 7. Vault mutation guard
 
@@ -434,8 +464,9 @@ Inter's font file); `Georgia, sans` → Georgia, with 10 new PNGs keyed
 `2e33eefc` in the same output folder; no errors.
 
 Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
-A rerun needs a fixture with several maps:
-[#86](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/86).
+**Rerun** on the fixture vault from `Smoke/Smoke book.md` (two maps, in
+`Smoke/Seasonal Charms.md` and `Smoke/Map key.md`); step 1 expects the version
+just built, and step 4's key is whatever the new PNG names show.
 
 Text Mapper v1.1.0 enabled.
 
@@ -444,13 +475,13 @@ Text Mapper v1.1.0 enabled.
 2. Settings → Vault Compiler: "Map font" is empty. Output folder inside the
    vault. Compile.
 3. Open `assets/textmapper/` next to the output and open the PNG of the
-   Elemental Magic map (the one with `Ice Armour`, `Fireball`). Compare it with
-   the same map in `Elemental Magic Spells.md` in reading view. Expected:
+   map with `Fog Mantle` and `Moss Germinations`. Compare it with the map in
+   `Smoke/Seasonal Charms.md` in reading view. Expected:
    - transparent background (in Finder/Preview it shows the checkerboard or
      the window colour, not cream or white);
    - a black outline around every hex;
    - coordinates written `0402`, not `04.02`;
-   - labels `Ice Armour`, not `Ice Armour|Ice Armour`;
+   - labels `Fog Mantle`, and `Mend a Bone` (not `Rootbinder|Mend a Bone`);
    - the green, pink and orange path outlines;
    - the text in Inter, the font Obsidian draws the map in (same letter
      shapes as the map in reading view). If instead a notice says
@@ -460,7 +491,7 @@ Text Mapper v1.1.0 enabled.
    and confirm the labels are now in Georgia (old-style digits in `0402`) and
    `assets/textmapper/` has new files ending `_2cb44a0b.png`. Clear the field
    again.
-5. Look at two other maps (e.g. Body Magic, Combat Skill Branches) at full size.
+5. Look at the pointy-top map of `Smoke/Map key.md` at full size.
 6. Is anything missing, odd or ugly that this list did not ask about? Report
    it even if it seems unrelated.
 
@@ -469,16 +500,20 @@ Text Mapper v1.1.0 enabled.
 Result 2026-10-27: all steps passed (reported by the user).
 
 Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
-Text Mapper v1.1.0 enabled, "Map font" empty.
+**Rerun** on the fixture vault from `Smoke/Smoke book.md`; step 1 expects the
+version just built. Text Mapper v1.1.0 enabled, "Map font" empty.
 
 1. The plugin list shows **0.15.0**.
 2. Settings: "Tidy map labels" is on. Compile into `Export`.
-3. Open the Body Magic map PNG (the one with `Limb Regeneration`). Expected:
+3. Open the PNG of `Smoke/Seasonal Charms.md` (the one with
+   `Moss Germinations`). Expected:
    - no hex numbers (`0402` etc.) anywhere;
    - every label in the middle of its hex, with the white glow behind it;
-   - `Limb Regeneration` on two lines, both inside the hex;
-   - no label wider than its hex; long single words split with a hyphen.
-4. Look at two more maps (e.g. Elemental Magic, Combat Skill Branches) at
+   - `Moss Germinations` on two lines, both inside the hex;
+   - no label wider than its hex; `Unpredictable` split with a hyphen,
+     `Polish&Transplant` after the `&`;
+   - `Mend a Bone` still a link label.
+4. Look at the pointy-top map of `Smoke/Map key.md` (`Talentweb Strand`) at
    full size; note any label that touches the hex edge or overlaps another.
 5. Turn "Tidy map labels" off, compile again into `Export`: the maps look as
    in v0.14 (numbers on top, labels at the bottom), and `assets/textmapper/`

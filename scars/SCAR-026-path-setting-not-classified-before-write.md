@@ -11,7 +11,7 @@ The output folder `/Users/user/Desktop`, chosen with the system folder
 picker, was joined to the filename as text and then split on `/` with empty
 parts dropped. The leading `/` vanished, and the compile wrote
 `<vault>/Users/user/Desktop/…` into the vault. The same code took
-`/x/Vault Backup/out` for the vault folder ` Backup/out`, because "inside the
+`/x/Rovers Backup/out` for the vault folder ` Backup/out`, because "inside the
 vault" was tested with `startsWith(vaultRoot)`. The story said "writes only to
 the configured output", and every write had its own copy of "create the
 folders, then write" in three files, none of which checked where it wrote.

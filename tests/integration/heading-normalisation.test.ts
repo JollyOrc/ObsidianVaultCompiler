@@ -37,15 +37,15 @@ describe('heading normalisation: AC-1 toggle', () => {
   it('when off, US-6.1 applies: filename heading, internal headings not shifted', () => {
     /**
      * US-6.3 | AC-1 (OD-4): off means US-6.1. The leading `# Fight` becomes the
-     * US-6.1 heading `### Magic`; `## Body Magic` stays h2 (normalised: h4).
+     * US-6.1 heading `### Magic`; `## Leaf Craft` stays h2 (normalised: h4).
      */
     const files = {
       'index.md': '![[1.3.2 Magic.md]]',
-      '1.3.2 Magic.md': '# Fight\n\n## Body Magic\n\nContent.',
+      '1.3.2 Magic.md': '# Fight\n\n## Leaf Craft\n\nContent.',
     };
     const result = compile(files, 'index.md', false);
     assert.match(result.content, /^### Magic$/m);
-    assert.match(result.content, /^## Body Magic$/m);
+    assert.match(result.content, /^## Leaf Craft$/m);
     assert.doesNotMatch(result.content, /Fight/);
   });
 
@@ -53,11 +53,11 @@ describe('heading normalisation: AC-1 toggle', () => {
     /** US-6.3 | AC-1: on → AC-6 applies (title at depth 3, rest shifted). */
     const files = {
       'index.md': '![[1.3.2 Magic.md]]',
-      '1.3.2 Magic.md': '# Fight\n\n## Body Magic\n\nContent.',
+      '1.3.2 Magic.md': '# Fight\n\n## Leaf Craft\n\nContent.',
     };
     const result = compile(files, 'index.md', true);
     assert.match(result.content, /^### Magic$/m);
-    assert.match(result.content, /^#### Body Magic$/m);
+    assert.match(result.content, /^#### Leaf Craft$/m);
   });
 });
 
@@ -95,11 +95,11 @@ describe('heading normalisation: prefix depth parsing', () => {
 
   it('four-segment prefix → depth 4', () => {
     const files = {
-      'index.md': '![[1.3.2.1 Body Magic.md]]',
-      '1.3.2.1 Body Magic.md': '# Body Magic\n\nContent.',
+      'index.md': '![[1.3.2.1 Leaf Craft.md]]',
+      '1.3.2.1 Leaf Craft.md': '# Leaf Craft\n\nContent.',
     };
     const result = compile(files, 'index.md');
-    assert.match(result.content, /^#### Body Magic/m);
+    assert.match(result.content, /^#### Leaf Craft/m);
   });
 
   it('leading zeros are stripped before counting (01.03.02 = depth 3)', () => {
@@ -151,14 +151,14 @@ describe('heading normalisation: heading replacement', () => {
   it('remaining headings are offset to preserve relative depth', () => {
     const files = {
       'index.md': '![[1.3.2 Magic.md]]',
-      '1.3.2 Magic.md': '# Magic\n\n## Body Magic\n\n### Spells\n\nContent.',
+      '1.3.2 Magic.md': '# Magic\n\n## Leaf Craft\n\n### Spells\n\nContent.',
     };
     const result = compile(files, 'index.md');
     // # Magic → ### Magic (depth 3, replaces original h1)
-    // ## Body Magic → #### Body Magic (depth 4 = 3+1)
+    // ## Leaf Craft → #### Leaf Craft (depth 4 = 3+1)
     // ### Spells → ##### Spells (depth 5 = 3+2)
     assert.match(result.content, /^### Magic/m);
-    assert.match(result.content, /^#### Body Magic/m);
+    assert.match(result.content, /^#### Leaf Craft/m);
     assert.match(result.content, /^##### Spells/m);
   });
 
@@ -324,24 +324,24 @@ describe('heading normalisation: section embed (relative)', () => {
   it('section embed normalises headings relative to the embedding file depth', () => {
     // Embedding context: root (depth 0), so section headings start at depth 1
     const files = {
-      'index.md': '![[1.3.2 Magic.md#Body Magic]]',
-      '1.3.2 Magic.md': '# Magic\n\n## Body Magic\n\n### Spells\n\nContent.',
+      'index.md': '![[1.3.2 Magic.md#Leaf Craft]]',
+      '1.3.2 Magic.md': '# Magic\n\n## Leaf Craft\n\n### Spells\n\nContent.',
     };
     const result = compile(files, 'index.md');
     // US-6.3 | AC-7 (OD-3): root is depth 0 with no heading above the embed,
     // so the section's shallowest heading moves UP to depth 1.
-    assert.match(result.content, /^# Body Magic$/m, 'section heading at embedding_depth+1');
+    assert.match(result.content, /^# Leaf Craft$/m, 'section heading at embedding_depth+1');
     assert.match(result.content, /^## Spells$/m);
   });
 
   it('same section embedded from a depth-2 file lands at depth 3', () => {
     const files = {
       'index.md': '![[1.2 Rules.md]]',
-      '1.2 Rules.md': '# Rules\n\n![[1.3.2 Magic.md#Body Magic]]',
-      '1.3.2 Magic.md': '# Magic\n\n## Body Magic\n\n### Spells\n\nContent.',
+      '1.2 Rules.md': '# Rules\n\n![[1.3.2 Magic.md#Leaf Craft]]',
+      '1.3.2 Magic.md': '# Magic\n\n## Leaf Craft\n\n### Spells\n\nContent.',
     };
     const result = compile(files, 'index.md');
-    assert.match(result.content, /^### Body Magic/m);
+    assert.match(result.content, /^### Leaf Craft/m);
     assert.match(result.content, /^#### Spells/m);
   });
 });

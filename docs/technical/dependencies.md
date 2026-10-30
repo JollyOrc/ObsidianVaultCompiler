@@ -70,7 +70,7 @@ into `main.js`. It should avoid external runtime dependencies where possible.
   (`codeberg.org/devurandom/text-mapper.js`; AGPL-3.0-or-later with CC-BY-SA-4.0
   and CC0-1.0 parts) and four terrain files, and rendered through Node's `fs`
   with temp files (desktop only). Its maps had a cream background, no hex
-  outlines, a serif font and labels like `Ice Armour|Ice Armour`. Removed in
+  outlines, a serif font and labels like `Fog Mantle|Fog Mantle`. Removed in
   v0.14.0 (T-4.2-B); US-4.3 (bundled fallback parser) was withdrawn.
 - Option B of ADR-011 (external Node rendering) stays rejected.
 

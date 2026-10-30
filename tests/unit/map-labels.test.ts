@@ -79,7 +79,7 @@ const H0402 = { cx: 600, cy: 346.4, num: '0402' };
 
 describe('US-4.9 AC-1: hex numbers are removed', () => {
   it('removes the coordinates group and every hex number in it', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Ice Crystal' }, { cx: 750, cy: 433, num: '0503', label: 'Flame' }]);
+    const svg = pluginSvg([{ ...H0402, label: 'Fog Lantern' }, { cx: 750, cy: 433, num: '0503', label: 'Flame' }]);
     const out = tidyMapLabels(svg, ID, measure, false).svg;
     assert.doesNotMatch(out, /coordinates-/);
     assert.doesNotMatch(out, />0402</);
@@ -87,7 +87,7 @@ describe('US-4.9 AC-1: hex numbers are removed', () => {
   });
 
   it('keeps hexes, outlines and labels', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Ice Crystal' }]);
+    const svg = pluginSvg([{ ...H0402, label: 'Fog Lantern' }]);
     const out = tidyMapLabels(svg, ID, measure, false).svg;
     assert.match(out, /<polygon fill="#a4f0ff" stroke="black" stroke-width="3"/);
     assert.equal(labelTexts(out).length, 2, 'glow and label');
@@ -96,7 +96,7 @@ describe('US-4.9 AC-1: hex numbers are removed', () => {
 
 describe('US-4.9 AC-2: labels are centred on the hex', () => {
   it('one line: y moves from centre + 69.3 to the centre, x stays', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Ice Crystal' }]), ID, measure, false).svg;
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Fog Lantern' }]), ID, measure, false).svg;
     for (const t of labelTexts(out)) {
       assert.equal(t.y ?? t.tspanY[0], '346.4');
       assert.match(t.attrs + t.plain, /x="600.0"/);
@@ -104,7 +104,7 @@ describe('US-4.9 AC-2: labels are centred on the hex', () => {
   });
 
   it('keeps font-size, dy, text-anchor and the glow stroke', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Ice Crystal' }]), ID, measure, false).svg;
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Fog Lantern' }]), ID, measure, false).svg;
     const [glow, label] = labelTexts(out);
     assert.ok(glow.glow && !label.glow);
     for (const t of [glow, label]) {
@@ -116,7 +116,7 @@ describe('US-4.9 AC-2: labels are centred on the hex', () => {
   });
 
   it('two lines at 20pt: line height 32, y 330.4 and 362.4', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Limb Regeneration' }]), ID, measure, false).svg;
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Moss Germinations' }]), ID, measure, false).svg;
     for (const t of labelTexts(out)) {
       assert.deepEqual(t.tspanY, ['330.4', '362.4']);
       assert.deepEqual(t.tspanX, ['600.0', '600.0']);
@@ -131,24 +131,24 @@ describe('US-4.9 AC-2: labels are centred on the hex', () => {
 });
 
 describe('US-4.9 AC-3: line breaks at spaces', () => {
-  it('Limb Regeneration → Limb / Regeneration, in glow and label alike', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Limb Regeneration' }]), ID, measure, false).svg;
+  it('Moss Germinations → Moss / Germinations, in glow and label alike', () => {
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Moss Germinations' }]), ID, measure, false).svg;
     const texts = labelTexts(out);
     assert.equal(texts.length, 2);
-    for (const t of texts) assert.deepEqual(t.lines, ['Limb', 'Regeneration']);
+    for (const t of texts) assert.deepEqual(t.lines, ['Moss', 'Germinations']);
   });
 
   it('a label that fits stays one line', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Ice Crystal' }]), ID, measure, false).svg;
-    for (const t of labelTexts(out)) assert.ok(t.lines.length <= 1 && /Ice Crystal/.test(t.plain));
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Fog Lantern' }]), ID, measure, false).svg;
+    for (const t of labelTexts(out)) assert.ok(t.lines.length <= 1 && /Fog Lantern/.test(t.plain));
   });
 
-  it('words fill a line while it fits: Above the Elements → Above the / Elements', () => {
-    assert.deepEqual(breakLabel('Above the Elements', 160, t => measure(t, 26.67)).lines, ['Above the', 'Elements']);
+  it('words fill a line while it fits: Under the Brambles → Under the / Brambles', () => {
+    assert.deepEqual(breakLabel('Under the Brambles', 160, t => measure(t, 26.67)).lines, ['Under the', 'Brambles']);
   });
 
   it('a trailing space in the label (as written in the vault) adds no empty line', () => {
-    assert.deepEqual(breakLabel('Ice Armour ', 160, t => measure(t, 26.67)).lines, ['Ice Armour']);
+    assert.deepEqual(breakLabel('Fog Mantle ', 160, t => measure(t, 26.67)).lines, ['Fog Mantle']);
   });
 
   it('pointy-top lines are at most 138.6 wide', () => {
@@ -161,7 +161,7 @@ describe('US-4.9 AC-3: line breaks at spaces', () => {
 
   it('a label with its own size is measured and spaced at that size', () => {
     const calls: number[] = [];
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Limb Regeneration', size: '15pt' }]), ID,
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Moss Germinations', size: '15pt' }]), ID,
       (t, size) => { calls.push(size); return measure(t, size); }, false).svg;
     assert.ok(calls.every(s => Math.abs(s - 20) < 0.01), `sizes measured: ${calls}`);
     // 15pt = 20 units; 17 chars × 9.6 = 163.2 > 160 → two lines;
@@ -173,26 +173,26 @@ describe('US-4.9 AC-3: line breaks at spaces', () => {
 describe('US-4.9 AC-4: words wider than a line are hyphenated', () => {
   const m = (t: string) => measure(t, 26.67);
 
-  it('Inconvenience → Inconvenien- / ce (longest prefix that fits with its hyphen)', () => {
-    assert.deepEqual(breakLabel('Inconvenience', 160, m).lines, ['Inconvenien-', 'ce']);
+  it('Unpredictable → Unpredictab- / le (longest prefix that fits with its hyphen)', () => {
+    assert.deepEqual(breakLabel('Unpredictable', 160, m).lines, ['Unpredictab-', 'le']);
   });
 
   it('a word with & breaks after it, without a hyphen', () => {
-    assert.deepEqual(breakLabel('Repair&Manipulate', 160, m).lines, ['Repair&', 'Manipulate']);
+    assert.deepEqual(breakLabel('Polish&Transplant', 160, m).lines, ['Polish&', 'Transplant']);
   });
 
   it('a word with - breaks after it, without a second hyphen', () => {
     assert.deepEqual(breakLabel('Spell-breaker', 160, m).lines, ['Spell-', 'breaker']);
   });
 
-  it('a word that fits is not hyphenated (Regeneration, 153.6)', () => {
-    assert.deepEqual(breakLabel('Regeneration', 160, m).lines, ['Regeneration']);
+  it('a word that fits is not hyphenated (Germinations, 153.6)', () => {
+    assert.deepEqual(breakLabel('Germinations', 160, m).lines, ['Germinations']);
   });
 
   it('keeps at least 2 characters on the second line', () => {
     // 13 letters do not fit; the longest prefix with hyphen is 11 + "-",
     // which leaves 2 letters for the second line.
-    const lines = breakLabel('Inconveniencx', 160, m).lines;
+    const lines = breakLabel('Unpredictablx', 160, m).lines;
     assert.ok(lines[lines.length - 1].length >= 2, lines.join('|'));
   });
 
@@ -222,45 +222,45 @@ describe('US-4.9 AC-4: words wider than a line are hyphenated', () => {
 
   it('& is measured unescaped and written escaped', () => {
     const seen: string[] = [];
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Repair&Manipulate' }]), ID,
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Polish&Transplant' }]), ID,
       (t, size) => { seen.push(t); return measure(t, size); }, false).svg;
     assert.ok(seen.some(t => t.includes('&') && !t.includes('&amp;')));
-    for (const t of labelTexts(out)) assert.deepEqual(t.lines, ['Repair&amp;', 'Manipulate']);
+    for (const t of labelTexts(out)) assert.deepEqual(t.lines, ['Polish&amp;', 'Transplant']);
   });
 });
 
 describe('US-4.9 AC-5: linked labels keep their link', () => {
   it('the <a href> stays around the label text, the glow stays outside it', () => {
-    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Limb Regeneration', link: 'Limb regeneration' }]), ID, measure, false).svg;
-    assert.match(out, /<a [^>]*href="Limb regeneration"[^>]*><text\b[^>]*>(?:<tspan[^>]*>[^<]*<\/tspan>){2}<\/text><\/a>/);
+    const out = tidyMapLabels(pluginSvg([{ ...H0402, label: 'Moss Germinations', link: 'Moss germinations' }]), ID, measure, false).svg;
+    assert.match(out, /<a [^>]*href="Moss germinations"[^>]*><text\b[^>]*>(?:<tspan[^>]*>[^<]*<\/tspan>){2}<\/text><\/a>/);
     assert.match(out, /<g><text\b[^>]*stroke="white"[^>]*>(?:<tspan[^>]*>[^<]*<\/tspan>){2}<\/text><a /);
   });
 });
 
 describe('US-4.9 AC-6: unknown structure is left alone', () => {
   it('no labels group: the map keeps its labels as drawn, and the step is reported', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Ice Crystal' }], { withLabels: false });
+    const svg = pluginSvg([{ ...H0402, label: 'Fog Lantern' }], { withLabels: false });
     const r = tidyMapLabels(svg, ID, measure, false);
     assert.deepEqual(r.skipped, ['labels']);
     assert.doesNotMatch(r.svg, /coordinates-/, 'the other step still runs');
   });
 
   it('no coordinates group: reported, labels still tidied', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Limb Regeneration' }], { withCoords: false });
+    const svg = pluginSvg([{ ...H0402, label: 'Moss Germinations' }], { withCoords: false });
     const r = tidyMapLabels(svg, ID, measure, false);
     assert.deepEqual(r.skipped, ['coordinates']);
     assert.ok(labelTexts(r.svg).every(t => t.lines.length === 2));
   });
 
   it('a labels group whose entries do not have the expected shape is left unchanged', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Limb Regeneration' }]).replace('<g><text', '<g><circle r="1"/><text');
+    const svg = pluginSvg([{ ...H0402, label: 'Moss Germinations' }]).replace('<g><text', '<g><circle r="1"/><text');
     const r = tidyMapLabels(svg, ID, measure, false);
     assert.deepEqual(r.skipped, ['labels']);
     assert.match(r.svg, /y="415.7"/);
   });
 
   it('maps written with `option global` (ids without the map id) are recognised', () => {
-    const svg = pluginSvg([{ ...H0402, label: 'Limb Regeneration' }], { id: '' });
+    const svg = pluginSvg([{ ...H0402, label: 'Moss Germinations' }], { id: '' });
     const r = tidyMapLabels(svg, ID, measure, false);
     assert.deepEqual(r.skipped, []);
     assert.doesNotMatch(r.svg, />0402</);

@@ -16,7 +16,7 @@ import { splitFrontmatter } from '../../plugin/src/utils.ts';
 
 describe('US-5.2 frontmatter rule: splitFrontmatter', () => {
   it('removes a tags block and reports its line count', () => {
-    const r = splitFrontmatter('---\ntags:\n  - ElementalMagic\n  - Wizardry\n---\nSpell text.');
+    const r = splitFrontmatter('---\ntags:\n  - SeasonalCharms\n  - Wizardry\n---\nSpell text.');
     assert.deepEqual(r, { body: 'Spell text.', lines: 5 });
   });
 

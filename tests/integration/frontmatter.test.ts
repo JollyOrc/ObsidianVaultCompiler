@@ -26,24 +26,24 @@ function lines(content: string): string[] {
   return content.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
 }
 
-const ICE = '---\ntags:\n  - ElementalMagic\n  - Wizardry\n---\nSpell text.';
+const ICE = '---\ntags:\n  - SeasonalCharms\n  - Wizardry\n---\nSpell text.';
 
 describe('US-5.2 AC-2: preamble note with frontmatter', () => {
   it('toggle on: title, then the text; no YAML', () => {
-    const r = compile({ 'index.md': '![[Ice Crystal.md]]', 'Ice Crystal.md': ICE }, 'index.md', true);
-    assert.deepEqual(lines(r.content), ['# Ice Crystal', 'Spell text.']);
+    const r = compile({ 'index.md': '![[Fog Lantern.md]]', 'Fog Lantern.md': ICE }, 'index.md', true);
+    assert.deepEqual(lines(r.content), ['# Fog Lantern', 'Spell text.']);
   });
 
   it('toggle off: US-6.1 heading, then the text; no YAML', () => {
-    const r = compile({ 'index.md': '![[Ice Crystal.md]]', 'Ice Crystal.md': ICE }, 'index.md', false);
-    assert.deepEqual(lines(r.content), ['## Ice Crystal', 'Spell text.']);
+    const r = compile({ 'index.md': '![[Fog Lantern.md]]', 'Fog Lantern.md': ICE }, 'index.md', false);
+    assert.deepEqual(lines(r.content), ['## Fog Lantern', 'Spell text.']);
   });
 
   for (const normalise of [true, false]) {
     it(`toggle ${normalise ? 'on' : 'off'}: no tags:, tag value or --- in the output`, () => {
-      const r = compile({ 'index.md': '![[Ice Crystal.md]]', 'Ice Crystal.md': ICE }, 'index.md', normalise);
+      const r = compile({ 'index.md': '![[Fog Lantern.md]]', 'Fog Lantern.md': ICE }, 'index.md', normalise);
       assert.doesNotMatch(r.content, /tags:/);
-      assert.doesNotMatch(r.content, /ElementalMagic/);
+      assert.doesNotMatch(r.content, /SeasonalCharms/);
       assert.doesNotMatch(r.content, /^---/m);
     });
   }
@@ -97,24 +97,24 @@ describe('US-5.2 AC-5: pass-through wrapper with frontmatter (US-6.5)', () => {
 
 describe('US-5.2 AC-6: section embed of a note with frontmatter (US-6.3 AC-7)', () => {
   const files = {
-    'index.md': '![[M.md#Body Magic]]',
-    'M.md': '---\ntags: [magic]\n---\n# Magic\n## Body Magic\n### Spells',
+    'index.md': '![[M.md#Leaf Craft]]',
+    'M.md': '---\ntags: [magic]\n---\n# Magic\n## Leaf Craft\n### Spells',
   };
 
   it('toggle on: the section moves to h1', () => {
-    assert.deepEqual(lines(compile(files, 'index.md', true).content), ['# Body Magic', '## Spells']);
+    assert.deepEqual(lines(compile(files, 'index.md', true).content), ['# Leaf Craft', '## Spells']);
   });
 
   it('toggle off: the section as written', () => {
-    assert.deepEqual(lines(compile(files, 'index.md', false).content), ['## Body Magic', '### Spells']);
+    assert.deepEqual(lines(compile(files, 'index.md', false).content), ['## Leaf Craft', '### Spells']);
   });
   for (const normalise of [true, false]) {
     it(`toggle ${normalise ? 'on' : 'off'}: a YAML comment with the anchor text is not the section`, () => {
       const r = compile({
-        'index.md': '![[M.md#Body Magic]]',
-        'M.md': '---\n# Body Magic\ntags: [magic]\n---\n# Magic\n## Body Magic\n### Spells',
+        'index.md': '![[M.md#Leaf Craft]]',
+        'M.md': '---\n# Leaf Craft\ntags: [magic]\n---\n# Magic\n## Leaf Craft\n### Spells',
       }, 'index.md', normalise);
-      assert.deepEqual(lines(r.content), normalise ? ['# Body Magic', '## Spells'] : ['## Body Magic', '### Spells']);
+      assert.deepEqual(lines(r.content), normalise ? ['# Leaf Craft', '## Spells'] : ['## Leaf Craft', '### Spells']);
       assert.doesNotMatch(r.content, /tags:/);
     });
   }
@@ -222,7 +222,7 @@ describe('US-5.2 AC-12: warning lines count the frontmatter', () => {
 
 describe('US-5.2 AC-13: the in-memory source is not changed', () => {
   it('the file map passed in is equal before and after a compile', () => {
-    const files = { 'index.md': '---\na: 1\n---\n![[Ice Crystal.md]]', 'Ice Crystal.md': ICE };
+    const files = { 'index.md': '---\na: 1\n---\n![[Fog Lantern.md]]', 'Fog Lantern.md': ICE };
     const before = JSON.stringify(files);
     compile(files, 'index.md', true);
     compile(files, 'index.md', false);

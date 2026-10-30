@@ -298,11 +298,11 @@ describe('heading-anchored embed: integration with surrounding content', () => {
 describe('URL-encoded heading anchors', () => {
   it('wiki embed with %20-encoded anchor resolves to correct section', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nSpell content here.\n\n## Other\n\nOther content.',
-      'index.md': '![[notes.md#Body%20Magic]]',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nSpell content here.\n\n## Other\n\nOther content.',
+      'index.md': '![[notes.md#Leaf%20Craft]]',
     };
     const result = new InMemoryVaultCompiler(files).compile('index.md');
-    assert.ok(result.content.includes('Body Magic'), 'heading preserved');
+    assert.ok(result.content.includes('Leaf Craft'), 'heading preserved');
     assert.ok(result.content.includes('Spell content here'), 'section body included');
     assert.ok(!result.content.includes('Other content'), 'other section excluded');
     assert.strictEqual(result.warnings.length, 0, 'no warnings');
@@ -310,8 +310,8 @@ describe('URL-encoded heading anchors', () => {
 
   it('wiki embed with %20-encoded anchor does not produce missing-anchor warning', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nContent.',
-      'index.md': '![[notes.md#Body%20Magic]]',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nContent.',
+      'index.md': '![[notes.md#Leaf%20Craft]]',
     };
     const result = new InMemoryVaultCompiler(files).compile('index.md');
     assert.strictEqual(result.warnings.length, 0);
@@ -319,11 +319,11 @@ describe('URL-encoded heading anchors', () => {
 
   it('markdown embed with %20-encoded anchor resolves to correct section', () => {
     const files = {
-      'notes.md': '# Main\n\n## Body Magic\n\nSpell content here.\n\n## Other\n\nOther content.',
-      'index.md': '![](notes.md#Body%20Magic)',
+      'notes.md': '# Main\n\n## Leaf Craft\n\nSpell content here.\n\n## Other\n\nOther content.',
+      'index.md': '![](notes.md#Leaf%20Craft)',
     };
     const result = new InMemoryVaultCompiler(files).compile('index.md');
-    assert.ok(result.content.includes('Body Magic'), 'heading preserved');
+    assert.ok(result.content.includes('Leaf Craft'), 'heading preserved');
     assert.ok(result.content.includes('Spell content here'), 'section body included');
     assert.ok(!result.content.includes('Other content'), 'other section excluded');
     assert.strictEqual(result.warnings.length, 0, 'no warnings');
