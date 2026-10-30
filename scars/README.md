@@ -44,6 +44,7 @@ Each SCAR covers:
 | [SCAR-026](SCAR-026-path-setting-not-classified-before-write.md) | A path from the user is joined as text, and the write lands somewhere nobody chose | Data safety / Specification | High |
 | [SCAR-027](SCAR-027-input-classified-before-its-header-is-removed.md) | A file is classified by its first line before its metadata header is removed | Specification / Verification | Medium |
 | [SCAR-028](SCAR-028-real-data-as-test-data.md) | Real user data serves as the development and test data | Process / Data protection | High |
+| [SCAR-029](SCAR-029-licence-fixed-in-the-build-not-in-shipped-artifacts.md) | A licence conflict is fixed in the build, but the artifacts already shipped keep it | Process / Licensing | High |
 
 ## Recurring themes
 
@@ -160,6 +161,11 @@ change the result.
 Measure on real data, keep only the numbers; build fixtures and story
 examples with invented words of the same shape; no build file points into a
 data folder; a forbidden-word check guards anything published.
+
+**Licences of what is shipped** (SCAR-029)
+Check a dependency's licence before it is bundled; when one is removed for
+licence reasons, withdraw every artifact that already carries it; check
+bundles and archives by their contents; a copy keeps its notice.
 
 **Shared code underdocumented** (SCAR-001)
 A utility's secondary transforms (not just its primary purpose) must be

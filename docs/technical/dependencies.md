@@ -72,6 +72,9 @@ into `main.js`. It should avoid external runtime dependencies where possible.
   with temp files (desktop only). Its maps had a cream background, no hex
   outlines, a serif font and labels like `Fog Mantle|Fog Mantle`. Removed in
   v0.14.0 (T-4.2-B); US-4.3 (bundled fallback parser) was withdrawn.
+  The release zips v0.10.0 to v0.13.0, which carried that package, were
+  withdrawn on 2026-10-30 (#89, SCAR-029): the Unlicense cannot carry AGPL
+  or CC-BY-SA code. Since v0.14.0 `main.js` is built from `plugin/src` only.
 - Option B of ADR-011 (external Node rendering) stays rejected.
 
 ## 5. Cache and state
