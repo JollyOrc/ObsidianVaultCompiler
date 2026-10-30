@@ -332,8 +332,14 @@ Required assertions:
 
 ## 6. Manual smoke tests in Obsidian
 
-1. Install the plugin in a test vault with the Text Mapper plugin (id
-   `text-mapper`) enabled.
+Vault: `tests/fixtures/basic-vault/` (since 2026-10-30; the former example
+vault held real data and was removed, SCAR-028). `npm run build` deploys the
+plugin there; set the output folder to `Export` (ignored by git) so no
+compiled file lands beside the fixture notes, which the fixture integration
+test reads.
+
+1. Open the fixture vault in Obsidian with the plugin and the Text Mapper
+   plugin (id `text-mapper`) enabled.
 2. Choose `index2compile.md` and run compilation.
 3. Verify the master file opens without errors.
 4. Verify generated assets are visible to Obsidian.
@@ -385,10 +391,11 @@ npm run build              # typecheck → lint → test → bundle → deploy �
 `npm run build` stops at the first failing step, so a type error, a lint error
 or a failing test leaves `main.js`, the deployed copy in the example vault and
 `releases/` unchanged (proven 2026-10-27 with a deliberately failing test,
-T-7.1-B). `deploy` copies `main.js` and `styles.css` into
-`Example Vault/.obsidian/plugins/obsidian-vault-compiler/`;
-`plugin/manifest.json` is a symlink to the manifest in that folder, so the
-version Obsidian shows is always the one just built (SCAR-012).
+T-7.1-B). `deploy` (`plugin/deploy.mjs`) copies `main.js`, `manifest.json`
+and `styles.css` into
+`tests/fixtures/basic-vault/.obsidian/plugins/obsidian-vault-compiler/`, or
+into `OBSIDIAN_PLUGIN_DIR` when set, so the version Obsidian shows is always
+the one just built (SCAR-012).
 
 Release is blocked if any command exits non-zero or any manual smoke test fails.
 Record the test count in the release notes (SCAR-006).
@@ -426,7 +433,11 @@ sans-serif as in Obsidian, no notice (so Obsidian lets the compiler read
 Inter's font file); `Georgia, sans` → Georgia, with 10 new PNGs keyed
 `2e33eefc` in the same output folder; no errors.
 
-Example vault `Example Vault`, Text Mapper v1.1.0 enabled.
+Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
+A rerun needs a fixture with several maps:
+[#86](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/86).
+
+Text Mapper v1.1.0 enabled.
 
 1. Settings → Community plugins: Vault Compiler shows **0.14.0**. If not,
    stop: the old build is loaded (reload Obsidian).
@@ -457,7 +468,8 @@ Example vault `Example Vault`, Text Mapper v1.1.0 enabled.
 
 Result 2026-10-27: all steps passed (reported by the user).
 
-Vault `Example Vault`, Text Mapper v1.1.0 enabled, "Map font" empty.
+Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
+Text Mapper v1.1.0 enabled, "Map font" empty.
 
 1. The plugin list shows **0.15.0**.
 2. Settings: "Tidy map labels" is on. Compile into `Export`.

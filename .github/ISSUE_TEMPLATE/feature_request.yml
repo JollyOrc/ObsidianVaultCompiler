@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new behaviour or a change to an existing one.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Behaviour is specified as user stories with concrete examples
+        (`docs/user-stories/userstories.md`). An example of the notes you have
+        and the compiled output you want makes a request much easier to accept.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do, and what stops you today?
+      placeholder: I want … so that … Today the compiled document …
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example — notes and the output you want
+      description: A few short notes and the compiled output you expect from them. Include a nested case if it matters (a note embedded in an embedded note).
+      placeholder: |
+        Notes:
+        index2compile.md: - [[Spells]]
+        Spells.md: ...
+
+        Wanted output:
+        # Spells
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: input
+    id: story
+    attributes:
+      label: Related user story (if you know it)
+      placeholder: US-1.3

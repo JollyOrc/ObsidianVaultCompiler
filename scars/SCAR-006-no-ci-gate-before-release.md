@@ -35,5 +35,6 @@ failing — covering features that were considered delivered.
   trust in the suite.
 - Record the pass count in release notes ("360/360 tests passing"). This
   creates an auditable baseline and makes regressions immediately visible.
-- Do not accumulate "will fix later" without a ticket. If it is worth fixing,
+- Do not accumulate "will fix later" without a ticket (in this project: a
+  GitHub issue). If it is worth fixing,
   it is worth tracking. If it is not worth tracking, it is not worth deferring.

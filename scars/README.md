@@ -43,6 +43,7 @@ Each SCAR covers:
 | [SCAR-025](SCAR-025-rendered-output-inspected-too-small.md) | Rendered output is inspected too small to see its defects | Verification | Low |
 | [SCAR-026](SCAR-026-path-setting-not-classified-before-write.md) | A path from the user is joined as text, and the write lands somewhere nobody chose | Data safety / Specification | High |
 | [SCAR-027](SCAR-027-input-classified-before-its-header-is-removed.md) | A file is classified by its first line before its metadata header is removed | Specification / Verification | Medium |
+| [SCAR-028](SCAR-028-real-data-as-test-data.md) | Real user data serves as the development and test data | Process / Data protection | High |
 
 ## Recurring themes
 
@@ -154,6 +155,11 @@ List the parts of a file format that are not content (frontmatter, BOM),
 remove them once at read time before every rule, keep one reader guarded by a
 text check, and test each classification with a header whose look-alikes would
 change the result.
+
+**Synthetic data only** (SCAR-028)
+Measure on real data, keep only the numbers; build fixtures and story
+examples with invented words of the same shape; no build file points into a
+data folder; a forbidden-word check guards anything published.
 
 **Shared code underdocumented** (SCAR-001)
 A utility's secondary transforms (not just its primary purpose) must be

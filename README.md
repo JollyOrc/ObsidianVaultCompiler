@@ -88,6 +88,21 @@ Other commands (run in `plugin/`): `npm test`, `npm run test:unit`,
 | Tidy map labels | Leave out hex numbers, centre labels and break long labels into lines. |
 | Normalise headings | Set heading levels from numbered file names and nest all headings. |
 
+## Bugs, ideas and contributions
+
+Please use [GitHub Issues](https://github.com/JollyOrc/ObsidianVaultCompiler/issues):
+
+- **Bug report** — something compiles wrong or the plugin fails. Include a
+  few short notes that show it, the output you expected and the output you
+  got.
+- **Feature request** — a new behaviour, best with example notes and the
+  compiled output you want.
+
+Every change starts from an issue: it is written into the user stories with
+examples, then tests, then code (see `CLAUDE.md`). Issues labelled
+`needs-decision` wait for the behaviour to be decided; comments with examples
+help there.
+
 ## Project documents
 
 - `docs/user-stories/userstories.md` — the specification: every behaviour as a
@@ -95,7 +110,8 @@ Other commands (run in `plugin/`): `npm test`, `npm run test:unit`,
 - `docs/technical/tests.md` — quality gates and what each test file covers.
 - `docs/technical/dependencies.md` — build and run-time dependencies.
 - `scars/` — lessons learned during development, written to be reusable.
-- `development/` — tickets and architecture decisions.
+- `development/` — architecture decisions and the archive of tickets from
+  before GitHub Issues (`development/tickets/README.md` maps them to issues).
 - `releases/` — release notes per version.
 - `CLAUDE.md`, `AGENTS.md` — the working rules this project was developed
   with, including AI-assisted development.

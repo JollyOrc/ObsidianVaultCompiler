@@ -1,0 +1,65 @@
+name: Bug report
+description: The compiled document, the assets or the plugin do something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A small example that shows the problem helps most:
+        a few short notes, what the compiled document should contain and what it
+        contains instead. Please remove anything private from notes and paths.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Settings → Community plugins → Obsidian Vault Compiler.
+      placeholder: "0.16.1"
+    validations:
+      required: true
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version and platform
+      placeholder: "1.7.4, macOS 15 (desktop)"
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings that matter
+      description: For example "Normalise headings" on/off, "Tidy map labels", output folder inside or outside the vault.
+  - type: textarea
+    id: input
+    attributes:
+      label: Notes that show the problem
+      description: File names and their content, as short as possible. Include the starting file.
+      placeholder: |
+        index2compile.md:
+        - [[1 Intro]]
+
+        1 Intro.md:
+        # Welcome
+        Some text.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected output
+      description: The part of the compiled document (or assets/warnings) you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual output
+      description: What you got instead, including lines from the warnings file if there is one.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed private content from the notes, paths and output above.
+          required: true

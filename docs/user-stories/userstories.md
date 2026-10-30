@@ -1113,6 +1113,7 @@ marked as not measured.
   `2 Intro.md`) give two headings with the same anchor, so a link to the second
   goes to the first. Measured 2026-10-27: no two prefixed notes in the vault
   share a title after the prefix is removed. Not decided; see SCAR-011.
+  Tracked in [#85](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/85).
 
 ### Known defects (found 2026-10-27)
 
@@ -1131,7 +1132,7 @@ marked as not measured.
   `[Fighting pool](#The%20Fighting%20and%20Success%20Pools)` are left as
   written, so they do not match the slugified anchor of the heading
   (`#grit`). 23 such links in the example vault (2026-10-27). Not decided;
-  touches US-2.3 and US-3.1.
+  touches US-2.3 and US-3.1. Tracked in [#83](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/83).
 
 ### US-6.6 Tidy empty lines in the compiled output
 **As a** reader  
@@ -1217,7 +1218,7 @@ are shown as ```` ``` ````):
 not know code blocks either — a list of links inside a code block can be
 expanded as a ToC (US-1.3), `![[…]]` inside a code block is embedded, and
 links inside code are converted (US-2.3). The book has no code blocks
-(measured 2026-10-27). Not fixed.
+(measured 2026-10-27). Not fixed; tracked in [#84](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/84).
 
 ## Epic 7 — Obsidian plugin delivery
 

@@ -1,5 +1,9 @@
 # Implementation Tickets — Obsidian Vault Compiler
 
+> **Archive — read only since 2026-10-30.** Every ticket below is now a GitHub
+> issue; new work goes to GitHub Issues. See [README.md](README.md) for the
+> ticket → issue map.
+
 This backlog converts `docs/user-stories/userstories.md` and the technical
 documentation into actionable implementation tickets. Ticket IDs mirror user
 story IDs where possible.
