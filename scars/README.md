@@ -153,6 +153,7 @@ Back up by full path with a checksum list, check it after every restore, stop
 the run on a failed check, and count a mutant only on a tree verified before
 and after it. A survivor is a finding about the tests (SCAR-023). The backup
 holds the state to return to: for a manual check, the state as handed over.
+After a manual check, `git status` comes first; commits stage files by name.
 
 **Paths from the user** (SCAR-026)
 Classify every user-given path before use, with a table of example values in

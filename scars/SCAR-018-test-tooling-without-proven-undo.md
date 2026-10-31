@@ -57,5 +57,16 @@ the restore is wrong, every later mutant tests something else, and the report
   M13): the preset note was backed up before the ticket added its
   `template:` line, so the backup could not serve the compare after the
   check; split into `before/` and `handover/`.
+- After a manual check, the first step back is `git status`: any change the
+  check left in the sources or fixtures (a test note, an added line) is shown
+  to the tester and set aside or restored before anything is committed. Stage
+  files by name, never with `git add -A` or `git add .`, and read the staged
+  list (`git diff --cached --stat`) before each commit. A publish step that
+  copies the working tree, not the commit, needs the same check before it
+  runs. Example (2026-10-31, Vault Compiler v0.17.1): an embed line and an
+  empty note left by the manual check went into a commit through
+  `git add -A`; the publish copy showed them, and they were taken out before
+  the push.
 - Applies next to: every mutation run, every scripted refactor, probe setups
-  that write into the project, install scripts, manual-check fixtures.
+  that write into the project, install scripts, manual-check fixtures,
+  commits and publishes after a manual check.
