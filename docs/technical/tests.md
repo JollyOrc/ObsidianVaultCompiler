@@ -565,7 +565,10 @@ version just built. Text Mapper v1.1.0 enabled, "Map font" empty.
 
 ### M16 — Map directives: no hex outlines, no label glow (v0.17.0)
 
-Not run yet. No step edits a note (CLAUDE.md agent rule 10); unknown words
+Result 2026-10-31: passed (reported by the user). One change asked for: the
+corner boxes get a white fill (fixture changed, step 4 updated).
+
+No step edits a note (CLAUDE.md agent rule 10); unknown words
 are covered by `map-directives-compiler.test.ts`. On the fixture vault from `Smoke/Smoke book.md`, Text Mapper
 v1.1.0 enabled, "Map font" empty, "Tidy map labels" on.
 
