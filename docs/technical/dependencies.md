@@ -58,9 +58,10 @@ into `main.js`. It should avoid external runtime dependencies where possible.
 |---|---|
 | Engine | `app.plugins.plugins['text-mapper']` (installed and enabled). Missing → placeholder per map and one notice (US-4.2 AC-5). |
 | Drawing | `processMarkdown(source, div, { docId, addChild })` on a `div` that is never attached; the plugin draws one `<svg>` into it at once. Read from the plugin's v1.1.0 `main.js`; to be confirmed in Obsidian by M14. |
-| Terrain | The plugin always adds its built-in Gnomeyland and Apocalypse definitions; `include` lines are ignored (US-4.6). |
+| Terrain | The plugin always adds its built-in Gnomeyland and Apocalypse definitions; `include` lines are ignored (US-4.6). They come *after* the map source and the last definition wins, so a map's own `default attributes`, `glow` and `label` lines, and types named like built-in ones (`red`), have no effect (measured 2026-10-31 in Node, SCAR-030). |
 | Changes to the plugin's SVG | Background `rect` removed (transparent PNG); `font-family` from the "Map font" setting or Obsidian's note font list (plus `sans-serif` when no generic family is listed) set on the root; the `@font-face` rules Obsidian defines for those families embedded as `data:` URLs in a `<style>` (US-4.2 AC-4, US-4.8). |
 | Tidy labels (US-4.9) | With "Tidy map labels" on, the compiler also removes the plugin's coordinates group and rewrites its label groups (centred, wrapped lines) in the returned SVG; it relies on the shape of Text Mapper v1.1.0's output and skips a map with a notice when that shape differs. |
+| Map directives (US-4.10, v0.17.0) | A map line `# vault-compiler: no-outlines no-glow` (a comment, which the plugin skips) makes the compiler remove the plugin's `regions-` group and the glow texts of `labels-` and `path-labels-` from the returned SVG; the same shape check and notice as for tidy labels. |
 | Fonts | Read once per compile from Obsidian's style sheets; files such as Inter's `public/fonts/*.woff2` are read with `fetch` (works inside Obsidian: M14 retest, 2026-10-27). PNG names carry a font key (US-4.8 AC-6). |
 | PNG | `XMLSerializer` → `<img>` → canvas → PNG, longer side 2048 px (US-4.4, US-4.5). No Node.js file access, no temp files; works on mobile. |
 | Licence | Nothing from the plugin is copied or bundled. |

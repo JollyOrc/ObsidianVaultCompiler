@@ -2,7 +2,7 @@
  * Smoke-book fixture tests (#86).
  *
  * `tests/fixtures/basic-vault/Smoke/` holds the synthetic notes the manual
- * smoke tests (docs/technical/tests.md §6, M14, M15) are run on in Obsidian.
+ * smoke tests (docs/technical/tests.md §6, M14, M15, M16) are run on in Obsidian.
  * These tests compile `Smoke/Smoke book.md` without Obsidian and check that
  * the fixture still shows every case those checks rely on, so a change to the
  * notes cannot silently remove one:
@@ -11,7 +11,8 @@
  *   - US-5.2 frontmatter, also in front of a heading
  *   - US-6.3 to US-6.5 numbered notes, a renamed first heading, a preamble
  *     note, a headingless note and a pass-through wrapper
- *   - US-4.x two maps (one `option horizontal`) become two PNG references
+ *   - US-4.x three maps (one `option horizontal`, one with US-4.10
+ *     directives) become three PNG references
  *
  * The fixture notes sit in a subfolder so the top-level fixture test
  * (fixture-vault.test.ts) is unaffected. Warnings are not asserted: every map
@@ -73,6 +74,7 @@ describe('smoke book — "Normalise headings" on', () => {
       '#### Rootbinder',       // no prefix: last original heading (h3) + 1
       '#### Fog Lantern',
       '# Seasonal Charms',     // US-6.5: "2 Charms" passes through at depth 1
+      '## Skill tree',         // US-4.10: map with directives; same level as Appendix
       '## Appendix',           // headingless, `[text](path)` item of a mixed list
       '### Glossary of the Vale', // `[text](path)` ToC list
       '### Map key',
@@ -115,10 +117,10 @@ for (const normaliseHeadings of [true, false]) {
       assert.doesNotMatch(result.content, /\[\[|\]\((?:Appendix|Glossary|Map%20key)/);
     });
 
-    it('US-4.x: both maps become distinct PNG references, no fence is left', () => {
+    it('US-4.x: all three maps become distinct PNG references, no fence is left', () => {
       const maps = [...result.content.matchAll(/\]\((assets\/textmapper\/[^)]+\.png)\)/g)].map(m => m[1]);
-      assert.equal(maps.length, 2, maps.join(', '));
-      assert.notEqual(maps[0], maps[1]);
+      assert.equal(maps.length, 3, maps.join(', '));
+      assert.equal(new Set(maps).size, 3);
       assert.doesNotMatch(result.content, /```text-mapper/);
     });
 

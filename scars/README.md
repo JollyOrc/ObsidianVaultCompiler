@@ -45,6 +45,7 @@ Each SCAR covers:
 | [SCAR-027](SCAR-027-input-classified-before-its-header-is-removed.md) | A file is classified by its first line before its metadata header is removed | Specification / Verification | Medium |
 | [SCAR-028](SCAR-028-real-data-as-test-data.md) | Real user data serves as the development and test data | Process / Data protection | High |
 | [SCAR-029](SCAR-029-licence-fixed-in-the-build-not-in-shipped-artifacts.md) | A licence conflict is fixed in the build, but the artifacts already shipped keep it | Process / Licensing | High |
+| [SCAR-030](SCAR-030-dependency-defaults-applied-after-user-input.md) | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | Requirements / Integration | Medium |
 
 ## Recurring themes
 
@@ -59,7 +60,9 @@ inline wrappers (bold, links) as well as block containers (SCAR-002).
 **Process gaps let failures accumulate** (SCAR-003, SCAR-006)
 Without a gate that enforces "all ACs ticked" before merge and "tests green"
 before release, gaps and regressions compound silently across releases.
-Automation is the only reliable enforcement.
+Automation is the only reliable enforcement. A test that fails before the code
+has only proven the line it failed on; its later assertions are read again
+when the code first passes (SCAR-003).
 
 **Silent failures misread** (SCAR-008)
 An API that accepts the wrong argument without complaint produces empty
@@ -121,7 +124,8 @@ that adds a way to change a value finds every writer by grepping the value.
 **Guards that miss their criterion** (SCAR-023)
 A guard checks exactly its criterion, not less and not more: it counts the
 places it checked, matches the whole statement, uses inputs the real producer
-gives (every option value the real caller passes) and inputs on which the rule
+gives (every option value the real caller passes; fixtures taken from the
+producer's real output, in its serialised form) and inputs on which the rule
 and its rivals give different output, and is proven by a mutation check; a test that one side wins also
 shows the other side was in effect; before tickets, the tests are searched
 for guards that forbid a call the ticket adds.
@@ -129,7 +133,9 @@ for guards that forbid a call the ticket adds.
 **Statements about tools are measured** (SCAR-024)
 Every sentence in a story about what a dependency does is split into its
 parts, and each part has a test with the real tool, or is marked as not
-measured.
+measured. Where a tool merges the user's input with its own defaults, the
+merge order and which definition of a name wins are measured too; a line that
+parses may still have no effect (SCAR-030).
 
 **Visual output at reading size** (SCAR-025)
 A result judged by looking at it is inspected at its printed or reading size,

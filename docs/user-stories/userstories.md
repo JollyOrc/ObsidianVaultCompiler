@@ -608,8 +608,11 @@ confirmed in Obsidian by M15 the same day):
   `<text>` elements at `x = centre`, `y = centre + 69.3`: first the glow
   (`stroke="white" stroke-width="5pt"`), then the label; a label written
   `"Link|Label"` has its second `<text>` inside an `<a href="Link">`. Both
-  carry `font-size="20pt"` (26.7 units) and `dy="5px"` unless the map sets its
-  own label attributes or a size per label.
+  carry `font-size="20pt"` (26.7 units) and `dy="5px"` unless the label has
+  its own size (`"Moss" 14`). *(Corrected 2026-10-31, SCAR-030: it said "unless
+  the map sets its own label attributes or a size per label"; a map's own
+  `label …` line has no effect, because the plugin's Gnomeyland `label` line
+  comes after it — measured with the plugin's code in Node, see US-4.10.)*
 
 **Acceptance criteria**
 - **AC-1 Hex numbers removed.** The `coordinates-<map id>` group is removed
@@ -653,6 +656,14 @@ confirmed in Obsidian by M15 the same day):
 - **AC-6 Unknown structure.** If a map has no `coordinates-` or `labels-` group
   of the shape above (a different plugin version), that step is skipped for the
   map and one notice per compile says so; the map is never drawn half-changed.
+  - An empty group is the right shape, also as `XMLSerializer` writes it,
+    self-closed: a map without labels has `<g id="labels-<map id>"/>`;
+    nothing is tidied and nothing is reported. *(Added 2026-10-31: the
+    unit test used `<g id="labels-…"></g>`, which the serialiser never
+    writes, and the code reported such maps as "not tidied" — SCAR-023;
+    found while writing the tests for US-4.10. The serialiser's form comes
+    from the DOM serialisation rules and the plugin's code run in Node, not
+    measured in Obsidian.)*
 - **AC-7 Setting.** One toggle "Tidy map labels", on by default, switches
   AC-1 to AC-6 together; off gives the maps of v0.14.2 (OD-L1). Tests and the
   manual check cover both values.
@@ -678,6 +689,154 @@ confirmed in Obsidian by M15 the same day):
 widths, which depend on the map font — measured with the canvas in Obsidian at
 compile time. The examples' widths are illustrations for the rule, not
 measurements.
+
+### US-4.10 Map directives: no hex outlines, no label glow
+**As a** vault owner  
+**I want** to switch off, per map, the black hex outlines and the white glow
+behind labels in the compiled PNG  
+**So that** maps drawn in my own style (coloured outlines, symbols, a paper
+page behind them) — for example a skill tree of hex clusters — print without
+the plugin's black grid and white halos.
+
+*(Written 2026-10-31 after a prototype, see "Measured" below. Decisions OD-D1
+to OD-D3 taken the same day.)*
+
+Only the compiled PNG changes; the plugin is not modified, and the map in
+Obsidian stays as the plugin draws it (like US-4.9).
+
+What the plugin does (Text Mapper v1.1.0). **Measured 2026-10-31** by running
+the plugin's own `main.js` in Node with a minimal DOM stand-in, not in
+Obsidian:
+- The plugin appends Gnomeyland and Apocalypse *after* the map source, and the
+  last definition wins. So the map's own `default attributes …`, `glow …` and
+  `label …` lines have no effect: source
+  `default attributes fill="none" stroke="red" stroke-width="9"` /
+  `glow stroke="blue" stroke-width="1pt"` / `0101 "Moss"` still gives
+  `stroke="black" stroke-width="3"` outlines and a
+  `stroke="white" stroke-width="5pt"` glow. The same holds for a type the map
+  defines under a Gnomeyland name: `red attributes stroke="#c4574f"` is
+  replaced by Gnomeyland's debug type `red` (`fill="red" … scale(0.5)`).
+- Hex outlines: one `<g id="regions-<map id>">` with one
+  `<polygon fill="none" stroke="black" stroke-width="3" id="hex.X.Y-<map id>" points="…">`
+  per hex that has at least one type or label, drawn after the hex fills
+  (`backgrounds-`), paths (`paths-`) and symbols (`things-`), so it lies on top
+  of them.
+- Glow: every entry of `labels-<map id>` and of `path-labels-<map id>` is a
+  `<g>` holding first the glow `<text … stroke="white" stroke-width="5pt">`,
+  then the label `<text>`; a hex label written `"Link|Label"` has the label
+  `<text>` inside `<a href="Link">`, the glow outside it. A path label's two
+  texts each hold a `<textPath href="#path-N-<map id>">`.
+- A line that begins with `#` is skipped: the SVG for
+  `# vault-compiler: no-glow` / `0101 "Fog Lantern|Lantern"` equals the SVG
+  without the first line.
+
+**Acceptance criteria**
+- **AC-1 Directive line.** A line of the map source whose first character is
+  `#`, followed by optional spaces, `vault-compiler:` (letters in any case) and
+  a list of words separated by spaces, is a directive line. Words are compared
+  ignoring case. A map may have several directive lines anywhere in its
+  source; their words add up.
+  - `# vault-compiler: no-outlines no-glow` → both switches.
+  - `# vault-compiler: no-outlines` and, three lines later,
+    `#Vault-Compiler: NO-GLOW` → both switches.
+  - `  # vault-compiler: no-glow` (leading spaces) is not a directive line:
+    nothing is switched and nothing is reported.
+  - `# vault compiler: no-glow` (no hyphen) is an ordinary comment.
+- **AC-2 Unknown word.** A word other than `no-outlines` and `no-glow` is
+  ignored; the compile warns once per map block and word, in the report
+  (US-6.2) as `{ message: 'Map directive "no-outline" is unknown and was ignored',
+  link: 'no-outline', file: <note path>, line: 0 }` (line 0 like the other
+  map warnings). `no-outlines,no-glow` is one unknown word.
+  - `# vault-compiler: no-outline` / `# vault-compiler: no-outline` in one
+    block of `index2compile.md` → one warning.
+  - The same block in `a.md` and `b.md` → two warnings, one per file; the map
+    is still drawn once (US-4.7).
+  - `# vault-compiler:` with no words → nothing switched, no warning.
+- **AC-3 `no-outlines`.** The `regions-<map id>` group is removed with
+  everything in it; nothing else changes.
+  - Map `# vault-compiler: no-outlines` / `0101 skill-moss "Moss"` /
+    `0102 skill-moss "Fern"`: both `<polygon … stroke="black" stroke-width="3" id="hex.1.1-…">`
+    and `id="hex.1.2-…"` are gone; the `skill-moss` hex polygons in
+    `backgrounds-`, any symbols in `things-` and both labels stay.
+- **AC-4 `no-glow`.** In every entry of `labels-<map id>` and
+  `path-labels-<map id>`, the first `<text>` (the glow) is removed; the label
+  `<text>`, its `<a>` and its `<textPath>` stay.
+  - Hex `0101 "Moss"`: `<g><text … stroke="white" stroke-width="5pt">Moss</text><text …>Moss</text></g>`
+    → `<g><text …>Moss</text></g>`.
+  - Linked `0101 "Fog Lantern|Lantern"`: the glow `<text>` before the `<a>`
+    is removed; `<a href="Fog Lantern"><text …>Lantern</text></a>` stays.
+  - Path label `0101-0103 trail "Old Road"`: the `<text>` with
+    `stroke="white"` is removed; the second `<text><textPath href="#path-1-…">Old Road</textPath></text>`
+    stays.
+- **AC-5 Each switch alone.** The four combinations, map `0101 forest "Peak"`
+  plus a directive line:
+  - none → outline and glow (the PNG of today);
+  - `no-outlines` → glow kept, no outline;
+  - `no-glow` → outline kept, no glow;
+  - `no-outlines no-glow` → neither.
+- **AC-6 With "Tidy map labels" (US-4.9).** Tidying runs first, then
+  `no-glow`, so the label keeps its lines, position and `<tspan>`s.
+  - Tidy on, `no-glow`, label `"Moss Germinations"` (two lines, US-4.9 AC-3):
+    one `<text>` with `<tspan>Moss</tspan><tspan>Germinations</tspan>`, centred
+    on the hex; no glow `<text>`.
+  - Tidy off, `no-glow`: one `<text>` at the plugin's position
+    (`y = centre + 69.3`), one line.
+  - `no-outlines` does not depend on tidying: tidy on and off both lose the
+    `regions-` group.
+- **AC-7 Unknown structure.** If a switched-on step finds no group of the
+  shape above (a different plugin version): for `no-outlines`, no
+  `regions-<map id>` group; for `no-glow`, a `labels-`/`path-labels-` group
+  missing, or an entry whose first child is not a `<text>` with
+  `stroke="white"` — that step is skipped for the whole map (no glow removed
+  in that map, not some), and one notice per compile says
+  `Vault Compiler: map directive "no-glow" could not be applied; the map is drawn as the plugin made it.`
+  An empty group (a map without labels) is the right shape: nothing to remove,
+  no notice.
+- **AC-8 What stays.** The changes of US-4.2 AC-4 (background `<rect>`
+  removed, map font) and US-4.9 apply as before; a map without a directive
+  line gives the same PNG, byte for byte, as before this story.
+- **AC-9 PNG name.** No new key letter: the directive line is part of the map
+  source, so its content hash (US-4.1, US-4.8 AC-6) already differs from the
+  same map without it.
+  - `0101 forest "Peak"` and `# vault-compiler: no-glow` / `0101 forest "Peak"`
+    give two different PNG names; two maps with the same directive and
+    source share one PNG (US-4.7).
+- **AC-10 Map not drawn.** When TextMapper rendering is off or the plugin is
+  missing (US-4.1, US-4.2 AC-5), the block is kept with its directive line, as
+  every other line.
+- **AC-11** The map in Obsidian (reading and editing view) is unchanged
+  (measured in Node; to be confirmed in Obsidian by the manual check).
+
+**Fixture.** A new fixture note with a skill-tree map in invented words — one
+cluster of seven hexes in a custom type with a coloured outline, a checkbox
+and checkmark symbol, one linked label, one path label, and the directive
+`# vault-compiler: no-outlines no-glow` — and the existing `region-map.md`
+without directives, compiled together. Custom type names do not collide with
+Gnomeyland or Apocalypse names (see above).
+
+**Decisions (2026-10-31)**
+- **OD-D1:** a line in the map switches the edits on, per map — not a plugin
+  setting and not both. Measured before the choice: with both edits applied
+  to every map, the fixture's `region-map.md` loses its hex grid and the label
+  `Peak` is hard to read over the mountain symbol.
+- **OD-D2:** two switches, `no-outlines` and `no-glow`, not one "plain style".
+  The glow is what keeps a label readable over a symbol.
+- **OD-D3:** written as a `#` comment, `# vault-compiler: …`, not as
+  `option no-outlines`: the plugin skips comments, while a later plugin
+  version could give an `option` name a meaning of its own.
+
+**Measured (2026-10-31, prototype, in the scratchpad, not in the
+repository).** A cluster of seven hexes in a custom type with a filtered
+coloured outline, symbols for a checkbox, a checkmark, a watercolour splash and
+a small sub-label, rendered through the plugin's `main.js` in Node and drawn
+with `rsvg-convert`. With the plugin's outlines and glow it showed a black grid
+next to the coloured one and white halos; with both removed it matched the
+target design. Filters in the map need `option global`, because the plugin
+renames ids (`rough` → `rough-<map id>`) but not `url(#rough)` references.
+
+**Not measured yet:** all of the above inside Obsidian (SVG structure, the
+directive line in reading view), and SVG filters drawn through Obsidian's
+canvas (US-4.5).
 
 ## Epic 5 — Obsidian control commands
 

@@ -13,7 +13,7 @@ import {
   encodeAssetPath,
   normalizeAssetFilename,
 } from './utils.ts';
-import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef } from './textmapper.ts';
+import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 
 /**
  * Interface for an external renderer that can convert a text-mapper code block
@@ -448,6 +448,12 @@ export class InMemoryVaultCompiler {
         const assetRef = `${this.options.assetFolder}/textmapper/${filename}`;
         // Record the source so compileAsync can pass it to the renderer.
         this.textMapperSources.set(assetRef, code);
+        // US-4.10 | AC-2: one warning per block occurrence and unknown word.
+        for (const word of parseMapDirectives(code).unknown) {
+          const message = `Map directive "${word}" is unknown and was ignored`;
+          this.warnings.push(`Warning: ${message}`);
+          this.warningDetails.push({ message, link: word, file: path, line: 0 });
+        }
         return `![${alt}](${assetRef})`;
       });
     } else {

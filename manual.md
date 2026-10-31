@@ -429,6 +429,73 @@ changed):
   stay inside the hex. If one single word is too wide for its hex, a message
   tells you which map it is in.
 
+### Maps in your own style: no black outlines, no white glow
+
+Text Mapper draws a thin black outline around every hex and a white glow
+behind every name. For a map drawn in your own colours (a skill tree, for
+example) you can leave both out of the compiled picture. Put this line
+anywhere in the map:
+
+```
+# vault-compiler: no-outlines no-glow
+```
+
+- `no-outlines` leaves out the black hex outlines. Your own colours, symbols,
+  paths and names stay.
+- `no-glow` leaves out the white glow behind names (also names along paths).
+- You can use just one of the two words.
+- The line starts with `#`, so Text Mapper treats it as a comment: the map
+  inside Obsidian still shows the outlines and the glow. Only the compiled
+  picture changes. The line must start at the very beginning of the line,
+  with no spaces in front.
+- A misspelt word (`no-outline`) is ignored, and the warnings file lists it
+  with the note it is in.
+
+**Good to know when you style a map yourself:**
+
+- Writing your own `default attributes`, `glow` or `label` lines in the map
+  has no effect: Text Mapper adds its own after yours, and its own win. That
+  is why the line above exists.
+- Give your own hex types names Text Mapper doesn't use already. `red`,
+  `green` or `water` are taken; `skill-red` or `my-water` are safe.
+- If your map defines SVG filters (for rough, hand-drawn edges), add the line
+  `option global`, or the filters are not found.
+
+### Small boxes in the hex corners, with and without a tick
+
+A skill tree often has a small box in each hex to tick off. Add these two
+lines to the map, once:
+
+```
+<g id="box"><polygon points="74,-70 64,-53 44,-53 34,-70 44,-87 64,-87" fill="white" stroke="#4f7d4a" stroke-width="3"/></g>
+<g id="check"><path d="M 36,-80 L 50,-62 L 84,-106" fill="none" stroke="black" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g>
+```
+
+Each one must stay on a single line. The first defines `box`, a small white
+hex in the top-right corner; the second defines `check`, a tick over that
+corner. Then add the words to the hexes:
+
+```
+# vault-compiler: no-outlines no-glow
+skill-green attributes fill="none" stroke="#4f7d4a" stroke-width="6"
+0101 skill-green box "Climbing"
+0201 skill-green box check "Swimming"
+0102 skill-green "Running"
+```
+
+- `box` gives an empty box: *Climbing*.
+- `box check` gives a ticked box: *Swimming*.
+- Neither gives no box: *Running*.
+- Write `box` **before** `check`. Things are drawn in the order you write
+  them, so `check box` puts the white box over most of the tick.
+- The box covers the hex outline where they meet, like a label sticking out
+  of the corner.
+- Colours: `fill="white"` is the inside of the box and `stroke="#4f7d4a"` its
+  border; use your page colour (for example `fill="#efe6d6"`) if white stands
+  out too much. The tick's colour is its `stroke`.
+- These positions are for ordinary maps. Maps with `option horizontal` have
+  pointed tops, so the box would sit beside the corner, not on it.
+
 ---
 
 ## 10. Settings reference
@@ -504,6 +571,7 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | **Heading depth clamped** | A heading would be deeper than level 6, or a note was placed below its parent. | Usually fine; otherwise check the file-name numbering. |
 | **Circular dependency avoided** | Notes embed each other in a circle. | Remove one of the embeds. |
 | **TextMapper …** | A map couldn't be drawn. | See [section 9](#9-hex-maps-text-mapper). |
+| **Map directive "…" is unknown and was ignored** | A word in a `# vault-compiler:` line is misspelt. | Use `no-outlines` or `no-glow` (see [section 9](#9-hex-maps-text-mapper)). |
 
 ### Messages in the corner of the screen
 
@@ -517,6 +585,7 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | *Compilation failed: …* | Something went wrong; the message gives the reason. |
 | *… the Text Mapper plugin is not installed or enabled …* | Install or switch on Text Mapper to get map pictures. |
 | *… map font "…" could not be embedded …* | That font wasn't available; the next font in your list is used. |
+| *… map directive "…" could not be applied …* | Text Mapper drew a map differently than expected (perhaps a new version); that map keeps its outlines or glow. |
 
 ---
 

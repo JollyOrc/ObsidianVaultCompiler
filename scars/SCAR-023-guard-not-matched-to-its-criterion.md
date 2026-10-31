@@ -7,7 +7,7 @@
 
 ## What went wrong
 
-Four times a test did not match the criterion it named:
+Six times a test did not match the criterion it named:
 
 1. A guard over generated output read "the character after the call" with a
    pattern that does not match a line end; it checked 124 of 139 calls and
@@ -20,9 +20,16 @@ Four times a test did not match the criterion it named:
 4. A guard over the vault port forbade every `vault.process(` call although its
    criterion only said that export and preview never write presets; a later
    story's legitimate write turned the baseline red (US-022).
+5. A fixture wrote an empty SVG group as `<g id="labels-…"></g>`; the browser's
+   serialiser writes `<g id="labels-…"/>`, and the code reported every map
+   without labels as "not tidied" while the test passed (US-4.9, #91).
+6. A text check asserted that a call came after another and was not inside an
+   `if` block; a mutant that made the call's argument depend on the same
+   condition passed it (US-4.10, #92).
 
-The first three pass when the rule is broken; the fourth fails when nothing
-is wrong. (Gathered from SCAR-010, SCAR-017 and SCAR-018 on 2026-10-22.)
+Items 1 to 3, 5 and 6 pass when the rule is broken; item 4 fails when nothing
+is wrong. (Items 1 to 4 gathered from SCAR-010, SCAR-017 and SCAR-018 on
+2026-10-22; 5 and 6 added 2026-10-31.)
 
 ## Root cause
 
@@ -42,7 +49,11 @@ more blocks the next correct change.
   call (`if (group.heading !== null) { …setHeading() }`), not a name — and a
   drawing that a test fake can carry is tested by drawing it; when the fake
   cannot carry it, the fake is extended to follow the measured behaviour of
-  the real consumer.
+  the real consumer. Checking where a call is (after X, outside block Y) is
+  not checking the statement: match it whole, with its arguments, at the
+  nesting level the criterion asks for. Example (2026-10-31, US-4.10): the
+  check now matches `\n  const directives = applyMapDirectives(svg,
+  mapDocId(code), parseMapDirectives(code));` at function level.
 - Every test input is one the real producer can give (a list the store always
   sorts stays sorted) and is named for the branch it reaches. A surviving
   mutant is read first as a test input that cannot reach the mutated rule.
@@ -51,6 +62,14 @@ more blocks the next correct change.
   or `false`, and with `false` the auto-headings of US-6.1 never ran for any
   user. For an option, test every value the real caller can pass, not the
   value the test helper defaults to.
+- A fixture that stands in for a dependency's output is taken from that
+  output, in the exact form the real path produces it (after serialisation,
+  encoding, normalisation), not written by hand. Hand-written fixtures pick
+  the readable form, which may be one the producer never emits — empty
+  elements self-closed, attribute order, escaping, line endings. Example
+  (2026-10-31, US-4.10): the new fixtures are the plugin's own output, run
+  outside the app, serialised with self-closed empty elements; that is how
+  the defect of item 5 was found.
 - A test input must be able to tell the rule from its rivals. Example
   (2026-10-27, US-6.3): "the first heading is replaced by the filename" was
   tested only with notes whose first heading already equalled the filename

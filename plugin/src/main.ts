@@ -231,6 +231,7 @@ export default class VaultCompilerPlugin extends Plugin {
           new Notice('Vault Compiler: the Text Mapper plugin is not installed or enabled, so maps are left as placeholders.');
         }
         const skippedSteps = new Set<string>();
+        const skippedDirectives = new Set<string>();
         for (const ref of refs) {
           const hash = parseMapAssetRef(ref)?.hash;
           const code = hash ? blockMap.get(hash) : undefined;
@@ -246,6 +247,7 @@ export default class VaultCompilerPlugin extends Plugin {
           try {
             const tidy = await renderTextMapperBlock(this.app, code, destinationPath, writer, mapFont, this.settings.tidyMapLabels);
             tidy.skipped.forEach(step => skippedSteps.add(step));
+            tidy.skippedDirectives.forEach(directive => skippedDirectives.add(directive));
             if (tidy.unbreakable) {
               // US-4.9 | AC-4: once per map.
               const alt = result.content.match(new RegExp('!\\[([^\\]]*)\\]\\(' + this.escapeRegExp(ref) + '\\)'))?.[1] ?? ref;
@@ -265,6 +267,10 @@ export default class VaultCompilerPlugin extends Plugin {
             `Vault Compiler: some maps were not tidied (${[...skippedSteps].join(', ')}): ` +
             'the Text Mapper plugin drew them differently than expected.',
           );
+        }
+        for (const directive of skippedDirectives) {
+          // US-4.10 | AC-7: once per compile and directive.
+          new Notice(`Vault Compiler: map directive "${directive}" could not be applied; the map is drawn as the plugin made it.`);
         }
       }
 

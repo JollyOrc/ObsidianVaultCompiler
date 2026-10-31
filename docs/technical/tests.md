@@ -217,6 +217,47 @@ Tidy map labels (US-4.9, v0.15.0; `tests/unit/map-labels.test.ts`):
   (replaced by one that makes the map-id suffix mandatory); all caught.
 - Not testable here: the plugin's SVG inside Obsidian, real text widths and
   the look — manual check M15 (passed 2026-10-27).
+- Found 2026-10-31 (SCAR-023): the fixture writes an empty labels group as
+  `<g id="labels-…"></g>`; `XMLSerializer` writes `<g id="labels-…"/>`, and
+  the code reports such a map as not tidied. Test with the serialiser's form
+  in `tests/unit/map-directives.test.ts`; fixed in v0.17.0 (#91).
+
+Map directives (US-4.10, #92, v0.17.0; `tests/unit/map-directives.test.ts`,
+`tests/integration/map-directives-compiler.test.ts`):
+- Fixtures are the output of Text Mapper v1.1.0's own `main.js`, run in Node
+  with a DOM stand-in on 2026-10-31 and written in `XMLSerializer`'s form
+  (childless elements self-closed); only the `<defs>` library is cut. One
+  map holds a plain label, a linked label, a path label and a hex without a
+  label; a second map has no labels (empty, self-closed groups).
+- Covered: directive lines (AC-1: words together and on several lines, case,
+  spaces, leading spaces and a missing hyphen are no directive, a directive
+  inside a label); unknown words (AC-2: listed once per map, the comma case,
+  an empty list; the report entry per block and note, none when maps are off);
+  `no-outlines` removes exactly the `regions-` group (AC-3); `no-glow` removes
+  exactly the three glow texts and keeps `<a>` and `<textPath>` (AC-4); the
+  four combinations (AC-5); order with tidying, on and off, and a text check
+  that `renderTextMapperBlock` tidies, applies directives, then prepares
+  (AC-6); missing groups, a wrong first child, empty self-closed groups,
+  `option global` ids, the notice text (AC-7); no directive returns the SVG
+  unchanged and leaves the background rect to `prepareMapSvg` (AC-8); PNG
+  names (AC-9) and the kept block when maps are off (AC-10) — these two hold
+  today and guard it.
+- Written before the code: on 2026-10-31 each test that needed new code
+  failed for the missing function or warning only. With the code, one test
+  turned out wrong (it expected three glows after removing the labels group;
+  one is left) and was corrected.
+- Mutation check 2026-10-31: 13 mutants (self-closed groups, anchored and
+  case-insensitive directive lines, unknown words once, each switch, path
+  labels, the glow check, missing groups, outlines kept, directives only with
+  tidying, the warning's file, the notice text); one first survived —
+  directives applied only with tidying on — because the wiring check matched
+  call positions, not the statement (SCAR-023); it now matches the whole
+  statement at function level, and all 13 are caught.
+- Composed: the smoke book's `Skill tree.md` (see §5) compiles with the two
+  other maps into three distinct PNG references.
+- Not testable here: the plugin's SVG inside Obsidian, SVG filters through
+  Obsidian's canvas, the directive line in reading view (AC-11), and the
+  look — manual check M16.
 
 ### Epic 5 — Obsidian control commands
 - `meta-bind-embed`, `leaflet`, `calendarium` and `compressed-json` fences are
@@ -349,6 +390,7 @@ Every note name is unique in the vault (SCAR-012). Start note:
 | `Seasonal Charms.md` | flat-top map: long labels, `Polish&Transplant`, linked label `Rootbinder\|Mend a Bone`, green, pink and orange paths (US-4.2, US-4.8, US-4.9) |
 | `Appendix.md` | headingless; `[text](path)` ToC list, a section embed `![[1.1 Moving#Climbing]]` (US-1.2), `![[media.png]]` |
 | `Glossary of the Vale.md`, `Map key.md` | `Map key` holds a pointy-top map (`option horizontal`) |
+| `Skill tree.md` | map with `# vault-compiler: no-outlines no-glow` and `option global`: seven hexes of a custom type `skill-moss` with a filtered green outline, checkbox, checkmark, watercolour and `Dice` symbols, the linked label `Fog Lantern\|Lantern Lore`, the path label `Old Road`, the hyphenated label `Thorn-weaving Hands` (US-4.10, added 2026-10-31) |
 
 `tests/integration/smoke-vault.test.ts` compiles the smoke book with
 "Normalise headings" on and off and asserts the heading list, the
@@ -518,5 +560,34 @@ version just built. Text Mapper v1.1.0 enabled, "Map font" empty.
 5. Turn "Tidy map labels" off, compile again into `Export`: the maps look as
    in v0.14 (numbers on top, labels at the bottom), and `assets/textmapper/`
    has new files whose names do not end in `t.png`.
+6. Is anything missing, odd or ugly that this list did not ask about? Report
+   it even if it seems unrelated.
+
+### M16 — Map directives: no hex outlines, no label glow (v0.17.0)
+
+Not run yet. No step edits a note (CLAUDE.md agent rule 10); unknown words
+are covered by `map-directives-compiler.test.ts`. On the fixture vault from `Smoke/Smoke book.md`, Text Mapper
+v1.1.0 enabled, "Map font" empty, "Tidy map labels" on.
+
+1. The plugin list shows **0.17.0**.
+2. Open `Smoke/Skill tree.md` in reading view. Expected: the map as the
+   plugin draws it — black hex outlines and white glow are still there, and
+   the line `# vault-compiler: no-outlines no-glow` is not shown as text
+   (AC-11). Note whether the green outlines look rough (filters work in
+   Obsidian's view).
+3. Compile into `Export`; no notice about map directives.
+4. Open the PNG of the skill tree at full size (SCAR-025). Expected:
+   - no black hex outlines; seven green, slightly rough hexes with gaps;
+   - no white halo behind any label; `Thorn-weaving Hands` on more than one
+     line, broken after `Thorn-`; `Lantern Lore` and `Old Road` (along the
+     path at the bottom) readable;
+   - a small white hex in the top-right corner of every hex, covering the
+     green outline where they meet; checkmarks on
+     `Root Grip` and `Feats of Moss`, a green wash with drips behind
+     `Feats of Moss`, the word `Dice` under it;
+   - zoomed in: the edges of the wash and the outlines look rough, not
+     straight (filters drawn through the canvas).
+5. Open the PNG of `Smoke/Seasonal Charms.md`: black outlines and white
+   glow are still there (no directive, AC-8).
 6. Is anything missing, odd or ugly that this list did not ask about? Report
    it even if it seems unrelated.

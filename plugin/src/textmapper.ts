@@ -391,9 +391,12 @@ export function readObsidianNoteFont(): string | null {
 }
 
 /**
- * US-4.1, US-4.2, US-4.4, US-4.5, US-4.8: draws one map with the installed
- * plugin and writes it as a PNG with a transparent background and the map
- * font prepared for this compile (`prepareMapFont`).
+ * US-4.1, US-4.2, US-4.4, US-4.5, US-4.8, US-4.9, US-4.10 | AC-6: draws one
+ * map with the installed plugin and writes it as a PNG with a transparent
+ * background and the map font prepared for this compile (`prepareMapFont`).
+ * Labels are tidied when `tidyLabels` is on, then the map's own directives
+ * are applied; `skippedDirectives` names directives the map's shape did not
+ * allow (US-4.10 AC-7).
  */
 export async function renderTextMapperBlock(
   app: any,
@@ -402,7 +405,7 @@ export async function renderTextMapperBlock(
   writer: OutputWriter,
   mapFont: MapFont,
   tidyLabels: boolean,
-): Promise<{ skipped: string[]; unbreakable: boolean }> {
+): Promise<{ skipped: string[]; unbreakable: boolean; skippedDirectives: string[] }> {
   let svg = await renderMapSvg(getTextMapperPlugin(app), code, {
     createContainer: () => document.createElement('div'),
     serialize: element => new XMLSerializer().serializeToString(element),
@@ -413,10 +416,13 @@ export async function renderTextMapperBlock(
     svg = tidied.svg;
     report = { skipped: tidied.skipped, unbreakable: tidied.unbreakable };
   }
+  // US-4.10 | AC-6: directives after tidying, with tidying on and off.
+  const directives = applyMapDirectives(svg, mapDocId(code), parseMapDirectives(code));
+  svg = directives.svg;
   const prepared = prepareMapSvg(svg, mapFont.family, mapFont.css);
   const { width, height } = computePngDimensions(...Object.values(parseSvgDimensions(prepared)) as [number, number]);
   await writePngFromSvg(writer, prepared, destinationPath, width, height);
-  return report;
+  return { ...report, skippedDirectives: directives.skipped };
 }
 
 /**
@@ -532,12 +538,18 @@ const unescapeXml = (text: string) =>
 const escapeXml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
- * US-4.9: finds `<g id="<name>-<docId>">` (or `<g id="<name>">` for maps with
- * `option global`) and the index just after its matching `</g>`.
+ * US-4.9 | AC-6; US-4.10 | AC-7: finds `<g id="<name>-<docId>">` (or
+ * `<g id="<name>">` for maps with `option global`) and the index just after
+ * its matching `</g>`. An empty group written self-closed by `XMLSerializer`
+ * (`<g id="labels-…"/>`) is found too, with an empty inner range (#91).
  */
 function findGroup(svg: string, name: string, docId: string): { start: number; innerStart: number; innerEnd: number; end: number } | null {
-  const open = new RegExp(`<g id="${name}(?:-${docId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?">`).exec(svg);
+  const open = new RegExp(`<g id="${name}(?:-${docId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?"(/?)>`).exec(svg);
   if (!open) return null;
+  if (open[1] === '/') {
+    const end = open.index + open[0].length;
+    return { start: open.index, innerStart: end, innerEnd: end, end };
+  }
   let depth = 1;
   const tags = /<(\/?)g\b[^>]*?(\/?)>/g;
   tags.lastIndex = open.index + open[0].length;
@@ -631,6 +643,112 @@ export function tidyMapLabels(
     }
   }
   return { svg: out, skipped, unbreakable };
+}
+
+/** US-4.10: the switches a map's directive lines set. */
+export interface MapDirectives {
+  noOutlines: boolean;
+  noGlow: boolean;
+  /** Unknown words, each once, as first written (AC-2). */
+  unknown: string[];
+}
+
+/**
+ * US-4.10 | AC-1: a directive line — `#` in the first column, optional
+ * spaces, `vault-compiler:` in any case, then the words.
+ */
+const DIRECTIVE_LINE = /^#\s*vault-compiler:(.*)$/i;
+
+/**
+ * US-4.10 | AC-1, AC-2: reads the directive lines of a map source.
+ *
+ * Words of all directive lines add up and are compared ignoring case;
+ * `no-outlines` and `no-glow` switch, every other word is listed in `unknown`
+ * once (by its lower-case form), in the spelling it first had. Lines with
+ * leading spaces are no directive lines.
+ */
+export function parseMapDirectives(code: string): MapDirectives {
+  const result: MapDirectives = { noOutlines: false, noGlow: false, unknown: [] };
+  const seen = new Set<string>();
+  for (const line of code.split('\n')) {
+    const match = DIRECTIVE_LINE.exec(line.replace(/\r$/, ''));
+    if (!match) continue;
+    for (const word of match[1].trim().split(/\s+/).filter(w => w !== '')) {
+      const key = word.toLowerCase();
+      if (key === 'no-outlines') {
+        result.noOutlines = true;
+      } else if (key === 'no-glow') {
+        result.noGlow = true;
+      } else if (!seen.has(key)) {
+        seen.add(key);
+        result.unknown.push(word);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * US-4.10 | AC-4, AC-7: removes the glow `<text>` from every entry of the
+ * `labels` and `path-labels` groups, or returns null — leaving the map as it
+ * is — when a group is missing or an entry is not `<g>` + a first `<text>`
+ * with `stroke="white"` + the rest. The label `<text>`, its `<a>`, `<tspan>`s
+ * and `<textPath>` stay.
+ */
+function removeGlow(svg: string, docId: string): string | null {
+  const ENTRY = /<g>(<text\b([^>]*)>(?:(?!<\/text>)[\s\S])*<\/text>)((?:(?!<\/g>)[\s\S])*)<\/g>/y;
+  let out = svg;
+  for (const name of ['path-labels', 'labels']) {
+    const group = findGroup(out, name, docId);
+    if (!group) return null;
+    const inner = out.slice(group.innerStart, group.innerEnd);
+    const rebuilt: string[] = [];
+    ENTRY.lastIndex = 0;
+    while (ENTRY.lastIndex < inner.length) {
+      const m = ENTRY.exec(inner);
+      if (!m || !/\bstroke="white"/.test(m[2])) return null;
+      rebuilt.push(`<g>${m[3]}</g>`);
+    }
+    out = out.slice(0, group.innerStart) + rebuilt.join('') + out.slice(group.innerEnd);
+  }
+  return out;
+}
+
+/**
+ * US-4.10 | AC-3 to AC-8: applies a map's directives to the SVG the plugin
+ * drew (after tidying, before `prepareMapSvg`).
+ *
+ * Applies exactly these transforms (SCAR-001):
+ *   1. `noOutlines`: removes the `regions` group with everything in it;
+ *   2. `noGlow`: removes the glow `<text>` of every hex and path label.
+ * A step whose groups do not have the measured shape is skipped for the whole
+ * map and named in `skipped` (`no-outlines`, `no-glow`); with no directive
+ * the SVG is returned unchanged.
+ */
+export function applyMapDirectives(
+  svg: string,
+  docId: string,
+  directives: { noOutlines: boolean; noGlow: boolean },
+): { svg: string; skipped: string[] } {
+  const skipped: string[] = [];
+  let out = svg;
+  if (directives.noOutlines) {
+    const regions = findGroup(out, 'regions', docId);
+    if (regions) {
+      out = out.slice(0, regions.start) + out.slice(regions.end);
+    } else {
+      skipped.push('no-outlines');
+    }
+  }
+  if (directives.noGlow) {
+    const without = removeGlow(out, docId);
+    if (without === null) {
+      skipped.push('no-glow');
+    } else {
+      out = without;
+    }
+  }
+  return { svg: out, skipped };
 }
 
 /**
