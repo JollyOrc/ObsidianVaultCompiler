@@ -15,8 +15,8 @@
  *     directives) become three PNG references
  *
  * The fixture notes sit in a subfolder so the top-level fixture test
- * (fixture-vault.test.ts) is unaffected. Warnings are not asserted: every map
- * currently adds a false "Missing include" warning (#88).
+ * (fixture-vault.test.ts) is unaffected. Its warnings (none) are asserted in
+ * warnings-once.test.ts (US-8.5; the false map warnings of #88 are gone).
  */
 
 import { describe, it, before } from 'node:test';

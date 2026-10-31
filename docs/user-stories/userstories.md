@@ -1510,6 +1510,107 @@ external websites, or anchor targets in the compiled output
   A warning entry must never record `compiled-output` or a line number that
   refers to a position in the merged document.
 
+### US-8.5 Each problem is reported once, where it was written
+**As a** vault owner  
+**I want** every problem with a link reported exactly once, by the step that
+uses the link, with the note and line it is in  
+**So that** the warnings file and the warning list name real problems only,
+and a name that matches several notes never picks one silently.
+
+*(Written 2026-10-31 from [#88](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/88);
+decisions OD-W1 and OD-W2 taken the same day.)*
+
+Today (measured 2026-10-31 with v0.17.0, `InMemoryVaultCompiler.compile`):
+looking up a link (`resolve`) adds `Warning: Missing include` to
+`result.warnings` and counts a missing reference whenever the target is not
+found, and adds `Warning: Ambiguous filename …` whenever a bare name matches
+several files. Lookups that only classify — the scan for explicit embeds
+before ToC expansion, the pass-through check (US-6.5) and the heading-first
+check (US-6.3) — run it too; the scan puts the counter back but not the
+warnings. So:
+
+| Note `index.md` (and other files) | `result.warnings` today | warnings file today |
+|---|---|---|
+| A: ` ```text-mapper ` / `0101 grass "Vale"` / ` ``` ` | `Missing include` (false: the generated `assets/textmapper/….png`) | — |
+| B: `![[Gone]]` | `Missing include` ×3 | `Missing include` |
+| C: `See [[Gone]] here.` | `Missing include`, `Missing wiki link` | `Missing wiki link` |
+| F: `![](gone.png)` | `Missing include` ×2, `Missing asset` | `Missing asset` |
+| E: `![[dup]]` and `See [[dup]].`; `a/dup.md`, `b/dup.md` | `Ambiguous filename dup.md; using a/dup.md` ×3 | — |
+| E2: `- [[Wrapper]]`; `Wrapper.md` = `![[dup]]` (pass-through) | `Ambiguous filename …` ×2 | — |
+| E3: `![](logo.png)`; `x/logo.png`, `y/logo.png` | `Ambiguous filename logo.png; using x/logo.png` ×2 | — |
+
+The warnings file (US-8.4) is written from `warningDetails` only, so A is
+invisible to users, while B, C and F are right there; the ambiguous name is
+never shown (US-3.1 promises "a warning logged").
+
+**Acceptance criteria**
+- **AC-1 Looking up reports nothing.** Finding a link's target never adds a
+  warning or counts a missing reference by itself, in any step. Only the step
+  that uses the link — embedding (`![[…]]`, `![…](…)`, a ToC item, a
+  pass-through), copying an asset, converting a link — reports what it
+  found, once.
+- **AC-2 One problem, one entry.** Each reported problem adds exactly one
+  `result.warnings` entry (`Warning: <message>`) and one `warningDetails`
+  entry with the same message, the link as written, the note and the line.
+  `stats.missingReferences` counts each missing target once. With the
+  examples above:
+  - A: no warning, no detail, `missingReferences` 0.
+  - B: `Warning: Missing include` once; detail `Missing include`, link
+    `Gone`, `index.md`, line 3; count 1.
+  - C: `Warning: Missing wiki link` once; detail as today; count 1.
+  - F: `Warning: Missing asset` once; detail as today; count 1.
+- **AC-3 Ambiguous names are reported per link (OD-W2).** When a bare name
+  matches several files, the lexicographically smallest path is used, as
+  before (US-3.1), and each link or embed that met the ambiguity reports
+  `Ambiguous filename <name>; using <path>` with the link as written, its
+  note and line:
+  - E: two entries, `{ link: 'dup', file: 'index.md', line: 3 }` (the embed)
+    and `{ link: 'dup', file: 'index.md', line: 5 }` (the wiki link).
+  - E2: one entry `{ link: 'dup', file: 'Wrapper.md', line: 1 }`, with
+    "Normalise headings" on (pass-through) and off (ordinary embed). With
+    frontmatter `---` / `tags: [x]` / `---` above the embed, line 4 (source
+    lines, US-5.2 AC-12), on and off.
+  - E3: one entry `{ link: 'logo.png', file: 'index.md', line: 3 }`.
+  The output text is unchanged (`a/dup.md` and `x/logo.png` are used).
+  - **Ambiguous** means: no file exists at the path as written (absolute, or
+    relative to the note, with or without `.md`), and the bare name matches
+    more than one file of the vault. `![[dup]]` in `a/index.md` with
+    `a/dup.md` and `b/dup.md` finds `a/dup.md` relative to the note: not
+    ambiguous, nothing reported.
+  - **In Obsidian** the file is chosen by Obsidian's link lookup
+    (`getFirstLinkpathDest`), which the plugin consults first; the
+    compiler's own name search never runs there. The ambiguity is therefore
+    checked against the compiler's list of vault files whoever chose, and the
+    message names the path actually used: a lookup that returns `b/dup.md`
+    gives `Ambiguous filename dup.md; using b/dup.md`. A lookup that returns
+    `a/dup.md` for `![[dup]]` in `a/index.md` reports nothing: the name is
+    found next to the note. *(Added 2026-10-31
+    while coding; which file Obsidian picks for an ambiguous name is not
+    measured.)*
+- **AC-4 Composed cases.**
+  - A ToC item `- [[dup]]` reports once, from the embed it becomes; the ToC
+    classification is a lookup (AC-1).
+  - A note embedded twice in the document reports its problems twice, once
+    per place in the compiled document, as for every other warning today
+    (measured: `Part.md` with `![[Gone]]`, embedded twice from `index.md`,
+    gives two identical `Missing include` details and a count of 2).
+  - A link that is both missing and ambiguous cannot occur (a match is not
+    missing).
+- **AC-5 Nothing else changes.** The compiled text of the smoke book and of
+  `index2compile.md` is byte-identical before and after; only
+  `result.warnings`, `warningDetails` and the count change as above.
+
+**Decisions (2026-10-31)**
+- **OD-W1:** the false warning of #88 is fixed for the whole class (every
+  lookup that only classifies), not only for generated map paths; the
+  ambiguous-name report comes with it, because it moves out of the lookup
+  anyway. External image embeds (`![logo](https://…)` is removed today and
+  reported as `Missing asset`) are a separate issue,
+  [#94](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/94): they are
+  to be kept as written, without a warning.
+- **OD-W2:** an ambiguous name is reported once per link, with its place (not
+  once per name, and not left out of the warnings file).
+
 ### US-8.2 Handle missing or unreadable inputs safely
 **As a** vault owner  
 **I want** missing or unreadable files to be reported without aborting the whole

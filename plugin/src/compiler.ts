@@ -56,6 +56,8 @@ interface PassThrough {
   rawPath: string;
   target: string;
   anchor: string | null;
+  /** US-8.5 | AC-3: the ambiguity message of the embed, reported by the caller. */
+  ambiguity: string | null;
 }
 
 export interface WarningDetail {
@@ -83,6 +85,11 @@ interface ResolvedTarget {
   path: string;
   anchor: string | null;
   missing: boolean;
+  /**
+   * US-8.5 | AC-3: `Ambiguous filename <name>; using <path>` when the bare
+   * name matched several files, else null. `resolve` never reports it.
+   */
+  ambiguity: string | null;
 }
 
 export class InMemoryVaultCompiler {
@@ -278,6 +285,14 @@ export class InMemoryVaultCompiler {
     return result.join('/');
   }
 
+  /**
+   * US-3.1 | AC-1 to AC-4; US-8.5 | AC-1, AC-3: finds the file a link points
+   * at — the plugin's lookup (Obsidian's link database) first, then the path
+   * as written (absolute or relative, case-insensitive, with or without
+   * `.md`), then the bare name anywhere in the vault (lexicographically
+   * smallest path). It reports nothing and counts nothing: the step that uses
+   * the link reports a missing target or `ambiguity`.
+   */
   private resolve(raw: string, currentFile: string): ResolvedTarget {
     if (this.options.resolve) {
       const resolvedPath = this.options.resolve(raw.trim(), currentFile);
@@ -289,7 +304,10 @@ export class InMemoryVaultCompiler {
           link = split[0];
           anchor = decodeURIComponent(split.slice(1).join('#'));
         }
-        return { path: this.norm(resolvedPath), anchor, missing: false };
+        const path = this.norm(resolvedPath);
+        const local = decodeURIComponent(link);
+        const ambiguity = this.directMatch(local, currentFile) === null ? this.ambiguityOf(local, path) : null;
+        return { path, anchor, missing: false, ambiguity };
       }
     }
 
@@ -301,46 +319,83 @@ export class InMemoryVaultCompiler {
       anchor = split.slice(1).join('#');
     }
 
-    const currentDir = this.parent(currentFile);
+    const direct = this.directMatch(link, currentFile);
+    if (direct !== null) {
+      return { path: direct, anchor, missing: false, ambiguity: null };
+    }
 
-    // Direct attempts.
+    const matches = this.basenameMatches(link);
+    if (matches.length > 0) {
+      const chosen = matches[0];
+      return { path: chosen, anchor, missing: false, ambiguity: this.ambiguityOf(link, chosen) };
+    }
+    return { path: link, anchor, missing: true, ambiguity: null };
+  }
+
+  /**
+   * US-3.1 | AC-1, AC-2; US-8.5 | AC-3: the file at `link` as written —
+   * exact, from the note's folder or the vault root, case-insensitive, or
+   * with `.md` added — or null.
+   */
+  private directMatch(link: string, currentFile: string): string | null {
+    const currentDir = this.parent(currentFile);
     const directCandidates = [link, this.join(currentDir, link), this.join('', link)];
     for (const candidate of directCandidates) {
       const normalized = this.norm(candidate);
       if (this.files.has(normalized)) {
-        return { path: normalized, anchor, missing: false };
+        return normalized;
       }
       // Case-insensitive exact.
       const exactInsensitive = [...this.files.keys()].find(k => k.toLowerCase() === normalized.toLowerCase());
       if (exactInsensitive) {
-        return { path: exactInsensitive, anchor, missing: false };
+        return exactInsensitive;
       }
       // Append markdown extension for targets without a recognized extension.
       if (!/\.[A-Za-z0-9]+$/.test(normalized)) {
         const withMd = normalized + '.md';
         if (this.files.has(withMd)) {
-          return { path: withMd, anchor, missing: false };
+          return withMd;
         }
       }
     }
+    return null;
+  }
 
-    // Magic search by basename.
-    let targetBase = this.basename(link) || link;
-    if (!/\.[A-Za-z0-9]+$/.test(targetBase)) {
-      targetBase += '.md';
-    }
-    const matches = [...this.files.keys()].filter(key => this.basename(key).toLowerCase() === targetBase.toLowerCase());
-    if (matches.length > 0) {
-      const chosen = [...matches].sort()[0];
-      if (matches.length > 1) {
-        this.warnings.push(`Warning: Ambiguous filename ${targetBase}; using ${chosen}`);
-      }
-      return { path: chosen, anchor, missing: false };
-    }
+  /**
+   * US-3.1 | AC-3, AC-4: the name a bare link is searched by — its basename,
+   * with `.md` when it has no extension.
+   */
+  private targetBasename(link: string): string {
+    const base = this.basename(link) || link;
+    return /\.[A-Za-z0-9]+$/.test(base) ? base : base + '.md';
+  }
 
-    this.stats.missingReferences += 1;
-    this.warnings.push(`Warning: Missing include`);
-    return { path: link, anchor, missing: true };
+  /**
+   * US-3.1 | AC-3, AC-4: every vault file whose basename is the link's
+   * (case-insensitive), sorted, so the first one wins.
+   */
+  private basenameMatches(link: string): string[] {
+    const targetBase = this.targetBasename(link).toLowerCase();
+    return [...this.files.keys()].filter(key => this.basename(key).toLowerCase() === targetBase).sort();
+  }
+
+  /**
+   * US-8.5 | AC-3: the ambiguity message for a bare link that was resolved to
+   * `chosen` — by the compiler or by Obsidian — when its name matches more
+   * than one vault file; else null.
+   */
+  private ambiguityOf(link: string, chosen: string): string | null {
+    if (this.basenameMatches(link).length < 2) return null;
+    return `Ambiguous filename ${this.targetBasename(link)}; using ${chosen}`;
+  }
+
+  /**
+   * US-8.5 | AC-2: reports one problem — one `warnings` entry and one
+   * `warningDetails` entry with the same message.
+   */
+  private report(message: string, link: string, file: string, line: number): void {
+    this.warnings.push(`Warning: ${message}`);
+    this.warningDetails.push({ message, link, file, line });
   }
 
   /**
@@ -510,9 +565,7 @@ export class InMemoryVaultCompiler {
     // First, collect all files that are already explicitly embedded (via ![[...]] or ![alt](file.md))
     // so we can skip bare [[link]] list items that would otherwise duplicate an embed.
     const explicitEmbeds = new Set<string>();
-    // Pre-scan: collect explicitly-embedded paths without counting missing refs.
-    // Save and restore the counter so this read-only scan doesn't pollute stats.
-    const _savedMissing = this.stats.missingReferences;
+    // Pre-scan: collect explicitly-embedded paths; resolve reports nothing (US-8.5 AC-1).
     content.replace(/!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, (_, link: string) => {
       const r = this.resolve(link.trim(), path);
       if (!r.missing) explicitEmbeds.add(r.path);
@@ -523,7 +576,6 @@ export class InMemoryVaultCompiler {
       if (!r.missing && this.isMarkdownPath(r.path)) explicitEmbeds.add(r.path);
       return '';
     });
-    this.stats.missingReferences = _savedMissing; // restore — scan is read-only
 
     content = this.expandTocLists(content, path, explicitEmbeds);
 
@@ -542,6 +594,11 @@ export class InMemoryVaultCompiler {
       // US-6.5: a wrapper around one embed adds no heading of its own.
       const passThrough = this.matchPassThrough(content, path);
       if (passThrough !== null) {
+        if (passThrough.ambiguity !== null) {
+          // US-8.5 | AC-3: the wrapper's only embed, on its first non-empty line.
+          const line = content.split('\n').findIndex(l => l.trim() !== '') + 1 + lineOffset;
+          this.report(passThrough.ambiguity, passThrough.rawPath, path, line);
+        }
         const expanded = this.expandPassThrough(passThrough, path, depth);
         this.processedStack.pop();
         return this.wrapWithSentinel(expanded, path);
@@ -606,20 +663,6 @@ export class InMemoryVaultCompiler {
 
 
   /**
-   * US-1.3 | AC-2: resolves a link without side effects — the missing-reference
-   * count and the warnings `resolve` may add are put back. Used to classify
-   * list items; the real passes report missing targets themselves.
-   */
-  private probeResolve(raw: string, currentFile: string): ResolvedTarget {
-    const missingBefore = this.stats.missingReferences;
-    const warningsBefore = this.warnings.length;
-    const result = this.resolve(raw, currentFile);
-    this.stats.missingReferences = missingBefore;
-    this.warnings.length = warningsBefore;
-    return result;
-  }
-
-  /**
    * US-1.3 | Definitions: classifies one list-item line.
    *
    * - `embed`: `![[t]]` / `![alt](t)`; `text` is the embed without bullet
@@ -637,7 +680,7 @@ export class InMemoryVaultCompiler {
     const indent = match[1];
     const rest = match[2].trim();
     const isNote = (raw: string) => {
-      const r = this.probeResolve(raw, currentFile);
+      const r = this.resolve(raw, currentFile);
       return { note: !r.missing && this.isMarkdownPath(r.path), target: r.path };
     };
     const embedWiki = rest.match(/^!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
@@ -994,7 +1037,7 @@ export class InMemoryVaultCompiler {
     const resolved = this.resolve(rawPath, path);
     if (resolved.missing || !this.isMarkdownPath(resolved.path)) return null;
     if (anchor === null && !this.isEffectivelyHeadingFirst(resolved.path)) return null;
-    return { rawPath, target: resolved.path, anchor };
+    return { rawPath, target: resolved.path, anchor, ambiguity: resolved.ambiguity };
   }
 
   /**
@@ -1087,11 +1130,12 @@ export class InMemoryVaultCompiler {
       const link = rawLink.trim();
       const resolved = this.resolve(link, currentFile);
       if (resolved.missing) {
-        const line = context.line;
-        const message = `Missing include`;
-        this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link, file: currentFile, line });
+        this.stats.missingReferences += 1;
+        this.report('Missing include', link, currentFile, context.line);
         return `\n<!-- Warning: Missing include -->\n`;
+      }
+      if (resolved.ambiguity !== null) {
+        this.report(resolved.ambiguity, link, currentFile, context.line);
       }
       if (this.isMarkdownPath(resolved.path)) {
         if (resolved.anchor !== null) {
@@ -1173,11 +1217,12 @@ export class InMemoryVaultCompiler {
         if (this.usedAssetNames.has(this.basename(rawPath))) {
           return _m;
         }
-        const line = context.line;
-        const message = `Missing asset`;
-        this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link: rawPath, file: currentFile, line });
+        this.stats.missingReferences += 1;
+        this.report('Missing asset', rawPath, currentFile, context.line);
         return `<!-- Warning: Missing asset -->`;
+      }
+      if (resolved.ambiguity !== null) {
+        this.report(resolved.ambiguity, rawPath, currentFile, context.line);
       }
       if (this.isMarkdownPath(resolved.path)) {
         if (resolved.anchor !== null) {
@@ -1235,9 +1280,13 @@ export class InMemoryVaultCompiler {
       if (resolved.missing) {
         const loc = this.findSourceLocation(source as string, offset as number);
         const message = `Missing wiki link`;
-        this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link: rawLink.trim(), file: loc.file, line: loc.line });
+        this.stats.missingReferences += 1;
+        this.report(message, rawLink.trim(), loc.file, loc.line);
         return `<!-- Warning: ${message} -->`;
+      }
+      if (resolved.ambiguity !== null) {
+        const loc = this.findSourceLocation(source as string, offset as number);
+        this.report(resolved.ambiguity, rawLink.trim(), loc.file, loc.line);
       }
       if (!this.isMarkdownPath(resolved.path)) {
         return `[[${rawLink.trim()}]]`;
@@ -1269,8 +1318,8 @@ export class InMemoryVaultCompiler {
         if (this.isMarkdownPath(rawPath)) {
           const loc = this.findSourceLocation(source as string, offset as number);
           const message = `Missing markdown link`;
-          this.warnings.push(`Warning: ${message}`);
-          this.warningDetails.push({ message, link: rawPath, file: loc.file, line: loc.line });
+          this.stats.missingReferences += 1;
+          this.report(message, rawPath, loc.file, loc.line);
           return `<!-- Warning: ${message} -->`;
         }
         // Generated or existing asset references should not be reported as
@@ -1285,9 +1334,13 @@ export class InMemoryVaultCompiler {
         }
         const loc = this.findSourceLocation(source as string, offset as number);
         const message = `Missing asset link`;
-        this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link: rawPath, file: loc.file, line: loc.line });
+        this.stats.missingReferences += 1;
+        this.report(message, rawPath, loc.file, loc.line);
         return `<!-- Warning: ${message} -->`;
+      }
+      if (resolved.ambiguity !== null) {
+        const loc = this.findSourceLocation(source as string, offset as number);
+        this.report(resolved.ambiguity, rawPath, loc.file, loc.line);
       }
       if (this.isMarkdownPath(resolved.path)) {
         const label = text || this.headingMap.get(resolved.path) || titleFromBasename(this.basename(resolved.path));

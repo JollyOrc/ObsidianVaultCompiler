@@ -46,6 +46,7 @@ Each SCAR covers:
 | [SCAR-028](SCAR-028-real-data-as-test-data.md) | Real user data serves as the development and test data | Process / Data protection | High |
 | [SCAR-029](SCAR-029-licence-fixed-in-the-build-not-in-shipped-artifacts.md) | A licence conflict is fixed in the build, but the artifacts already shipped keep it | Process / Licensing | High |
 | [SCAR-030](SCAR-030-dependency-defaults-applied-after-user-input.md) | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | Requirements / Integration | Medium |
+| [SCAR-031](SCAR-031-lookup-with-side-effects.md) | A lookup also reports, so every caller that only looks fills the report | Design / Verification | Medium |
 
 ## Recurring themes
 
@@ -125,7 +126,8 @@ that adds a way to change a value finds every writer by grepping the value.
 A guard checks exactly its criterion, not less and not more: it counts the
 places it checked, matches the whole statement, uses inputs the real producer
 gives (every option value the real caller passes; fixtures taken from the
-producer's real output, in its serialised form) and inputs on which the rule
+producer's real output, in its serialised form; a stand-in for every
+collaborator the real caller always injects) and inputs on which the rule
 and its rivals give different output, and is proven by a mutation check; a test that one side wins also
 shows the other side was in effect; before tickets, the tests are searched
 for guards that forbid a call the ticket adds.
@@ -172,6 +174,12 @@ data folder; a forbidden-word check guards anything published.
 Check a dependency's licence before it is bundled; when one is removed for
 licence reasons, withdraw every artifact that already carries it; check
 bundles and archives by their contents; a copy keeps its notice.
+
+**Lookups that report** (SCAR-031)
+A function that answers a question reports nothing; the step that acts on the
+answer reports once, with its place. A caller that has to undo side effects
+points at the function, not the caller. Reports are tested as exact lists,
+and checked to reach the place users read.
 
 **Shared code underdocumented** (SCAR-001)
 A utility's secondary transforms (not just its primary purpose) must be

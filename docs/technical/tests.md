@@ -337,6 +337,37 @@ Heading rules of 2026-10-27 (US-6.1, US-6.3 to US-6.5, US-2.3; v0.11.0):
   TextMapper temp-folder writes under `os.tmpdir()`. It asserts how many calls
   it found.
 
+Each problem reported once (US-8.5, #88; `tests/integration/warnings-once.test.ts`):
+- Expected values are the story's examples A to F, E2, E3: exact
+  `result.warnings`, `warningDetails` (message, link, note, line) and
+  `missingReferences` for a map block, a missing embed, wiki link and image,
+  an ambiguous embed and wiki link, an ambiguous embed inside a pass-through
+  wrapper ("Normalise headings" on and off) and an ambiguous image.
+- Composed: a ToC item reports once; a note embedded twice reports twice.
+- Text check: the body of `resolve` adds no warning and counts nothing.
+- Guard (passes before and after): the compiled text of `index2compile.md`
+  and the smoke book, both heading settings, equals its hash from v0.17.0
+  (AC-5); the fixture warnings shrink to the real `missing.md`.
+- Guard search: the ambiguity and missing-reference tests in
+  `link-resolution.test.ts`, `output-links.test.ts`, `fixture-vault.test.ts`
+  and `heading-embed.test.ts` need only some warning, which the reporting
+  pass still gives; none forbids the change.
+- Added while coding (v0.17.1): ambiguity is checked against the vault's file
+  list also when Obsidian's lookup chose the file (a stand-in lookup returning
+  `b/dup.md`, and one returning the file next to the note); a wrapper with
+  frontmatter (line 4, heading setting on and off).
+- Checked in Obsidian 2026-10-31 with v0.17.1 (reported by the user): an
+  ambiguous name in a scratch vault is listed in the warnings file. Passed.
+- Found while coding: lines of warnings from link conversion count the lines
+  of notes embedded above (`See [[dup]].` on line 5 reported as 10, same in
+  v0.17.0) — one `todo` test, #95.
+- Mutation check 2026-10-31: 14 mutants (resolve warns or counts again, each
+  pass without its ambiguity report or its count, the pass-through line, the
+  ambiguity threshold, the Obsidian path with and without the relative
+  check, `report` without its warnings entry); two first survived for want of
+  an input (frontmatter in a wrapper; Obsidian's lookup with a file next to
+  the note), tests added, all 14 caught.
+
 ## 4. Property-based and fuzz tests
 
 - Fuzz slugification with Unicode, spaces, underscores, punctuation and numeric

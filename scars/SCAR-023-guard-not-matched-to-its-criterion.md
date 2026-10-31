@@ -61,7 +61,13 @@ more blocks the next correct change.
   compiler with the heading option left out; the plugin always passes `true`
   or `false`, and with `false` the auto-headings of US-6.1 never ran for any
   user. For an option, test every value the real caller can pass, not the
-  value the test helper defaults to.
+  value the test helper defaults to. The same holds for an injected
+  collaborator: when the real caller always passes one (a lookup, a clock, a
+  file reader), at least one test passes a stand-in that behaves like it.
+  Example (2026-10-31, Vault Compiler US-8.5, #93): every test built the
+  compiler without the link lookup the plugin always passes (Obsidian's), so
+  the compiler's own name search ran in all tests and never in Obsidian; the
+  ambiguous-name report, as first written, could only work in tests.
 - A fixture that stands in for a dependency's output is taken from that
   output, in the exact form the real path produces it (after serialisation,
   encoding, normalisation), not written by hand. Hand-written fixtures pick
