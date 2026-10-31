@@ -82,7 +82,7 @@ describe('US-8.5 AC-3: ambiguous names are reported per link', () => {
     assert.doesNotMatch(r.content, /from b/);
   });
 
-  it('E: the wiki link reports its own line, 5', { todo: 'US-8.4: link-conversion lines count embedded lines (#95)' }, () => {
+  it('E: the wiki link reports its own line, 5 (#95)', () => {
     assert.equal(compile(E).warningDetails[1].line, 5);
   });
 
@@ -182,10 +182,12 @@ function compileFixture(start: string, normaliseHeadings: boolean): CompileResul
 const sha = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
 
 describe('US-8.5 AC-5: the compiled text does not change', () => {
-  // Measured 2026-10-31 with v0.17.0, before the change.
+  // Measured 2026-10-31 with v0.17.0, before the change. The index2compile.md
+  // hashes changed once on purpose with #96 (v0.18.0): its `- ![[media.png]]`
+  // keeps the bullet (US-1.3 AC-2); asserted below.
   const BEFORE: Array<[string, boolean, string]> = [
-    ['index2compile.md', false, '078bc3fff078bc19'],
-    ['index2compile.md', true, 'ed3b10982dcd3570'],
+    ['index2compile.md', false, '261974b48defb467'],
+    ['index2compile.md', true, '365c5b4ea395d465'],
     ['Smoke/Smoke book.md', false, '9ad1f566a7dc74d0'],
     ['Smoke/Smoke book.md', true, 'e6c94dc2f6fd2957'],
   ];
@@ -194,6 +196,14 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
       assert.equal(sha(compileFixture(start, normaliseHeadings).content), hash);
     });
   }
+
+  it('#96: the one intended change — the image item keeps its bullet', () => {
+    for (const normaliseHeadings of [false, true]) {
+      const lines = compileFixture('index2compile.md', normaliseHeadings).content.split('\n');
+      assert.ok(lines.includes('- ![](assets/media.png)'));
+      assert.ok(!lines.includes('![](assets/media.png)'));
+    }
+  });
 
   it('fixture warnings: index2compile.md has only its real missing note; the smoke book none', () => {
     const index = compileFixture('index2compile.md', false);

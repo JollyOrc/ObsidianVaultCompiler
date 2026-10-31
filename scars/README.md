@@ -47,6 +47,7 @@ Each SCAR covers:
 | [SCAR-029](SCAR-029-licence-fixed-in-the-build-not-in-shipped-artifacts.md) | A licence conflict is fixed in the build, but the artifacts already shipped keep it | Process / Licensing | High |
 | [SCAR-030](SCAR-030-dependency-defaults-applied-after-user-input.md) | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | Requirements / Integration | Medium |
 | [SCAR-031](SCAR-031-lookup-with-side-effects.md) | A lookup also reports, so every caller that only looks fills the report | Design / Verification | Medium |
+| [SCAR-032](SCAR-032-in-band-markers-read-by-other-steps.md) | Invisible markers written into the text are read by steps they were not meant for | Design / Verification | Medium |
 
 ## Recurring themes
 
@@ -181,6 +182,12 @@ A function that answers a question reports nothing; the step that acts on the
 answer reports once, with its place. A caller that has to undo side effects
 points at the function, not the caller. Reports are tested as exact lists,
 and checked to reach the place users read.
+
+**Markers in the text** (SCAR-032)
+Prefer a side channel to markers in the text. Otherwise list every step that
+reads the text between insertion and removal, insert markers only where their
+reader looks, run each reader's tests with markers present, and remove them
+in one place with a guard on the output.
 
 **Shared code underdocumented** (SCAR-001)
 A utility's secondary transforms (not just its primary purpose) must be

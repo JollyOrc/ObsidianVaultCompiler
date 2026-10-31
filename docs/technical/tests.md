@@ -97,6 +97,23 @@ Code blocks are never headings (KD-3, v0.16.1; `tests/integration/code-blocks.te
 - Copying the same source twice does not create a second file.
 - A log/notice records reuse of an existing asset copy.
 
+
+Images from the web, titles and image lists (US-2.6, US-1.3 AC-2, #94;
+`tests/integration/web-images.test.ts`):
+- Web images kept exactly as written, without warning or copy, in nine
+  forms (both schemes, upper case, no alt, query, encoded space, angle
+  brackets, title, inside a sentence); `![[url]]` and `![[url|200]]`; local
+  images with double and single quoted titles, angle brackets, a missing image
+  with a title; a note embedded with a title; list items with local, wiki-sized,
+  web and missing images, a note and an image in one list.
+- Guards: a local image without a title, and a missing note in a list, are
+  unchanged.
+- Mutation check 2026-10-31 (#96): 7 mutants; two first survived for want of
+  an input (a web image without an extension; a note embedded with a title
+  above a ToC listing it), tests added, all caught.
+- The compiled `index2compile.md` changed once on purpose: its
+  `- ![[media.png]]` item keeps the bullet; the output-hash guards of US-8.5
+  were updated and the line is asserted.
 ### Epic 3 — Link resolution challenge
 - Absolute markdown links become anchor links.
 - Relative markdown links become anchor links.
@@ -367,6 +384,24 @@ Each problem reported once (US-8.5, #88; `tests/integration/warnings-once.test.t
   check, `report` without its warnings entry); two first survived for want of
   an input (frontmatter in a wrapper; Obsidian's lookup with a file next to
   the note), tests added, all 14 caught.
+
+Source lines in warnings (US-8.4 AC-5, #95; `tests/integration/warning-lines.test.ts`):
+- One test per row of the story's table: a link or embed after notes embedded
+  above, a ToC list, a section embed, frontmatter, a map block, a Dataview
+  block, in an embedded note, with a title injected ("Normalise headings" on
+  and off), a link brought along by a section embed, a link in a heading.
+  Each asserts the warning's note and line.
+- Guard: no location marker reaches the compiled text.
+- Guard: a section embed whose heading holds a link is still found. Its first
+  run found a regression in the new code (a marker inside the embed's own
+  anchor); embeds are now left unmarked.
+- One story example was wrong (a link below frontmatter is on line 8, not 7);
+  corrected with its test (SCAR-003).
+- Mutation check 2026-10-31 (#97): 10 mutants (line map through map and
+  control fences and the injected title, links and markdown links marked,
+  embeds left unmarked, marker read and stripped, section headings, embed
+  lines); one first survived (section headings with markers), test added,
+  all caught.
 
 ## 4. Property-based and fuzz tests
 

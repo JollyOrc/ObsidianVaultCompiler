@@ -16,6 +16,62 @@ import {
 import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 
 /**
+ * US-2.6 | AC-3, AC-4: the destination of `![alt](…)` — `<…>` or the text up to
+ * the first space — and the title written after it (`"…"` or `'…'`), with the
+ * spaces in front of it, so it can be written back as it was. Every step that
+ * reads an image's destination uses this.
+ */
+export function parseEmbedDestination(raw: string): { path: string; title: string } {
+  const text = raw.trim();
+  const match = text.match(/^(?:<([^>]*)>|(\S+))(\s+(?:"[^"]*"|'[^']*'))?$/);
+  if (!match) return { path: text, title: '' };
+  return { path: match[1] ?? match[2], title: match[3] ?? '' };
+}
+
+/** US-8.4 | AC-5: the location markers of `markLinks`. */
+const LINE_MARKER = /<!-- __vl__:\d+:.*? -->/g;
+
+/**
+ * US-8.4 | AC-5: replaces every match of `pattern` in `content` (default: by
+ * nothing) and keeps `lineMap` — the source line of each line — in step: the
+ * lines a match spans become the lines of its replacement, all mapped to the
+ * line the match starts on.
+ */
+function replaceKeepingLines(
+  content: string,
+  lineMap: number[],
+  pattern: RegExp,
+  replacement = '',
+): { content: string; lineMap: number[] } {
+  const newlines = (text: string) => (text.match(/\n/g) ?? []).length;
+  const pieces: string[] = [];
+  const map = [lineMap[0]];
+  let inputLine = 0;
+  let last = 0;
+  // Text kept as it is: each newline starts the next input line.
+  const copy = (text: string) => {
+    pieces.push(text);
+    for (let k = newlines(text); k > 0; k--) map.push(lineMap[++inputLine]);
+  };
+  for (const match of content.matchAll(pattern)) {
+    copy(content.slice(last, match.index));
+    const startLine = inputLine;
+    pieces.push(replacement);
+    for (let k = newlines(replacement); k > 0; k--) map.push(lineMap[startLine]);
+    // The text after the match continues the line the match started on.
+    inputLine += newlines(match[0]);
+    last = (match.index ?? 0) + match[0].length;
+  }
+  copy(content.slice(last));
+  return { content: pieces.join(''), lineMap: map };
+}
+
+/** US-2.6 | AC-1, AC-2: true for `http://` and `https://` addresses, in any case. */
+export function isWebAddress(target: string): boolean {
+  return /^https?:\/\//i.test(target.trim());
+}
+
+/**
  * Interface for an external renderer that can convert a text-mapper code block
  * into a PNG asset in the vault.
  */
@@ -478,8 +534,9 @@ export class InMemoryVaultCompiler {
 
     const note = this.readNote(path);
     let content = note.body;
-    // US-5.2 AC-12: added to embed warning lines so they count source lines.
-    let lineOffset = note.lines;
+    // US-5.2 AC-12; US-8.4 AC-5: the source line of every line of `content`,
+    // kept through every step below that changes the number of lines.
+    let lineMap = content.split('\n').map((_line, index) => index + 1 + note.lines);
     try {
       // Basic readability check.
       // eslint-disable-next-line no-control-regex
@@ -496,7 +553,7 @@ export class InMemoryVaultCompiler {
 
     // TextMapper rendering.
     if (this.options.enableTextMapper) {
-      content = this.processTextMapperFences(content, (code) => {
+      const fenced = this.processTextMapperFences(content, (code) => {
         const alt = altForTextMapper(code);
         const hash = computeContentHash(code);
         const filename = mapAssetName(hash, this.options.mapFontKey);
@@ -511,11 +568,15 @@ export class InMemoryVaultCompiler {
         }
         return `![${alt}](${assetRef})`;
       });
+      content = fenced.text;
+      lineMap = fenced.from.map(index => lineMap[index]);
     } else {
       // Keep the raw fence but add a warning comment so readers know rendering is disabled.
-      content = this.processTextMapperFences(content, (code) => {
+      const fenced = this.processTextMapperFences(content, (code) => {
         return `\`\`\`text-mapper\n${code}\n\`\`\`\n<!-- Warning: TextMapper rendering is disabled -->`;
       });
+      content = fenced.text;
+      lineMap = fenced.from.map(index => lineMap[index]);
     }
 
     // Remove Obsidian control command fences.
@@ -529,18 +590,18 @@ export class InMemoryVaultCompiler {
     ];
     for (const lang of controlLanguages) {
       const fence = new RegExp('```' + lang.replace(/-/g, '\\-') + '[\\s\\S]*?```', 'g');
-      content = content.replace(fence, '');
+      ({ content, lineMap } = replaceKeepingLines(content, lineMap, fence));
     }
 
     // Remove SerializedQuery comment delimiters while preserving their listed
     // embeds for expansion.
     // Remove Dataview Serializer command markers.
-    content = content.replace(/<!--\s*QueryToSerialize:[\s\S]*?-->/g, '');
+    ({ content, lineMap } = replaceKeepingLines(content, lineMap, /<!--\s*QueryToSerialize:[\s\S]*?-->/g));
 
     // Remove SerializedQuery and Dataview Serializer markers while keeping
     // their nested list entries available for ToC expansion.
-    content = content.replace(/<!--\s*QueryToSerialize:[\s\S]*?-->/g, '');
-    content = content.replace(/<!--\s*SerializedQuery:[\s\S]*?-->/g, '');
+    ({ content, lineMap } = replaceKeepingLines(content, lineMap, /<!--\s*QueryToSerialize:[\s\S]*?-->/g));
+    ({ content, lineMap } = replaceKeepingLines(content, lineMap, /<!--\s*SerializedQuery:[\s\S]*?-->/g));
 
     let inSerializedQuery = false;
     content = content
@@ -572,7 +633,7 @@ export class InMemoryVaultCompiler {
       return '';
     });
     content.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, _alt: string, rawPath: string) => {
-      const r = this.resolve(rawPath, path);
+      const r = this.resolve(parseEmbedDestination(rawPath).path, path);
       if (!r.missing && this.isMarkdownPath(r.path)) explicitEmbeds.add(r.path);
       return '';
     });
@@ -596,7 +657,7 @@ export class InMemoryVaultCompiler {
       if (passThrough !== null) {
         if (passThrough.ambiguity !== null) {
           // US-8.5 | AC-3: the wrapper's only embed, on its first non-empty line.
-          const line = content.split('\n').findIndex(l => l.trim() !== '') + 1 + lineOffset;
+          const line = lineMap[content.split('\n').findIndex(l => l.trim() !== '')];
           this.report(passThrough.ambiguity, passThrough.rawPath, path, line);
         }
         const expanded = this.expandPassThrough(passThrough, path, depth);
@@ -605,8 +666,9 @@ export class InMemoryVaultCompiler {
       }
 
       const { content: normContent, clamped, title } = this.applyHeadingNormalisation(content, depth, path);
-      // An injected (not replacing) title adds a line above the source text.
-      lineOffset -= normContent.split('\n').length - content.split('\n').length;
+      // An injected (not replacing) title adds lines above the source text.
+      const added = normContent.split('\n').length - content.split('\n').length;
+      if (added > 0) lineMap = [...Array<number>(added).fill(lineMap[0]), ...lineMap];
       content = normContent;
       this.headingMap.set(path, title);
       effectiveDepth = Math.min(6, depth);
@@ -634,8 +696,10 @@ export class InMemoryVaultCompiler {
           if (skipTitle) skipTitle = false;
           else lastOriginal = heading.level;
         }
-        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: index + 1 + lineOffset };
-        const withWiki = this.processWikiEmbeds(line, path, context);
+        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index] };
+        // US-8.4 | AC-5: links carry their note and source line to link conversion.
+        const marked = this.markLinks(line, path, lineMap[index]);
+        const withWiki = this.processWikiEmbeds(marked, path, context);
         return this.processMarkdownEmbeds(withWiki, path, context);
       }).join('\n');
     }
@@ -675,13 +739,19 @@ export class InMemoryVaultCompiler {
    */
   private classifyTocItem(line: string, currentFile: string): {
     kind: 'embed' | 'link' | 'other'; indent: string; text: string; target: string; note: boolean; line: string;
+    file: boolean;
   } {
     const match = line.match(/^(\s*)(?:[-*]|\d+\.)\s+(.*)$/)!;
     const indent = match[1];
     const rest = match[2].trim();
     const isNote = (raw: string) => {
       const r = this.resolve(raw, currentFile);
-      return { note: !r.missing && this.isMarkdownPath(r.path), target: r.path };
+      const note = !r.missing && this.isMarkdownPath(r.path);
+      // US-1.3 | AC-2: a file that is not a note — on the web, or with an
+      // extension other than `.md` — keeps its list item.
+      const local = raw.split('#')[0].trim();
+      const file = !note && (isWebAddress(local) || (/\.[A-Za-z0-9]+$/.test(local) && !this.isMarkdownPath(local)));
+      return { note, target: r.path, file };
     };
     const embedWiki = rest.match(/^!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$/);
     if (embedWiki) {
@@ -689,7 +759,7 @@ export class InMemoryVaultCompiler {
     }
     const embedMd = rest.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (embedMd) {
-      return { kind: 'embed', indent, text: `![${embedMd[1]}](${embedMd[2]})`, line, ...isNote(embedMd[2]) };
+      return { kind: 'embed', indent, text: `![${embedMd[1]}](${embedMd[2]})`, line, ...isNote(parseEmbedDestination(embedMd[2]).path) };
     }
     const wiki = rest.match(/^\[\[([^\]]+)\]\]$/);
     if (wiki) {
@@ -701,7 +771,7 @@ export class InMemoryVaultCompiler {
       const probe = isNote(md[2].trim());
       return { kind: probe.note ? 'link' : 'other', indent, text: `[${md[1]}](${md[2]})`, line, ...probe };
     }
-    return { kind: 'other', indent, text: rest, target: '', note: false, line };
+    return { kind: 'other', indent, text: rest, target: '', note: false, line, file: false };
   }
 
   /**
@@ -711,8 +781,9 @@ export class InMemoryVaultCompiler {
    * embed of a note or a link to a note (either syntax), each link item
    * becomes an embed in place, keeping its indentation and dropping the
    * bullet — unless this file already embeds that note explicitly (AC-5).
-   * Otherwise link items stay as written. Embed items lose their bullet in any
-   * list.
+   * Otherwise link items stay as written. Embed items of notes lose their
+   * bullet in any list; an item that embeds a file that is not a note stays as
+   * written (US-1.3 AC-2, decided 2026-10-31).
    */
   private expandTocLists(content: string, currentFile: string, explicitEmbeds: Set<string>): string {
     const ITEM = /^\s*(?:[-*]|\d+\.)\s+/;
@@ -730,7 +801,9 @@ export class InMemoryVaultCompiler {
       const items = run.map(line => this.classifyTocItem(line, currentFile));
       const isToc = items.every(item => item.kind !== 'other' && item.note);
       for (const item of items) {
-        if (item.kind === 'embed') {
+        if (item.kind === 'embed' && item.file) {
+          out.push(item.line);
+        } else if (item.kind === 'embed') {
           out.push(`${item.indent}${item.text}`);
         } else if (item.kind === 'link' && isToc && !explicitEmbeds.has(item.target)) {
           out.push(`${item.indent}!${item.text}`);
@@ -764,6 +837,12 @@ export class InMemoryVaultCompiler {
    * consulting the nearest enclosing provenance sentinel pair.
    */
   private findSourceLocation(content: string, offset: number): { file: string; line: number } {
+    // US-8.4 | AC-5: a link carries its location in the marker right before it.
+    const marked = content.slice(Math.max(0, offset - 1024), offset).match(/<!-- __vl__:(\d+):(.*?) -->$/);
+    if (marked) {
+      return { file: marked[2], line: Number(marked[1]) };
+    }
+
     const beginRe = /<!-- __vs__:(.*?) -->/g;
     const endRe   = /<!-- __ve__:(.*?) -->/g;
 
@@ -818,7 +897,29 @@ export class InMemoryVaultCompiler {
   private stripSentinels(content: string): string {
     return content
       .replace(/<!-- __vs__:.*? -->\n?/g, '')
-      .replace(/\n?<!-- __ve__:.*? -->/g, '');
+      .replace(/\n?<!-- __ve__:.*? -->/g, '')
+      .replace(LINE_MARKER, '');
+  }
+
+  /**
+   * US-8.4 | AC-5: puts a location marker (`<!-- __vl__:<line>:<note> -->`)
+   * in front of every link that `convertLinks` will read — wiki links and
+   * markdown links, not embeds — so its warnings name the note and source
+   * line however the document is assembled. `stripSentinels` removes them.
+   */
+  private markLinks(line: string, path: string, sourceLine: number): string {
+    const marker = `<!-- __vl__:${sourceLine}:${path} -->`;
+    const mark = (text: string) =>
+      text.replace(/(?<!!)(?:\[\[[^\]|]+(?:\|[^\]]*)?\]\]|\[[^\]]*\]\([^)]+\))/g, link => marker + link);
+    // Embeds are left whole: their targets are read by the embed passes.
+    const EMBED = /!\[\[[^\]|]+(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\([^)]+\)/g;
+    let out = '';
+    let last = 0;
+    for (const embed of line.matchAll(EMBED)) {
+      out += mark(line.slice(last, embed.index)) + embed[0];
+      last = (embed.index ?? 0) + embed[0].length;
+    }
+    return out + mark(line.slice(last));
   }
 
 
@@ -826,26 +927,34 @@ export class InMemoryVaultCompiler {
    * Process text-mapper fenced code blocks line by line.
    * Handles CRLF endings, empty blocks, and blocks nested inside other fences.
    * Calls `onBlock(code)` for each block and replaces the whole fence with the result.
+   * US-8.4 | AC-5: `from` gives, for each output line, the input line (0-based)
+   * it comes from; every line of a replaced block comes from its opening line.
    */
   private processTextMapperFences(
     content: string,
     onBlock: (code: string) => string
-  ): string {
+  ): { text: string; from: number[] } {
     const rawLines = content.split('\n');
     const result: string[] = [];
+    const from: number[] = [];
+    let blockStart = 0;
+    const push = (text: string, index: number) => {
+      result.push(text);
+      for (let k = text.split('\n').length; k > 0; k--) from.push(index);
+    };
     let outerFenceLen = 0;  // >0 means we are inside a non-text-mapper fence
     let outerFenceChar = '';
     let inTm = false;
     let tmLines: string[] = [];
 
-    for (const rawLine of rawLines) {
+    for (const [index, rawLine] of rawLines.entries()) {
       const line = rawLine.replace(/\r$/, '');  // strip CRLF \r
 
       if (inTm) {
         const closeMatch = line.match(/^(`{3,})\s*$/);
         if (closeMatch && closeMatch[1].length === 3) {
           inTm = false;
-          result.push(onBlock(tmLines.join('\n')));
+          push(onBlock(tmLines.join('\n')), blockStart);
           tmLines = [];
         } else {
           tmLines.push(line);
@@ -864,7 +973,7 @@ export class InMemoryVaultCompiler {
             outerFenceChar = '';
           }
         }
-        result.push(rawLine);
+        push(rawLine, index);
         continue;
       }
 
@@ -877,25 +986,26 @@ export class InMemoryVaultCompiler {
           // Start of a text-mapper block — consume the opening line
           inTm = true;
           tmLines = [];
+          blockStart = index;
         } else {
           // Start of a non-text-mapper outer fence
           outerFenceLen = backticks.length;
           outerFenceChar = backticks[0];
-          result.push(rawLine);
+          push(rawLine, index);
         }
         continue;
       }
 
-      result.push(rawLine);
+      push(rawLine, index);
     }
 
     // Unclosed text-mapper fence at EOF — pass through unchanged
     if (inTm) {
-      result.push('```text-mapper');
-      result.push(...tmLines);
+      push('```text-mapper', blockStart);
+      tmLines.forEach((tmLine, k) => push(tmLine, blockStart + 1 + k));
     }
 
-    return result.join('\n');
+    return { text: result.join('\n'), from };
   }
 
   /**
@@ -1066,7 +1176,7 @@ export class InMemoryVaultCompiler {
       return '';
     }
     // The section starts with its anchor heading (never inside a code block).
-    const shown = section.split('\n').map(l => matchHeading(l)).find(h => h !== null);
+    const shown = section.split('\n').map(l => matchHeading(l.replace(LINE_MARKER, ''))).find(h => h !== null);
     this.headingMap.set(path, shown ? shown.rest.trim() : titleFromBasename(base));
     return '\n' + this.shiftSectionTo(section, depth, base, path) + '\n';
   }
@@ -1128,6 +1238,10 @@ export class InMemoryVaultCompiler {
   private processWikiEmbeds(content: string, currentFile: string, context: EmbedContext): string {
     return content.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_m, rawLink, display) => {
       const link = rawLink.trim();
+      if (isWebAddress(link)) {
+        // US-2.6 | AC-2: the alias becomes the alt text, as for local images.
+        return `![${display ? display.trim() : ''}](${link})`;
+      }
       const resolved = this.resolve(link, currentFile);
       if (resolved.missing) {
         this.stats.missingReferences += 1;
@@ -1183,7 +1297,7 @@ export class InMemoryVaultCompiler {
       if (/<!-- __v[se]__:[^\s>]+ -->/.test(lines[i])) continue;
 
       // KD-3: a line inside a code block is never a heading.
-      const heading = inCode[i] ? null : matchHeading(lines[i]);
+      const heading = inCode[i] ? null : matchHeading(lines[i].replace(LINE_MARKER, ''));
       if (heading && heading.rest.trim() !== '') {
         const level = heading.level;
         const text = heading.rest.trim().toLowerCase();
@@ -1212,17 +1326,22 @@ export class InMemoryVaultCompiler {
       if (/^(?:\.\.\/|\.\/)?assets\//.test(rawPath)) {
         return _m;
       }
-      const resolved = this.resolve(rawPath, currentFile);
+      const destination = parseEmbedDestination(rawPath);
+      // US-2.6 | AC-1: images from the web stay as written.
+      if (isWebAddress(destination.path)) {
+        return _m;
+      }
+      const resolved = this.resolve(destination.path, currentFile);
       if (resolved.missing) {
-        if (this.usedAssetNames.has(this.basename(rawPath))) {
+        if (this.usedAssetNames.has(this.basename(destination.path))) {
           return _m;
         }
         this.stats.missingReferences += 1;
-        this.report('Missing asset', rawPath, currentFile, context.line);
+        this.report('Missing asset', destination.path, currentFile, context.line);
         return `<!-- Warning: Missing asset -->`;
       }
       if (resolved.ambiguity !== null) {
-        this.report(resolved.ambiguity, rawPath, currentFile, context.line);
+        this.report(resolved.ambiguity, destination.path, currentFile, context.line);
       }
       if (this.isMarkdownPath(resolved.path)) {
         if (resolved.anchor !== null) {
@@ -1244,7 +1363,9 @@ export class InMemoryVaultCompiler {
         }
         return this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
       }
-      return this.assetTag(resolved.path, alt);
+      const tag = this.assetTag(resolved.path, alt);
+      // US-2.6 | AC-3: an image keeps its title after the new path.
+      return destination.title !== '' && tag.startsWith('![') ? `${tag.slice(0, -1)}${destination.title})` : tag;
     });
   }
 

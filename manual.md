@@ -154,16 +154,29 @@ Obsidian's embeds work as well, anywhere in a note (not only in lists):
 | `![[Combat]]` | the whole note *Combat* |
 | `![[Combat#Rounds]]` | only the section *Rounds* of the note *Combat*: that heading and everything under it, up to the next heading of the same or higher level |
 | `![[map.png]]` | the picture, copied into `assets` |
+| `![Logo](logo.png "Company logo")` | the picture, copied into `assets`, with its title kept |
+| `![Logo](https://example.com/logo.png)` | left exactly as written: the picture is shown from the web when the document is read, nothing is copied |
+| `![[https://example.com/logo.png]]` | turned into `![](https://example.com/logo.png)`, so it shows as a picture |
 
 The standard markdown style `![Combat](Combat.md)` works exactly the same.
+
+In a list, an item that embeds a **note** loses its bullet, so the note does
+not start on a list marker. An item that embeds a **picture or other file**
+keeps it, so a list of pictures stays a list:
+
+```markdown
+- ![Front](front.png)        →   - ![Front](assets/front.png)
+- ![Back](back.png)          →   - ![Back](assets/back.png)
+```
 
 ### Links can be written any way Obsidian understands
 
 Short links (`[[Combat]]`), full paths (`[[Rules/Chapters/Combat]]`) and
 relative paths (`[Combat](../Chapters/Combat.md)`) are all found the same way
 Obsidian finds them. If two notes in different folders have the same name and
-the link doesn't say which one, the plugin picks the first one alphabetically by
-folder path and adds a warning.
+the link doesn't say which one, Obsidian decides which one is used, as when you
+click the link, and the warnings file says which note was used and where the
+link is.
 
 ### Numbered file names (recommended)
 

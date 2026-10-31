@@ -278,6 +278,20 @@ Definitions:
     list marker. `- ![[A]]` / `- some text` → `![[A]]` / `- some text`.
     (Measured 2026-10-27: no list in the book mixes embed items with other
     items.)
+  - This holds only for embeds of notes. An item that embeds a file that is
+    not a note — a target with an extension other than `.md`, or a web address
+    (US-2.6) — stays a list item, exactly as written before embedding
+    (decided 2026-10-31; before, it lost its bullet and a wiki alias, so
+    `- ![[pic.png|200]]` became `![](assets/pic.png)`):
+    - `- ![a](pic.png)` / `- ![b](pic.png)` → `- ![a](assets/pic.png)` /
+      `- ![b](assets/pic.png)`;
+    - `- ![[pic.png|200]]` → `- ![200](assets/pic.png)`;
+    - `- ![logo](https://example.com/x.png)` → unchanged; also a web image
+      without an extension, `- ![chart](https://example.com/render?id=3)`;
+    - `- ![](gone.png)` → `- <!-- Warning: Missing asset -->`;
+    - `- ![[A]]` / `- ![a](pic.png)` → the note `A`, then `- ![a](assets/pic.png)`;
+    - a missing note keeps today's form: `- ![[Gone]]` →
+      `<!-- Warning: Missing include -->` (no bullet).
 - **AC-3 Order.** Items are embedded in listed order.
 - **AC-4 Nesting.** Nested ToCs expand recursively (an embedded note's own
   ToC lists expand when that note is processed).
@@ -358,6 +372,64 @@ written safely in the compiled markdown
 - File extensions are lowercased.
 - Compiled markdown links use the normalized filename.
 - Original source filenames are preserved by deduplication tracking.
+
+### US-2.6 Images from the web, and image titles
+**As a** vault owner  
+**I want** images embedded from a web address to stay in the compiled
+document, and image titles to be kept  
+**So that** no picture disappears from the document.
+
+*(Written 2026-10-31 from [#94](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/94);
+decisions OD-I1 to OD-I3 the same day. Measured with v0.17.1: every form below
+was replaced by `<!-- Warning: Missing asset -->` and reported as a missing
+asset; `![[https://…]]` by `<!-- Warning: Missing include -->`.)*
+
+Definitions:
+- A **web address** starts with `http://` or `https://`, in any case.
+- The **destination** of `![alt](…)` is either `<…>` (angle brackets, may
+  contain spaces) or the text up to the first space; it may be followed by a
+  **title** in `"…"` or `'…'`.
+
+**Acceptance criteria**
+- **AC-1 Web images stay as written (OD-I1).** `![alt](destination)` with a
+  web address is kept exactly as written, without a warning and without
+  copying anything:
+  - `![logo](https://example.com/x.png)`, `![logo](http://example.com/x.png)`,
+    `![logo](HTTPS://example.com/x.png)`, `![](https://example.com/x.png)`;
+  - `![logo](https://example.com/x.png?size=2&v=1)`,
+    `![logo](https://example.com/a%20b.png)`,
+    `![logo](<https://example.com/a b.png>)`,
+    `![logo](https://example.com/x.png "Logo")`;
+  - inside a sentence: `Look: ![logo](https://example.com/x.png) here.` stays.
+- **AC-2 Wiki embeds of a web address (OD-I2).** `![[https://example.com/x.png]]`
+  becomes `![](https://example.com/x.png)`; an alias becomes the alt text, as
+  for local images (`![[pic.png|200]]` → `![200](assets/pic.png)`):
+  `![[https://example.com/x.png|200]]` → `![200](https://example.com/x.png)`.
+  No warning.
+- **AC-3 Titles are kept (OD-I3).** A local image with a title is copied like
+  one without, and the title is kept as written after the new path:
+  - `![logo](pic.png "Logo")` → `![logo](assets/pic.png "Logo")`;
+  - `![logo](pic.png 'Logo')` → `![logo](assets/pic.png 'Logo')`;
+  - `![x](<my pic.png>)` → `![x](assets/my_pic.png)` (US-2.5 names);
+  - missing: `![x](gone.png "T")` → `<!-- Warning: Missing asset -->`, reported
+    with link `gone.png`.
+- **AC-4 One parser.** Every step that reads an image's destination — the
+  scan for explicit embeds, the ToC classification (US-1.3) and the embedding —
+  uses the same rule, so a title or angle brackets never make a note or file
+  unrecognised in one step and recognised in another.
+  - `![A](A.md "the note")` embeds note `A`.
+  - The same embed above the list `- [[A]]` / `- [[B]]`: `A` counts as
+    already embedded (US-1.3 AC-5), so it appears once and the item stays a
+    link.
+- **AC-5 In lists** see US-1.3 AC-2: a list item that embeds an image keeps
+  its bullet.
+
+**Decisions (2026-10-31)**
+- **OD-I1:** web images are kept as written, without a warning (not with a
+  warning, not removed).
+- **OD-I2:** `![[url]]` becomes `![](url)` (not kept as written, not removed).
+  Not measured: whether Obsidian itself shows `![[url]]` as an image.
+- **OD-I3:** the title of a local image is kept (not dropped).
 
 ## Epic 3 — Link resolution challenge
 
@@ -1509,6 +1581,39 @@ external websites, or anchor targets in the compiled output
   throughout the pipeline so it is available when those passes emit warnings.
   A warning entry must never record `compiled-output` or a line number that
   refers to a position in the merged document.
+- **AC-5 Source lines in every case** *(added 2026-10-31 from
+  [#95](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/95))*. The
+  line is the line of the link or embed in the note as stored, frontmatter
+  included, whatever the compiler did around it: notes embedded above it,
+  ToC lists expanded above it, map blocks turned into one image line, removed
+  control blocks (Dataview, Meta Bind …), a title injected by "Normalise
+  headings", and a section embed that brings the link along. In each example
+  the warning is for the last line shown; measured with v0.17.1 (before → after):
+
+  | Note (`index.md` unless named) | before | after |
+  |---|---|---|
+  | `# Index` / `` / `text` / `` / `See [[Gone]].` | 5 | 5 |
+  | `# Index` / `` / `![[Here]]` / `` / `See [[Gone]].` | 10 | 5 |
+  | the same with `See [x](Gone.md).` | 10 | 5 |
+  | the same with `See [[Other]].` (exists, not embedded) | 10 | 5 |
+  | two embeds above (`![[Here]]`, `![[Here2]]`), link on line 7 | 18 | 7 |
+  | ToC list `- [[Here]]` / `- [[Here2]]` above, link on line 6 | 16 | 6 |
+  | section embed `![[Here#Here]]` above, link on line 5 | 11 | 5 |
+  | frontmatter `---` / `tags: [x]` / `---` above `# Index` / `` / `text` / ``, link on line 8 | 5 | 8 |
+  | ` ```text-mapper ` block of 4 lines above, link on line 8 | 5 | 8 |
+  | ` ```dataview ` block of 4 lines above, link on line 8 | 5 | 8 |
+  | the same two with `![[Gone]]` (embed warning) on line 8 | 5 | 8 |
+  | `Part.md` = `# Part` / `` / `See [[Gone]].`, embedded | 3 | 3 |
+  | `Part.md` = `# Part` / `` / `![[Here]]` / `` / `See [[Gone]].` | 10 | 5 |
+  | `Part.md` = `Intro.` / `` / `![[Here]]` / `` / `See [[Gone]].`, "Normalise headings" on / off | 11 / 12 | 5 / 5 |
+
+  A link brought along by a section embed is reported in the note it is
+  written in: `Here.md` = `# Here` / `` / `from here [[Gone]]`, embedded as
+  `![[Here#Here]]` → `Here.md`, line 3. A link inside a heading reports the
+  heading's line: `## See [[Gone]]` on line 3 → line 3. The markers that carry
+  the location never change which section a section embed finds:
+  `![x](Here.md#Notes on [[Other]])` with `Here.md` = `# Here` / `` /
+  `## Notes on [[Other]]` / `` / `body` embeds that section.
 
 ### US-8.5 Each problem is reported once, where it was written
 **As a** vault owner  
