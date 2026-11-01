@@ -307,7 +307,18 @@ file name. See [section 8](#8-headings) for the details.
 **Step 7 — Turn links into jump links.** A link to another note becomes a link
 to that note's heading *inside the document*, so readers can click to jump
 there. For example, `[[1.2 Combat]]` becomes a link labelled **Combat** that
-jumps to the *Combat* heading.
+jumps to the *Combat* heading. The jump links are written the way Obsidian
+writes them itself, so they work when you read the document in Obsidian.
+
+- A link to a heading — in another note (`[[Combat#Rounds]]`) or in the same
+  note (`[[#Rounds]]`, `[Rounds](#Rounds)`) — jumps to that heading in the
+  document. If the heading isn't in the note, or isn't part of the document,
+  the link jumps to the start of the note instead and you get a warning.
+- If two headings have the same text, the link jumps to the right one by
+  naming the heading above it (`#Chapter Two#Intro`), as Obsidian does. If
+  nothing tells them apart — two notes with the same title side by side —
+  the link goes to the first and you get a warning.
+- Links to a block (`[[#^id]]`) aren't converted yet.
 
 - If the linked note exists but is **not part of the document** (you never
   listed or embedded it), the link is replaced by a hidden warning, because it
@@ -576,7 +587,9 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | Warning | What it means | How to fix it |
 |---|---|---|
 | **Missing include** | A listed or embedded note doesn't exist. | Check the spelling of the link, or create the note. |
-| **Missing heading anchor** | `![[Note#Heading]]` names a heading that isn't in the note. | Check the heading's spelling in the note. |
+| **Missing heading anchor** | `![[Note#Heading]]` or a link to a heading names a heading that isn't in the note. | Check the heading's spelling in the note. |
+| **heading … not embedded in compiled output** | A link points at a heading of a note, but only another part of that note is in the document. | Embed the whole note, or link to the part that is in it. |
+| **Heading "…" occurs … times and no heading path tells them apart** | Two headings have the same text and nothing above them differs. | Rename one of the headings or notes. |
 | **link target … not embedded in compiled output** | You link to a note that exists but isn't part of the document. | Add the note to a table of contents, or remove the link. |
 | **Ambiguous filename** | Two notes have the same name; the plugin picked one. | Use a link with the folder path, or rename one of the notes. |
 | **Missing asset** | A picture or file couldn't be found. | Check the file name in the embed. |
@@ -652,11 +665,11 @@ Try switching **Normalise headings** on, and number your file names (`1`,
 [section 8](#8-headings).
 
 **A link in the document jumps to the wrong place.**
-If two notes in the document have the same title (for example `1 Intro.md` and
-`2 Intro.md`, both titled *Intro*), links to the second may jump to the first.
-Give the notes different names. Also, links that you wrote by hand to a heading
-(like `[Zeal](#Zeal)`) are kept exactly as written and may not match the
-heading in the document.
+If two notes in the document have the same title and sit side by side (for
+example `1 Intro.md` and `2 Intro.md`, both titled *Intro*), links to the
+second jump to the first; the warnings file says so. Give the notes different
+names. The jump links are made for Obsidian; other programs that show markdown
+(GitHub, Pandoc) may not find them.
 
 **Can I use it on my phone or tablet?**
 Yes. The only limit is that the document must be saved inside the vault.

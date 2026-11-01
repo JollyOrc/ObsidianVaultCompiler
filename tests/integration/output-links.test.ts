@@ -33,7 +33,7 @@ describe('compiled output link portability', () => {
       'Dir with Space/Target Spell.md': '# Target Spell\n',
     };
     const result = new InMemoryVaultCompiler(encodedFiles).compile('index2compile.md');
-    assert.match(result.content, /\[Spell\]\(#target-spell\)/i);
+    assert.match(result.content, /\[Spell\]\(#Target%20Spell\)/);
   });
 
   it('removes invalid HTML link targets from output', () => {

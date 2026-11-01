@@ -485,7 +485,7 @@ describe('pass-through embed: the target is shown as if embedded directly at the
       'B.md': '# Real Heading\nContent',
       'C.md': 'See [[A]].',
     }, 'index.md');
-    assert.match(result.content, /\[B\]\(#b\)/);
+    assert.match(result.content, /\[B\]\(#B\)/);
     assert.match(result.content, /^# B$/m);
   });
 });

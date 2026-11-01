@@ -58,6 +58,28 @@ describe('US-8.4 AC-5: warnings name the line in the note as stored', () => {
   }
 });
 
+describe('US-8.4 AC-5: several links on one line (found with v0.18.0)', () => {
+  it('each warning names its own note and line', () => {
+    const r = new InMemoryVaultCompiler({
+      'index.md': '# Index\n\n![[Grit]]\n',
+      'Grit.md': '# Grit\n\nSee [[Gone]], [[Lost]], [x](Away.md).\n',
+    }, { enableTextMapper: true, assetFolder: 'assets' }).compile('index.md');
+    assert.deepEqual(r.warningDetails, [
+      { message: 'Missing wiki link', link: 'Gone', file: 'Grit.md', line: 3 },
+      { message: 'Missing wiki link', link: 'Lost', file: 'Grit.md', line: 3 },
+      { message: 'Missing markdown link', link: 'Away.md', file: 'Grit.md', line: 3 },
+    ]);
+  });
+
+  it('a link reads the marker right before it, not an earlier one', () => {
+    const r = new InMemoryVaultCompiler({
+      'index.md': '# Index\n\nSee [[Grit]].\n\n![[Grit]]\n',
+      'Grit.md': '# Grit\n\nSee [[index]].\n\nSee [[Gone]].\n',
+    }, { enableTextMapper: true, assetFolder: 'assets' }).compile('index.md');
+    assert.deepEqual(r.warningDetails, [{ message: 'Missing wiki link', link: 'Gone', file: 'Grit.md', line: 5 }]);
+  });
+});
+
 describe('US-8.4 AC-5: the location markers never change which section is found', () => {
   it('a section whose heading holds a link is embedded', () => {
     const r = new InMemoryVaultCompiler({

@@ -13,6 +13,8 @@
  *     note, a headingless note and a pass-through wrapper
  *   - US-4.x three maps (one `option horizontal`, one with US-4.10
  *     directives) become three PNG references
+ *   - US-2.3 links to headings: another note's, the same note's, a heading
+ *     text two notes share, the second of two equal headings (M17)
  *
  * The fixture notes sit in a subfolder so the top-level fixture test
  * (fixture-vault.test.ts) is unaffected. Its warnings (none) are asserted in
@@ -75,6 +77,13 @@ describe('smoke book — "Normalise headings" on', () => {
       '#### Fog Lantern',
       '# Seasonal Charms',     // US-6.5: "2 Charms" passes through at depth 1
       '## Skill tree',         // US-4.10: map with directives; same level as Appendix
+      '# Heading links',       // US-2.3 (M17): prefix 3
+      '## Grit and Moss (optional)',
+      '## Zeal',               // also under Dueling (US-2.3 AC-5, AC-6)
+      '## Part One',
+      '### Notes',
+      '## Part Two',
+      '### Notes',             // the second Notes (US-2.3 AC-6)
       '## Appendix',           // headingless, `[text](path)` item of a mixed list
       '### Glossary of the Vale', // `[text](path)` ToC list
       '### Map key',
@@ -126,6 +135,19 @@ for (const normaliseHeadings of [true, false]) {
 
     it('US-2.1: the image from the vault root is copied as an asset', () => {
       assert.match(result.content, /!\[\]\(assets\/media\.png\)/);
+    });
+
+    it('US-2.3: the links of `3 Heading links` (M17)', () => {
+      for (const link of [
+        '[Dueling](#Dueling)',
+        '[Zeal](#Zeal)',
+        '[Grit and Moss (optional)](#Grit%20and%20Moss%20%28optional%29)',
+        '[grit](#Grit%20and%20Moss%20%28optional%29)',
+        '[Zeal](#Heading%20links#Zeal)',
+        '[Notes](#Part%20Two#Notes)',
+      ]) {
+        assert.ok(result.content.includes(link), link);
+      }
     });
   });
 }

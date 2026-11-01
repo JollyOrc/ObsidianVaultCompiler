@@ -184,18 +184,29 @@ const sha = (text: string) => createHash('sha256').update(text).digest('hex').sl
 describe('US-8.5 AC-5: the compiled text does not change', () => {
   // Measured 2026-10-31 with v0.17.0, before the change. The index2compile.md
   // hashes changed once on purpose with #96 (v0.18.0): its `- ![[media.png]]`
-  // keeps the bullet (US-1.3 AC-2); asserted below.
+  // keeps the bullet (US-1.3 AC-2); asserted below. They changed again with
+  // #99 (v0.19.0): only `[B](#b)` → `[B](#B)` (US-2.3 AC-2), asserted below.
+  // The smoke book gained `3 Heading links.md` for M17; a line diff against
+  // v0.18.0 showed only that note's six links (US-2.3) and no other change.
   const BEFORE: Array<[string, boolean, string]> = [
-    ['index2compile.md', false, '261974b48defb467'],
-    ['index2compile.md', true, '365c5b4ea395d465'],
-    ['Smoke/Smoke book.md', false, '9ad1f566a7dc74d0'],
-    ['Smoke/Smoke book.md', true, 'e6c94dc2f6fd2957'],
+    ['index2compile.md', false, '6f08f48986a530b4'],
+    ['index2compile.md', true, '61fc2cd03fc90d87'],
+    ['Smoke/Smoke book.md', false, 'c4b3972c089fc6af'],
+    ['Smoke/Smoke book.md', true, '0524bc309e091948'],
   ];
   for (const [start, normaliseHeadings, hash] of BEFORE) {
     it(`${start}, "Normalise headings" ${normaliseHeadings ? 'on' : 'off'}: byte-identical`, () => {
       assert.equal(sha(compileFixture(start, normaliseHeadings).content), hash);
     });
   }
+
+  it('#99: the one intended change of v0.19.0 — anchors are heading text', () => {
+    for (const normaliseHeadings of [false, true]) {
+      const lines = compileFixture('index2compile.md', normaliseHeadings).content.split('\n');
+      assert.equal(lines.filter(l => l === '- [B](#B)').length, 2);
+      assert.ok(!lines.includes('- [B](#b)'));
+    }
+  });
 
   it('#96: the one intended change — the image item keeps its bullet', () => {
     for (const normaliseHeadings of [false, true]) {
@@ -205,10 +216,13 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
     }
   });
 
-  it('fixture warnings: index2compile.md has only its real missing note; the smoke book none', () => {
+  it('fixture warnings: index2compile.md has only its real missing note', () => {
     const index = compileFixture('index2compile.md', false);
     assert.deepEqual(index.warnings, ['Warning: Missing include']);
     assert.deepEqual(index.warningDetails, [{ message: 'Missing include', link: 'missing.md', file: 'index2compile.md', line: 6 }]);
+  });
+
+  it('fixture warnings: the smoke book none', () => {
     const smoke = compileFixture('Smoke/Smoke book.md', false);
     assert.deepEqual(smoke.warnings, []);
     assert.deepEqual(smoke.warningDetails, []);

@@ -33,5 +33,11 @@ test; the rest was taken from expectation, not from the tool.
   ("not measured: …"), not as a fact, and stays an open item.
 - When a story builds on another story's statement about a tool, the test
   that backs it is named; without one, it is measured first.
+- When the tool can produce the thing in question itself (an editor's link
+  autocomplete, an export, a "copy" command), take its own output as the
+  first measurement instead of guessing candidate forms and trying each
+  (added 2026-11-01: three rounds of guessed link forms left headings with
+  `#` and `:` unreachable; the fourth, Obsidian's own autocomplete, showed
+  the rule at once — SCAR-033).
 - Applies next to: compiler and renderer behaviour, Obsidian API timing and
   events, file formats, library defaults.

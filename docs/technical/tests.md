@@ -114,6 +114,65 @@ Images from the web, titles and image lists (US-2.6, US-1.3 AC-2, #94;
 - The compiled `index2compile.md` changed once on purpose: its
   `- ![[media.png]]` item keeps the bullet; the output-hash guards of US-8.5
   were updated and the line is asserted.
+
+Anchors Obsidian finds (US-2.3 AC-1 to AC-7, #83, #85;
+`tests/integration/obsidian-anchors.test.ts`, written 2026-11-01 before the
+code):
+- `findInObsidian` models the lookup measured in Obsidian (the table in
+  US-2.3): heading text compared case-insensitively, `%` escapes decoded, a
+  path `A#B#C` matched against the target's parents nearest first, parents
+  skippable; in the heading (not in the link) `#`, `:`, `|`, `^` count as
+  spaces. A guard test replays the measured rows A1–A9, B1–B4, C1–C4,
+  D1–D10, E3, E7, E8, F1–F6 and G1–G9 against the model, so the model cannot
+  drift from the measurement. Its first run with G7 (`%3A`) caught the model
+  replacing `:` in the link as well; fixed.
+- AC-2: one test per row of the anchor table (thirteen rows); each also
+  checks that the model finds every anchor. A converted link in a heading;
+  headings that differ only in `#`, `:`, `|`, `^` are duplicates.
+- AC-3: title rule with and without "Normalise headings", own label, a note
+  embedded twice, a note of which only a section is embedded.
+- AC-4: five link forms, a missing heading, a heading not embedded (exact
+  warning lists); guard: a note not in the output keeps the US-8.3 comment.
+- AC-5: heading, case and the author's own path in both heading modes; the
+  note's replaced first heading; missing headings in both syntaxes with
+  warnings; the same heading text in an earlier note; a link brought along by
+  a section embed. Guard: block links unchanged.
+- AC-6: the story's table, every row with its warning list and, where a path
+  is written, the model's answer compared with the intended heading; the
+  row with "Normalise headings" off (no parent, warning W) and the two
+  sibling notes with the same title in both modes; parents that differ only
+  in case (E8).
+- AC-7: a heading-like line in a code fence; the composed book with both
+  heading modes, five anchors, all found.
+- Existing tests that stated the slug rule were changed to the new
+  expectation (`output-links`, `pass-through-embed`, `heading-anchors`: the
+  invariant now compares decoded heading text, as Obsidian does).
+- Before the code: all 42 `todo` tests fail on v0.18.0.
+- Found while coding (v0.19.0): the AC-2 rows first used the raw heading in
+  the link (`[[Note#C# basics]]`), which Obsidian reads as a path; they now
+  use Obsidian's own form (F1–F6). Warnings of one note now come in the order
+  of its links (one scan for both link kinds). Section embeds are wrapped in
+  their note's sentinels so links find where a section-only note is.
+- `slugify` and its unit and fuzz tests were removed; nothing calls it.
+- Mutation check 2026-11-01 (#99, #101): 17 mutants (`%` not encoded,
+  `# : | ^` kept, no parent path, only the top parent, `find` ignoring
+  parents, alignment plain only / titled only, one phase, same-note links
+  in any copy, sections not wrapped — wiki, markdown, pass-through —, no
+  warning W, `decodeLink` without its fallback, no balanced brackets, a
+  missing same-note markdown link converted). Six first survived for want
+  of an input: a link to the only section embedded; a note embedded twice
+  with a same-note link; a lone `%` before an escape; a missing heading with
+  a space (`#Gone%20Away`); a section embedded in markdown syntax and through
+  a pass-through wrapper. Tests and story examples added; all 17 caught.
+- Output-hash guards: a line diff of both fixture books against v0.18.0
+  showed only `[B](#b)` → `[B](#B)` and the six links of `3 Heading links`;
+  hashes updated, the change asserted.
+
+`%` in links (US-3.1, #101; `tests/integration/percent-links.test.ts`,
+written before the code):
+- The story's five examples (a note and a heading named with `%`, a valid
+  escape, a picture, a missing note); each aborted the compilation in
+  v0.18.0. A text check keeps `decodeLink` the only decoder.
 ### Epic 3 — Link resolution challenge
 - Absolute markdown links become anchor links.
 - Relative markdown links become anchor links.
@@ -303,8 +362,8 @@ Frontmatter (US-5.2, v0.13.0):
 - Missing links emit `<!-- Warning: Missing include: filename.md -->`.
 - Unreadable files emit `<!-- Warning: Unreadable file: filename.md -->`.
 - Statistics report all required totals.
-- Slugification preserves numeric prefixes, e.g.
-  `1.3.1 Combat` -> `1.3.1-combat`.
+- Anchors are the heading text as Obsidian finds it (US-2.3 AC-2, since
+  v0.19.0), e.g. `1.3.1 Combat` -> `#1.3.1%20Combat`; see Epic 2.
 
 Heading rules of 2026-10-27 (US-6.1, US-6.3 to US-6.5, US-2.3; v0.11.0):
 - `tests/unit/title.test.ts` — every transform of `titleFromBasename`
@@ -402,11 +461,19 @@ Source lines in warnings (US-8.4 AC-5, #95; `tests/integration/warning-lines.tes
   embeds left unmarked, marker read and stripped, section headings, embed
   lines); one first survived (section headings with markers), test added,
   all caught.
+- Several links with warnings on one line (added 2026-11-01, found with
+  v0.18.0): every warning names its own note and line; the exact warning
+  list is asserted. Before the fix the second and third name a file that
+  contains marker text. A second test puts a link with a marker on an earlier
+  line of the same note, so that reading any marker but the last one gives
+  a wrong line. Mutation check 2026-11-01 (#98): 2 mutants (the old pattern;
+  the pattern without its end anchor); the second first survived for want of
+  that input, test added, both caught.
 
 ## 4. Property-based and fuzz tests
 
-- Fuzz slugification with Unicode, spaces, underscores, punctuation and numeric
-  prefixes.
+- (Slug fuzzing removed with `slugify` in v0.19.0, #99; anchors are tested
+  against the measured Obsidian model in `obsidian-anchors.test.ts`.)
 - Fuzz path resolution with absolute, relative, encoded and bare filenames.
 - Fuzz asset collision handling with many files of the same basename.
 - Fuzz TextMapper block parsing with empty blocks, comments, and invalid
@@ -431,7 +498,7 @@ Required assertions:
 1. The compiled output contains all included files in order.
 2. Embedded markdown appears inline.
 3. Assets are copied once and referenced correctly.
-4. Anchor links point to generated slugs.
+4. Anchor links point to headings Obsidian finds (US-2.3).
 5. Warnings for missing/unreadable/circular files are present.
 6. TextMapper output contains either a PNG reference or placeholder warning.
 7. Control command fences are absent.
@@ -456,6 +523,7 @@ Every note name is unique in the vault (SCAR-012). Start note:
 | `Seasonal Charms.md` | flat-top map: long labels, `Polish&Transplant`, linked label `Rootbinder\|Mend a Bone`, green, pink and orange paths (US-4.2, US-4.8, US-4.9) |
 | `Appendix.md` | headingless; `[text](path)` ToC list, a section embed `![[1.1 Moving#Climbing]]` (US-1.2), `![[media.png]]` |
 | `Glossary of the Vale.md`, `Map key.md` | `Map key` holds a pointy-top map (`option horizontal`) |
+| `3 Heading links.md` | links to a note, to a heading of another note, to a heading of its own with spaces and brackets (also written by hand in lower case), to a heading text another note has too, and to the second of two equal headings (`[[#Part Two#Notes]]`); M17 (US-2.3, added 2026-11-01) |
 | `Skill tree.md` | map with `# vault-compiler: no-outlines no-glow` and `option global`: seven hexes of a custom type `skill-moss` with a filtered green outline, checkbox, checkmark, watercolour and `Dice` symbols, the linked label `Fog Lantern\|Lantern Lore`, the path label `Old Road`, the hyphenated label `Thorn-weaving Hands` (US-4.10, added 2026-10-31) |
 
 `tests/integration/smoke-vault.test.ts` compiles the smoke book with
@@ -659,4 +727,25 @@ v1.1.0 enabled, "Map font" empty, "Tidy map labels" on.
 5. Open the PNG of `Smoke/Seasonal Charms.md`: black outlines and white
    glow are still there (no directive, AC-8).
 6. Is anything missing, odd or ugly that this list did not ask about? Report
+   it even if it seems unrelated.
+
+### M17 — Links to headings in Obsidian (US-2.3, #83, #85)
+
+Result 2026-11-01 with v0.19.0: passed (reported by the user).
+
+No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
+`Smoke/Smoke book.md`, output folder `Export`.
+
+1. The plugin list shows the version under test.
+2. Compile with "Normalise headings" on. Open the compiled book in reading
+   view and find the section **Heading links**. Click each of its six links
+   (scroll back after each); each lands where its line says:
+   - Dueling; the Zeal that follows Dueling;
+   - Grit and Moss (optional), twice;
+   - the Zeal under Heading links, not the one after Dueling;
+   - Notes under Part Two, not under Part One.
+3. Repeat step 2 with "Normalise headings" off.
+4. The warnings file of both compilations has no entry for
+   `3 Heading links.md`.
+5. Is anything missing, odd or ugly that this list did not ask about? Report
    it even if it seems unrelated.

@@ -2,19 +2,21 @@
  * Tests for links to embedded files (US-2.3, US-8.3) after the title rule of
  * 2026-10-27 (US-6.4) — known defect KD-1.
  *
- * Invariant: every `[label](#slug)` produced for a link to an embedded file
+ * Invariant: every `[label](#anchor)` produced for a link to an embedded file
  * points at a heading that exists in the output, with the toggle on and off.
+ * Since 2026-11-01 anchors are the heading text as Obsidian finds it
+ * (US-2.3 AC-2), no longer slugs.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { InMemoryVaultCompiler } from '../../plugin/src/compiler.ts';
-import { slugify } from '../../plugin/src/utils.ts';
 
-/** All heading slugs present in the compiled output. */
-function headingSlugs(content: string): Set<string> {
+
+/** US-2.3 | AC-2: all heading texts in the output, as Obsidian compares them. */
+function headingTexts(content: string): Set<string> {
   return new Set(
-    [...content.matchAll(/^#{1,6}\s+(.+)$/gm)].map(m => slugify(m[1].trim())),
+    [...content.matchAll(/^#{1,6}\s+(.+)$/gm)].map(m => m[1].trim().toLowerCase()),
   );
 }
 
@@ -43,17 +45,18 @@ for (const normalise of [true, false]) {
       /** US-2.3 / US-8.3 / KD-1: checks all 5 links of Links.md (SCAR-023: count asserted). */
       const targets = anchorTargets(result.content);
       assert.equal(targets.length, 5, `expected 5 anchor links, got ${targets.length}: ${targets.join(', ')}`);
-      const slugs = headingSlugs(result.content);
+      const texts = headingTexts(result.content);
       for (const t of targets) {
-        assert.ok(slugs.has(t), `anchor #${t} has no heading; headings: ${[...slugs].join(', ')}`);
+        const text = decodeURIComponent(t).toLowerCase();
+        assert.ok(texts.has(text), `anchor #${t} has no heading; headings: ${[...texts].join(', ')}`);
       }
     });
 
-    it('labels and slugs follow the title rule', () => {
-      /** US-2.3: `[[1.2 Third-Level]]` → `[Third-Level](#third-level)`. */
-      assert.match(result.content, /\[Third-Level\]\(#third-level\)/);
-      assert.match(result.content, /\[Combat\]\(#combat\)/);
-      assert.match(result.content, /\[Notes\]\(#notes\)/);
+    it('labels and anchors follow the title rule', () => {
+      /** US-2.3 AC-3: `[[1.2 Third-Level]]` → `[Third-Level](#Third-Level)`. */
+      assert.match(result.content, /\[Third-Level\]\(#Third-Level\)/);
+      assert.match(result.content, /\[Combat\]\(#Combat\)/);
+      assert.match(result.content, /\[Notes\]\(#Notes\)/);
     });
 
     it('a link with its own text keeps the text', () => {

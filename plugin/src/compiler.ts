@@ -1,5 +1,5 @@
 import {
-  slugify,
+  decodeLink,
   titleFromBasename,
   tidyBlankLines,
   codeBlockMask,
@@ -14,6 +14,35 @@ import {
   normalizeAssetFilename,
 } from './utils.ts';
 import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
+import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
+import type { Heading } from './anchors.ts';
+
+/**
+ * US-2.3 | AC-3 to AC-7: the headings of the assembled document and the parts
+ * of it each note fills (by sentinel), for link conversion.
+ */
+interface DocOutline {
+  headings: Array<{ level: number; text: string; offset: number; region: number }>;
+  /** Whether the line holding `pos` is a heading line. */
+  isHeadingLine(pos: number): boolean;
+  /** The parts filled by note `path`, in document order. */
+  regionsOf(path: string): number[];
+  /** The innermost part filled by note `path` around `pos`, or -1. */
+  regionAt(pos: number, path: string): number;
+  /** The first heading inside part `region`, or -1. */
+  firstHeadingIn(region: number): number;
+}
+
+/** US-2.3: where a link is and what link conversion knows at that moment. */
+interface LinkPlace {
+  doc: DocOutline;
+  /** Heading texts before links in headings were converted (by heading). */
+  sourceTexts: string[];
+  /** True while links on heading lines are converted. */
+  headingLines: boolean;
+  offset: number;
+  source: string;
+}
 
 /**
  * US-2.6 | AC-3, AC-4: the destination of `![alt](…)` — `<…>` or the text up to
@@ -27,6 +56,13 @@ export function parseEmbedDestination(raw: string): { path: string; title: strin
   if (!match) return { path: text, title: '' };
   return { path: match[1] ?? match[2], title: match[3] ?? '' };
 }
+
+/**
+ * US-2.3 | AC-1: a wiki link `[[target|display]]` or a markdown link
+ * `[text](target)` (not an embed); a markdown target may hold one level of
+ * balanced brackets as written (`(#Rules%20(optional))`, measured D1).
+ */
+const LINK = /(?<!!)\[\[([^\]|]+)(?:\|([^\]]*))?\]\]|(?<!!)\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)/g;
 
 /** US-8.4 | AC-5: the location markers of `markLinks`. */
 const LINE_MARKER = /<!-- __vl__:\d+:.*? -->/g;
@@ -358,16 +394,16 @@ export class InMemoryVaultCompiler {
         if (link.includes('#')) {
           const split = link.split('#');
           link = split[0];
-          anchor = decodeURIComponent(split.slice(1).join('#'));
+          anchor = decodeLink(split.slice(1).join('#'));
         }
         const path = this.norm(resolvedPath);
-        const local = decodeURIComponent(link);
+        const local = decodeLink(link);
         const ambiguity = this.directMatch(local, currentFile) === null ? this.ambiguityOf(local, path) : null;
         return { path, anchor, missing: false, ambiguity };
       }
     }
 
-    let link = decodeURIComponent(raw.trim());
+    let link = decodeLink(raw.trim());
     let anchor: string | null = null;
     if (link.includes('#')) {
       const split = link.split('#');
@@ -838,7 +874,9 @@ export class InMemoryVaultCompiler {
    */
   private findSourceLocation(content: string, offset: number): { file: string; line: number } {
     // US-8.4 | AC-5: a link carries its location in the marker right before it.
-    const marked = content.slice(Math.max(0, offset - 1024), offset).match(/<!-- __vl__:(\d+):(.*?) -->$/);
+    // The note part may not run past a ` -->`, so only the last marker on the
+    // line is read, not the first one up to the last's end (#98).
+    const marked = content.slice(Math.max(0, offset - 1024), offset).match(/<!-- __vl__:(\d+):((?:(?! -->).)*) -->$/);
     if (marked) {
       return { file: marked[2], line: Number(marked[1]) };
     }
@@ -1178,7 +1216,8 @@ export class InMemoryVaultCompiler {
     // The section starts with its anchor heading (never inside a code block).
     const shown = section.split('\n').map(l => matchHeading(l.replace(LINE_MARKER, ''))).find(h => h !== null);
     this.headingMap.set(path, shown ? shown.rest.trim() : titleFromBasename(base));
-    return '\n' + this.shiftSectionTo(section, depth, base, path) + '\n';
+    // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
+    return '\n' + this.wrapWithSentinel(this.shiftSectionTo(section, depth, base, path), pt.target) + '\n';
   }
 
   /**
@@ -1268,7 +1307,8 @@ export class InMemoryVaultCompiler {
           if (this.options.normaliseHeadings === true) {
             section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), currentFile);
           }
-          return `\n${section}\n`;
+          // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
+          return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
         return this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
       }
@@ -1359,7 +1399,8 @@ export class InMemoryVaultCompiler {
           if (this.options.normaliseHeadings === true) {
             section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), currentFile);
           }
-          return `\n${section}\n`;
+          // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
+          return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
         return this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
       }
@@ -1394,88 +1435,346 @@ export class InMemoryVaultCompiler {
   }
 
 
+  /**
+   * US-2.3 | AC-1 to AC-7: turns links into anchors Obsidian finds. Links in
+   * heading lines go first, so that every other anchor is written from the
+   * headings' final text. Each phase reads wiki and markdown links in one
+   * scan, in document order, so warnings come in source order and a
+   * converted link is never read a second time.
+   */
   private convertLinks(content: string): string {
-    // Convert wiki-style non-embed links.
-    content = content.replace(/(?<!!)\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_m, rawLink, display, offset, source) => {
-      const resolved = this.resolve(rawLink.trim(), '');
-      if (resolved.missing) {
-        const loc = this.findSourceLocation(source as string, offset as number);
-        const message = `Missing wiki link`;
-        this.stats.missingReferences += 1;
-        this.report(message, rawLink.trim(), loc.file, loc.line);
-        return `<!-- Warning: ${message} -->`;
-      }
-      if (resolved.ambiguity !== null) {
-        const loc = this.findSourceLocation(source as string, offset as number);
-        this.report(resolved.ambiguity, rawLink.trim(), loc.file, loc.line);
-      }
-      if (!this.isMarkdownPath(resolved.path)) {
-        return `[[${rawLink.trim()}]]`;
-      }
-      // US-8.3: if the target file exists in the vault but was never embedded in
-      // the compiled output, replace with a warning comment instead of a broken anchor.
-      if (!this.headingMap.has(resolved.path)) {
-        const loc = this.findSourceLocation(source as string, offset as number);
-        const label = rawLink.trim();
-        const message = `link target '${label}' not embedded in compiled output`;
-        this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link: label, file: loc.file, line: loc.line });
-        return `<!-- Warning: link target '${label}' not embedded in compiled output -->`;
-      }
-      const label = display ? display.trim() : this.headingMap.get(resolved.path) || titleFromBasename(this.basename(resolved.path));
-      const slug = slugify(this.headingMap.get(resolved.path) || titleFromBasename(this.basename(resolved.path)));
-      return `[${label}](#${slug})`;
+    // Which output heading is which source heading is decided on the text
+    // before any link in a heading is converted (`## See [[Pools]]`).
+    const sourceTexts = this.outlineOf(content).headings.map(h => h.text);
+    const headingsDone = this.convertLinkPhase(content, true, sourceTexts);
+    return this.convertLinkPhase(headingsDone, false, sourceTexts);
+  }
+
+  /**
+   * US-2.3 | AC-1 to AC-7: one phase of `convertLinks` — the links on heading
+   * lines (`headingLines`) or on all other lines.
+   */
+  private convertLinkPhase(content: string, headingLines: boolean, sourceTexts: string[]): string {
+    const doc = this.outlineOf(content);
+    return content.replace(LINK, (m, rawLink?: string, display?: string, text?: string, rawPath?: string, ...rest: unknown[]) => {
+      const offset = rest[rest.length - 2] as number;
+      const source = rest[rest.length - 1] as string;
+      if (doc.isHeadingLine(offset) !== headingLines) return m;
+      const at: LinkPlace = { doc, sourceTexts, headingLines, offset, source };
+      return rawLink !== undefined
+        ? this.convertWikiLink(rawLink, display, at)
+        : this.convertMarkdownLink(m, text ?? '', rawPath ?? '', at);
     });
+  }
 
-    // Convert markdown-style non-image links.
-    content = content.replace(/(?<!!)\[([^\]]*)\]\(([^)]+)\)/g, (_m, text, rawPath, offset, source) => {
-      // Pass through external URLs, anchor-only links, and mailto: unchanged.
-      if (/^https?:\/\//i.test(rawPath) || rawPath.startsWith('mailto:') || rawPath.startsWith('#')) {
-        return _m;
-      }
+  /** US-2.3 | AC-1, AC-3 to AC-5; US-8.3: one wiki link `[[rawLink|display]]`. */
+  private convertWikiLink(rawLink: string, display: string | undefined, at: LinkPlace): string {
+    const raw = rawLink.trim();
+    const label = display ? display.trim() : null;
+    const hash = raw.indexOf('#');
+    const headingPart = hash === -1 ? '' : raw.slice(hash + 1);
+    const toHeading = headingPart.trim() !== '' && !headingPart.startsWith('^');
+    if (hash === 0 && toHeading) {
+      const same = this.sameNoteLink(headingPart, label, raw, null, at);
+      if (same !== null) return same;
+    }
+    const resolved = this.resolve(raw, '');
+    if (resolved.missing) {
+      const loc = this.findSourceLocation(at.source, at.offset);
+      const message = `Missing wiki link`;
+      this.stats.missingReferences += 1;
+      this.report(message, raw, loc.file, loc.line);
+      return `<!-- Warning: ${message} -->`;
+    }
+    if (resolved.ambiguity !== null) {
+      const loc = this.findSourceLocation(at.source, at.offset);
+      this.report(resolved.ambiguity, raw, loc.file, loc.line);
+    }
+    if (!this.isMarkdownPath(resolved.path)) {
+      return `[[${raw}]]`;
+    }
+    // US-8.3: if the target file exists in the vault but was never embedded in
+    // the compiled output, replace with a warning comment instead of a broken anchor.
+    if (!this.headingMap.has(resolved.path)) {
+      const loc = this.findSourceLocation(at.source, at.offset);
+      const message = `link target '${raw}' not embedded in compiled output`;
+      this.warnings.push(`Warning: ${message}`);
+      this.warningDetails.push({ message, link: raw, file: loc.file, line: loc.line });
+      return `<!-- Warning: link target '${raw}' not embedded in compiled output -->`;
+    }
+    if (toHeading) {
+      return this.headingLink(resolved.path, headingPart, label, raw, at);
+    }
+    return this.noteLink(resolved.path, label, raw, at);
+  }
 
-      const resolved = this.resolve(rawPath, '');
-      if (resolved.missing) {
-        if (this.isMarkdownPath(rawPath)) {
-          const loc = this.findSourceLocation(source as string, offset as number);
-          const message = `Missing markdown link`;
-          this.stats.missingReferences += 1;
-          this.report(message, rawPath, loc.file, loc.line);
-          return `<!-- Warning: ${message} -->`;
-        }
-        // Generated or existing asset references should not be reported as
-        // missing source files.
-        if (/^(?:\.\.\/|\.\/)assets\//.test(rawPath) || this.usedAssetNames.has(this.basename(rawPath))) {
-          return _m;
-        }
-        // Asset download link.
-        const asset = this.sourceToAsset.get(resolved.path);
-        if (asset) {
-          return `[${text || this.basename(resolved.path)}](${asset})`;
-        }
-        const loc = this.findSourceLocation(source as string, offset as number);
-        const message = `Missing asset link`;
+  /** US-2.3 | AC-1, AC-3 to AC-5: one markdown link `[text](rawPath)`. */
+  private convertMarkdownLink(m: string, text: string, rawPath: string, at: LinkPlace): string {
+    // Pass through external URLs and mailto: unchanged.
+    if (/^https?:\/\//i.test(rawPath) || rawPath.startsWith('mailto:')) {
+      return m;
+    }
+    if (rawPath.startsWith('#')) {
+      // US-2.3 | AC-5: a heading of the same note; block links stay (#100).
+      const headingPart = rawPath.slice(1);
+      if (headingPart.trim() === '' || headingPart.startsWith('^')) return m;
+      return this.sameNoteLink(headingPart, text || null, rawPath, m, at) ?? m;
+    }
+
+    const resolved = this.resolve(rawPath, '');
+    if (resolved.missing) {
+      if (this.isMarkdownPath(rawPath)) {
+        const loc = this.findSourceLocation(at.source, at.offset);
+        const message = `Missing markdown link`;
         this.stats.missingReferences += 1;
         this.report(message, rawPath, loc.file, loc.line);
         return `<!-- Warning: ${message} -->`;
       }
-      if (resolved.ambiguity !== null) {
-        const loc = this.findSourceLocation(source as string, offset as number);
-        this.report(resolved.ambiguity, rawPath, loc.file, loc.line);
+      // Generated or existing asset references should not be reported as
+      // missing source files.
+      if (/^(?:\.\.\/|\.\/)assets\//.test(rawPath) || this.usedAssetNames.has(this.basename(rawPath))) {
+        return m;
       }
-      if (this.isMarkdownPath(resolved.path)) {
-        const label = text || this.headingMap.get(resolved.path) || titleFromBasename(this.basename(resolved.path));
-        const slug = slugify(this.headingMap.get(resolved.path) || titleFromBasename(this.basename(resolved.path)));
-        return `[${label}](#${slug})`;
+      // Asset download link.
+      const asset = this.sourceToAsset.get(resolved.path);
+      if (asset) {
+        return `[${text || this.basename(resolved.path)}](${asset})`;
       }
-      // For non-markdown assets: ensure registered, then return a portable link.
-      // Call assetTag for its side-effect of registering the asset (if not already done).
-      this.assetTag(resolved.path, text || this.basename(resolved.path));
-      const assetRef = this.sourceToAsset.get(resolved.path)!;
-      return `[${text || this.basename(resolved.path)}](${encodeAssetPath(assetRef)})`;
-    });
+      const loc = this.findSourceLocation(at.source, at.offset);
+      const message = `Missing asset link`;
+      this.stats.missingReferences += 1;
+      this.report(message, rawPath, loc.file, loc.line);
+      return `<!-- Warning: ${message} -->`;
+    }
+    if (resolved.ambiguity !== null) {
+      const loc = this.findSourceLocation(at.source, at.offset);
+      this.report(resolved.ambiguity, rawPath, loc.file, loc.line);
+    }
+    if (this.isMarkdownPath(resolved.path)) {
+      const hash = rawPath.indexOf('#');
+      const headingPart = hash === -1 ? '' : rawPath.slice(hash + 1);
+      if (headingPart.trim() !== '' && !headingPart.startsWith('^')) {
+        return this.headingLink(resolved.path, headingPart, text || null, rawPath, at);
+      }
+      return this.noteLink(resolved.path, text || null, rawPath, at);
+    }
+    // For non-markdown assets: ensure registered, then return a portable link.
+    // Call assetTag for its side-effect of registering the asset (if not already done).
+    this.assetTag(resolved.path, text || this.basename(resolved.path));
+    const assetRef = this.sourceToAsset.get(resolved.path)!;
+    return `[${text || this.basename(resolved.path)}](${encodeAssetPath(assetRef)})`;
+  }
 
-    return content;
+  /**
+   * US-2.3 | AC-3: a link to a whole note points at the first heading where
+   * the note first appears in the output — its title, or the heading of the
+   * only section embedded. The label is the link's own text, else the title.
+   */
+  private noteLink(path: string, label: string | null, raw: string, at: LinkPlace): string {
+    const title = this.headingMap.get(path) || titleFromBasename(this.basename(path));
+    return `[${label ?? title}](#${this.noteStartAnchor(path, null, title, raw, at)})`;
+  }
+
+  /**
+   * US-2.3 | AC-5: a link to a heading of the note the link is written in,
+   * in the part of the output that came from that note. Returns null when the
+   * link's note is not known (the caller keeps its own handling).
+   */
+  private sameNoteLink(headingPart: string, label: string | null, raw: string, asWritten: string | null, at: LinkPlace): string | null {
+    const file = this.findSourceLocation(at.source, at.offset).file;
+    if (!this.files.has(file)) return null;
+    const region = at.doc.regionAt(at.offset, file);
+    return this.headingLink(file, headingPart, label, raw, at, { region, asWritten });
+  }
+
+  /**
+   * US-2.3 | AC-4, AC-5: a link to a heading (or heading path) of note
+   * `path`. The heading is looked up in the note as Obsidian does; the label
+   * is the link's own text, else the heading as written in the note. A
+   * heading the note does not have, or that is not in the output, is
+   * reported, and the link goes to where the note starts in the output. For a
+   * link in the same note (`same`), only that part of the output counts, and
+   * a missing heading keeps a markdown link as written.
+   */
+  private headingLink(
+    path: string,
+    headingPart: string,
+    label: string | null,
+    raw: string,
+    at: LinkPlace,
+    same: { region: number; asWritten: string | null } | null = null,
+  ): string {
+    const parts = headingPart.split('#').filter(part => part.trim() !== '');
+    const source = this.sourceHeadings(path);
+    const index = new Outline(source).find(parts.map(linkKey));
+    const loc = () => this.findSourceLocation(at.source, at.offset);
+    if (index === -1) {
+      const where = loc();
+      this.report(`Missing heading anchor: ${raw}`, raw, where.file, where.line);
+      const written = parts[parts.length - 1].trim();
+      if (same !== null) {
+        return same.asWritten ?? `[${label ?? written}](#${parts.map(part => encodeAnchor(part.trim())).join('#')})`;
+      }
+      return `[${label ?? written}](#${this.noteStartAnchor(path, null, null, raw, at)})`;
+    }
+    const text = source[index].text;
+    const regions = same !== null && same.region !== -1 ? [same.region] : at.doc.regionsOf(path);
+    for (const region of regions) {
+      const placed = this.placeInRegion(at, region, path, index);
+      if (placed !== -1) return `[${label ?? text}](#${this.anchorOf(placed, raw, at)})`;
+    }
+    const where = loc();
+    const name = this.basename(path).replace(/\.md$/i, '');
+    const message = `heading '${name}#${text}' not embedded in compiled output`;
+    this.warnings.push(`Warning: ${message}`);
+    this.warningDetails.push({ message, link: raw, file: where.file, line: where.line });
+    const fallback = same !== null && same.region !== -1 ? same.region : null;
+    return `[${label ?? text}](#${this.noteStartAnchor(path, fallback, null, raw, at)})`;
+  }
+
+  /**
+   * US-2.3 | AC-3: the anchor of the first heading of `region`, else of the
+   * note's first part of the output; else the title as text.
+   */
+  private noteStartAnchor(path: string, region: number | null, title: string | null, raw: string, at: LinkPlace): string {
+    const regions = region !== null ? [region] : at.doc.regionsOf(path);
+    for (const r of regions) {
+      const first = at.doc.firstHeadingIn(r);
+      if (first !== -1) return this.anchorOf(first, raw, at);
+    }
+    return encodeAnchor(anchorText(title ?? (this.headingMap.get(path) || titleFromBasename(this.basename(path)))));
+  }
+
+  /**
+   * US-2.3 | AC-2, AC-6: the anchor of output heading `index`, from the
+   * headings' final text; reports warning W when no heading path tells it
+   * apart from an earlier heading with the same text.
+   */
+  private anchorOf(index: number, raw: string, at: LinkPlace): string {
+    const texts = at.headingLines ? at.sourceTexts : at.doc.headings.map(h => h.text);
+    const outline = new Outline(at.doc.headings.map((h, i) => ({ level: h.level, text: texts[i] })));
+    const { anchor, duplicates } = outline.anchorFor(index);
+    if (duplicates > 0) {
+      const where = this.findSourceLocation(at.source, at.offset);
+      this.report(
+        `Heading "${texts[index]}" occurs ${duplicates} times and no heading path tells them apart; the link goes to the first`,
+        raw, where.file, where.line,
+      );
+    }
+    return anchor;
+  }
+
+  /**
+   * US-2.3 | AC-4, AC-5: the output heading that source heading `index` of
+   * `path` became in `region`, or -1. The note's own headings in the region
+   * are matched to its source headings in order, by text; a first heading
+   * that the title rule replaced (US-6.4) is the region's first heading. Of
+   * the two readings — the region starts with an injected or replacing title,
+   * or it does not — the one that places more headings wins.
+   */
+  private placeInRegion(at: LinkPlace, region: number, path: string, index: number): number {
+    const source = this.sourceHeadings(path);
+    const owned = at.doc.headings.flatMap((h, i) => (h.region === region ? [i] : []));
+    const align = (titled: boolean): Map<number, number> => {
+      const placed = new Map<number, number>();
+      let next = 0;
+      owned.forEach((out, n) => {
+        if (titled && n === 0) return;
+        const key = headingKey(at.sourceTexts[out]);
+        let m = next;
+        while (m < source.length && headingKey(source[m].text) !== key) m++;
+        if (m < source.length) {
+          placed.set(m, out);
+          next = m + 1;
+        }
+      });
+      if (titled && owned.length > 0 && !placed.has(0) && startsWithHeading(this.readNote(path).body)) {
+        placed.set(0, owned[0]);
+      }
+      return placed;
+    };
+    const plain = align(false);
+    const titled = align(true);
+    return (titled.size > plain.size ? titled : plain).get(index) ?? -1;
+  }
+
+  /** US-2.3 | AC-4, AC-7: the headings of note `path` as stored, outside code blocks. */
+  private sourceHeadings(path: string): Heading[] {
+    const lines = this.readNote(path).body.split('\n');
+    const inCode = codeBlockMask(lines);
+    return lines.flatMap((line, i) => {
+      const heading = inCode[i] ? null : matchHeading(line);
+      return heading && heading.rest.trim() !== '' ? [{ level: heading.level, text: heading.rest.trim() }] : [];
+    });
+  }
+
+  /**
+   * US-2.3 | AC-3 to AC-7: the headings of the assembled document (outside
+   * code blocks, location markers removed) and the parts each note fills,
+   * read from the provenance sentinels. A heading belongs to the innermost
+   * part around it.
+   */
+  private outlineOf(content: string): DocOutline {
+    const sentinels = [...content.matchAll(/<!-- __v([se])__:(.*?) -->/g)];
+    const regions: Array<{ path: string; start: number; end: number }> = [];
+    const open: number[] = [];
+    const headings: Array<{ level: number; text: string; offset: number; region: number }> = [];
+    const lineStarts: number[] = [];
+    const headingStarts = new Set<number>();
+    const lines = content.split('\n');
+    const inCode = codeBlockMask(lines);
+    let next = 0;
+    let offset = 0;
+    const consume = (upTo: number) => {
+      while (next < sentinels.length && (sentinels[next].index ?? 0) < upTo) {
+        const [, kind, path] = sentinels[next];
+        const at = sentinels[next].index ?? 0;
+        if (kind === 's') {
+          regions.push({ path, start: at, end: content.length });
+          open.push(regions.length - 1);
+        } else {
+          const pos = open.map(r => regions[r].path).lastIndexOf(path);
+          if (pos !== -1) {
+            regions[open[pos]].end = at;
+            open.splice(pos);
+          }
+        }
+        next++;
+      }
+    };
+    lines.forEach((line, i) => {
+      consume(offset);
+      lineStarts.push(offset);
+      const heading = inCode[i] ? null : matchHeading(line.replace(LINE_MARKER, ''));
+      if (heading && heading.rest.trim() !== '') {
+        headings.push({ level: heading.level, text: heading.rest.trim(), offset, region: open.length > 0 ? open[open.length - 1] : -1 });
+        headingStarts.add(offset);
+      }
+      offset += line.length + 1;
+    });
+    const lineStartOf = (pos: number): number => {
+      let lo = 0;
+      let hi = lineStarts.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (lineStarts[mid] <= pos) lo = mid;
+        else hi = mid - 1;
+      }
+      return lineStarts[lo];
+    };
+    return {
+      headings,
+      isHeadingLine: pos => headingStarts.has(lineStartOf(pos)),
+      regionsOf: path => regions.flatMap((r, i) => (r.path === path ? [i] : [])),
+      regionAt: (pos, path) => {
+        let best = -1;
+        regions.forEach((r, i) => {
+          if (r.path === path && r.start <= pos && pos < r.end && (best === -1 || r.start >= regions[best].start)) best = i;
+        });
+        return best;
+      },
+      firstHeadingIn: region => headings.findIndex(h => h.offset >= regions[region].start && h.offset < regions[region].end),
+    };
   }
 
 }

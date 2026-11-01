@@ -1,18 +1,3 @@
-export function slugify(text: string): string {
-  // Decompose accented characters (è → e + combining grave) then strip diacritics
-  // so that non-ASCII input produces a meaningful, non-empty slug.
-  const slug = text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9.-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  // Guard: never return an empty string (fuzz requirement).
-  return slug || '_';
-}
-
 export function splitExtension(name: string): { stem: string; ext: string } {
   const match = name.match(/^(.*)(\.[^.]+)$/);
   if (!match) {
@@ -32,8 +17,8 @@ export function splitExtension(name: string): { stem: string; ext: string } {
  *   3. upper-cases the first character.
  * Nothing else changes: hyphens, underscores, brackets and the case of later
  * words are kept. Every heading the compiler writes for a file, and every link
- * label and anchor slug that points at one, must come from this function, so
- * that links always find their heading.
+ * label that points at one, must come from this function, so that links
+ * always find their heading (anchors: `anchors.ts`, US-2.3).
  */
 export function titleFromBasename(basename: string): string {
   const stem = basename.replace(/\.[^.]+$/, '').replace(/^[\d.]+\s+/, '');
@@ -203,4 +188,23 @@ export function tidyBlankLines(text: string): string {
     pendingEmpty = false;
   });
   return out.length > 0 ? `${out.join('\n')}\n` : '';
+}
+
+/**
+ * US-3.1 (#101): decodes the `%` escapes of a link (`%20`, `%25`, `%C3%A9`)
+ * and keeps any other `%` as written, so `50% off` stays `50% off` instead of
+ * aborting with "URI malformed". The only place that decodes a link.
+ */
+export function decodeLink(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+      try {
+        return decodeURIComponent(run);
+      } catch {
+        return run;
+      }
+    });
+  }
 }

@@ -335,15 +335,188 @@ folder next to the compiled output
 master file  
 **So that** navigation still works inside the single file.
 
+The compiled document is read in Obsidian (decided 2026-11-01; #83, #85; work
+item [#99](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/99)). Anchors are
+written the way Obsidian finds headings, not as GitHub or Pandoc slugs.
+
+**Measured in Obsidian (2026-11-01, reading view; three check notes):**
+
+| Link | Lands on |
+| --- | --- |
+| `(#Zeal)`, `(#zeal)`, `[[#Zeal]]` | `# Zeal` |
+| `(#The%20Brawling%20and%20Fortune%20Pools)`, the same in lower case | `# The Brawling and Fortune Pools` |
+| `(#the-brawling-and-fortune-pools)`, `(#1.3-grit-zeal)` (slugs) | not found |
+| `(#1.3%20Grit%20&%20Zeal)` | `# 1.3 Grit & Zeal` |
+| `(#intro-1)` (numbered duplicate) | not found |
+| `(#Two#Intro)`, `[[#Two#Intro]]` | `## Intro` under `# Two`, not the one under `# One` |
+| `(#Chapter%20Two#Intro)` | `## Intro` under `# Chapter Two` |
+| `(#Part%20B#Intro)`, `(#Chapter%20Four#Intro)`, `(#Part%20B#Chapter%20Four#Intro)` | `### Intro` under `# Part B` / `## Chapter Four` (a path may skip levels) |
+| `(#Rules%20(optional))`, `(#Rules%20%28optional%29)`, `(<#Rules (optional)>)` | `# Rules (optional)` |
+| `(#Café%20Rules)`, `(#Caf%C3%A9%20Rules)` | `# Café Rules` |
+| `(#Why?%20Because,%20it's%20fine)` | `# Why? Because, it's fine` |
+| `(#The%20bold%20rule)`, `(#The%20**bold**%20rule)` | `# The **bold** rule` |
+| `(#Notes%20on%20Other)`, `(#Notes%20on%20[[Other]])` | `# Notes on [[Other]]` |
+| `(#50%25%20off)` | `# 50% off` |
+| `(#50%%20off)` | "cannot open location" |
+| `(#Book#Intro)`, where `# Book` has two `## Intro` | the first Intro |
+| `(#chapter%20two#intro)` | `## Intro` under `# Chapter Two` (path parts ignore case) |
+| `(#C%23%20basics)`, `(#C#%20basics)` | not found (`# C# basics`) |
+| `(#See%20Pools)`, `(#See%20[Pools]%28#Pools%29)` | not found (`## See [Pools](#Pools)`) |
+| `(#Done%20:%29)` | "cannot open location" (`# Done :)`) |
+| Obsidian's own `[[#` completion for `C# basics`, `Done :)`, `Time: noon`, `See [Pools](#Pools)`, `A \| B`, `Up ^ down` | inserts `[[#C basics]]`, `[[#Done )]]`, `[[#Time noon]]`, `[[#See [Pools]( Pools)]]`, `[[#A B]]`, `[[#Up down]]`; each lands on its heading |
+| `(#C%20basics)`, `(#C%20%20basics)` | `# C# basics` |
+| `(#Done%20%29)`, `(#Done%20%20%29)` | `# Done :)` |
+| `(#Time%20noon)`, `(#Time%20%20noon)` | `# Time: noon` |
+| `(#Time%3A%20noon)` | not found |
+| `(#See%20[Pools]%28%20Pools%29)` | `## See [Pools](#Pools)` |
+| `(#See%20Pools)` | not found |
+
+Obsidian's own PDF export has no clickable links, so the anchor form does not
+matter there.
+
 **Acceptance criteria**
-- `[[file]]` and `[text](file.md)` become `[label](#slug)` where possible.
-- The label (when the link has no text of its own) and the slug come from the
-  title that the target file's heading has in the output (the title rule of
-  US-6.4), so the anchor always exists: `[[1.2 Third-Level]]` →
-  `[Third-Level](#third-level)` (decided 2026-10-27; see KD-1).
-- Slugification preserves numeric prefixes
-  (`1.3.1 Combat` -> `1.3.1-combat`).
-- Missing link targets are reported as HTML comments.
+
+- **AC-1 Which links.** Links to a note, to a heading in a note, and to a
+  heading in the same note become `[label](#anchor)`, in both syntaxes:
+  `[[Note]]`, `[text](Note.md)`, `[[Note#Heading]]`,
+  `[text](Note.md#Heading)`, `[[#Heading]]`, `[text](#Heading)`. Spaces in a
+  markdown target may be written `%20` (`Note.md#Fighting%20Pools`), brackets
+  as they are (`[r](#Rules%20(optional))`, measured D1). Warnings of one
+  note come in the order of its links.
+- **AC-2 Anchor form.** The anchor is the text of the target heading as it
+  stands in the compiled output, written the way Obsidian writes it itself
+  (check 4): `#`, `:`, `|` and `^` become a space, runs of spaces become one,
+  and the ends are trimmed. Then four characters are encoded: space →
+  `%20`, `(` → `%28`, `)` → `%29` (so that a `)` in a heading cannot end the
+  link), `%` → `%25`. Everything else is written as it is, case included:
+
+  | Heading in the output | Anchor |
+  | --- | --- |
+  | `## Zeal` | `#Zeal` |
+  | `## The Brawling and Fortune Pools` | `#The%20Brawling%20and%20Fortune%20Pools` |
+  | `### 1.3.1 Combat` (a heading inside a note keeps its number) | `#1.3.1%20Combat` |
+  | `## Grit & Zeal` | `#Grit%20&%20Zeal` |
+  | `## Rules (optional)` | `#Rules%20%28optional%29` |
+  | `## Café Rules` | `#Café%20Rules` |
+  | `## The **bold** rule` | `#The%20**bold**%20rule` |
+  | `## 50% off` | `#50%25%20off` |
+  | `## C# basics` | `#C%20basics` |
+  | `## Done :)` | `#Done%20%29` |
+  | `## Time: noon` | `#Time%20noon` |
+  | `## A \| B`, `## Up ^ down` | `#A%20B`, `#Up%20down` |
+  | `## See [[Pools]]` in a note, `## See [Pools](#Pools)` in the output | `#See%20[Pools]%28%20Pools%29` |
+
+  Two headings that differ only in these characters (`C# basics`,
+  `C basics`) have the same text for Obsidian and count as duplicates
+  (AC-6). Not measured: a heading whose converted link has a `%20` in its
+  own anchor, and `%%` in a heading.
+
+  This replaces the slug form (`#the-brawling-and-fortune-pools`,
+  `#1.3.1-combat`), which Obsidian does not find (breaking change,
+  2026-11-01).
+- **AC-3 Links to a note** point at the note's title in the output (the title
+  rule of US-6.4, KD-1): `[[1.2 Third-Level]]` →
+  `[Third-Level](#Third-Level)`; `[[1.3 Grit & Zeal]]` →
+  `[Grit & Zeal](#Grit%20&%20Zeal)`. The label is the link's own text, else
+  the title. A note embedded more than once: the first place (US-8.3); the
+  second title is a duplicate the first match already finds (AC-6), so no
+  path and no warning. A note of which only a section is in the output: the
+  heading that section shows — `index.md` embeds only `![[Pools#Other]]`, so
+  `[[Pools]]` → `[Pools](#Other)` (today `(#pools)`, a heading that is not
+  in the output).
+- **AC-4 Links to a heading in another note** point at that heading where the
+  note is embedded first. The heading is looked up in the note as US-3.1 says
+  (case-insensitive, whitespace collapsed). The label is the link's own text,
+  else the heading's text as written in the note.
+  - `[[Pools#Fighting Pools]]`, `[x](Pools.md#Fighting%20Pools)`,
+    `[[Pools#fighting pools]]` → `[Fighting Pools](#Fighting%20Pools)`,
+    `[x](#Fighting%20Pools)`, `[Fighting Pools](#Fighting%20Pools)` (no text
+    of its own, so the heading as written in the note);
+    `[[Pools#Fighting Pools|the pools]]` → `[the pools](#Fighting%20Pools)`.
+    Today all of them become `(#pools)`.
+  - A link to the note's first heading, which the title rule replaced
+    (`Pools.md` starts with `# The Fighting Pools`, shown as `## Pools`):
+    `[[Pools#The Fighting Pools]]` → `[The Fighting Pools](#Pools)`.
+  - The heading is not in the note: `[[Pools#Nope]]` → `[Nope](#Pools)`,
+    the note's title, and the warning
+    `Missing heading anchor: Pools#Nope` with the link's note and line.
+    Today: `(#pools)`, no warning.
+  - The heading is in the note but not in the output (only `![[Pools#Other]]`
+    is embedded): `[[Pools#Fighting Pools]]` → `[Fighting Pools](#Other)`,
+    where the note starts in the output (AC-3), and the warning
+    `heading 'Pools#Fighting Pools' not embedded in compiled output`. A link
+    to the section that is embedded, `[[Pools#Other]]`, →
+    `[Other](#Other)`, no warning.
+  - The note is not in the output at all: US-8.3 as today (the
+    `not embedded in compiled output` comment).
+- **AC-5 Links to a heading in the same note** (#83) point at that heading in
+  the part of the output that came from the note the link is written in — for
+  a section embed, the note the section came from.
+  - `Grit.md` has `## Rolling`: `[[#Rolling]]` → `[Rolling](#Rolling)`;
+    `[r](#Rolling)`, `[r](#rolling)` → `[r](#Rolling)`. Today `[[#Rolling]]`
+    is dropped as `Missing wiki link`.
+  - `[r](#The%20Fighting%20Pools)` where the note's `# The Fighting Pools`
+    was shown as `## Pools` → `[r](#Pools)`.
+  - The same heading text in an earlier note: the link stays in its own
+    note. `A.md` = `# A` / `## Rolling`, `B.md` = `# B` / `[[#Rolling]]` /
+    `## Rolling`, both embedded, "Normalise headings" on → in B,
+    `[Rolling](#B#Rolling)` (AC-6).
+  - The heading is in the note but not in the output: as AC-4. `index.md` =
+    `# Book` / `## Rolling` / `![[Grit#Part]]`, `Grit.md` = `# Grit` /
+    `## Part` / `See [[#Rolling]].` / `## Rolling` → `[Rolling](#Part)`, not
+    the book's own Rolling, and the warning
+    `heading 'Grit#Rolling' not embedded in compiled output` (Grit.md, line 5).
+  - A note embedded twice: each copy's links stay in that copy. `index.md` =
+    `# Book` / `## One` / `![[G]]` / `## Two` / `![[G]]`, `G.md` = `# G` /
+    `See [[#Rolling]].` / `## Rolling`, "Normalise headings" on → the first
+    copy `[Rolling](#Rolling)`, the second `[Rolling](#Two#G#Rolling)`.
+  - No such heading in the note: `[p](#Gone)` and `[p](#Gone%20Away)` stay as written,
+    `[[#Gone]]` → `[Gone](#Gone)`; both with the warning
+    `Missing heading anchor: #Gone` and the link's note and line.
+  - A heading path written by the author (`[[#Two#Intro]]`, `[x](#Two#Intro)`,
+    measured B3/B4) is looked up the way Obsidian does (AC-6) and written as
+    AC-6 says: in `Grit.md` = `# Grit` / `## One` / `### Intro` / `## Two` /
+    `### Intro`, `[[#Two#Intro]]` → `[Intro](#Two#Intro)`. Today it is
+    dropped as `Missing wiki link`.
+  - Block links (`[[#^id]]`, `(#^id)`) are not in scope and keep today's
+    behaviour: the markdown form stays as written, the wiki form is dropped as
+    `Missing wiki link`. Tracked in [#100](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/100).
+- **AC-6 Headings with the same text** (#85). Obsidian treats heading text
+  case-insensitively and does not number duplicates. A path `#A#B#C` finds
+  the first heading `C` (in output order) that has a heading `B` and above
+  that a heading `A` among its *parents* — the headings before it with a
+  smaller level, nearest first; parents may be skipped (measured C2–C4). A
+  heading at the same level is not a parent. When the target heading's text
+  occurs more than once in the output, the anchor gets the target's parents,
+  nearest first, until the path finds the target. Examples, each the output
+  of the notes named (`index.md` = `# Book` and the embeds, then the link):
+
+  | Notes | Normalise | Output | Link | Anchor |
+  | --- | --- | --- | --- | --- |
+  | `One.md` = `# One` / `## Intro`, `Two.md` = `# Two` / `## Intro` | on | `# Book` / `## One` / `### Intro` / `## Two` / `### Intro` | `[[One#Intro]]` | `[Intro](#Intro)` |
+  | same | on | same | `[[Two#Intro]]` | `[Intro](#Two#Intro)` |
+  | same | off | `# Book` / `## One` / `## Intro` / `## Two` / `## Intro` (Two is no parent) | `[[Two#Intro]]` | `[Intro](#Intro)` and warning W |
+  | `Chapter One.md`, `Chapter Two.md` as above | on | `## Chapter One` / `### Intro` / `## Chapter Two` / `### Intro` | `[[Chapter Two#Intro]]` | `[Intro](#Chapter%20Two#Intro)` |
+  | `Part A.md` = `# Part A` / `## Ch` / `### Intro`, `Part B.md` likewise | on | `## Part A` / `### Ch` / `#### Intro` / `## Part B` / `### Ch` / `#### Intro` | `[[Part B#Intro]]` | `[Intro](#Part%20B#Ch#Intro)` |
+  | `1 Intro.md` = `one`, `2 Intro.md` = `two` | on and off | `# Book` / `# Intro` / `# Intro` | `[[2 Intro]]` | `[Intro](#Intro)` and warning W |
+
+  Warning W: `Heading "Intro" occurs 2 times and no heading path tells them
+  apart; the link goes to the first`, with the link's note and line. A path
+  is never written when the plain text already finds the target. A path
+  that fits several headings opens the first (measured E7); path parts
+  ignore case (E8), so parents that differ only in case do not tell headings
+  apart.
+- **AC-7 Which headings count.** The headings of the compiled output, after
+  normalisation and title injection (US-6.3, US-6.4), at any level. Lines
+  inside code fences and frontmatter are not headings. The same notes give
+  the same anchors with "Normalise headings" on and off, except where the
+  title rule changes a heading's text.
+- **AC-8 Missing link targets** are reported as HTML comments (unchanged).
+
+**Migration:** links in the compiled output change from
+`(#the-brawling-and-fortune-pools)` to
+`(#The%20Brawling%20and%20Fortune%20Pools)`. Anything outside Obsidian that
+followed the old slugs (GitHub, Pandoc) no longer finds them.
 
 ### US-2.4 Handle spaces and special characters in asset paths
 **As a** vault owner  
@@ -451,6 +624,15 @@ filenames
   target file by matching the heading text case-insensitively after stripping
   leading `#` characters and collapsing whitespace. A heading anchor that does
   not match any heading in the target file is reported as a missing reference.
+  How links to a heading are written in the output: US-2.3 AC-4 and AC-5.
+- A `%` in a link or embed is decoded only where it starts an escape
+  (`%20`, `%25`, `%C3%A9`); any other `%` is taken as written *(added
+  2026-11-01, [#101](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/101); v0.18.0 aborted the whole compilation with
+  "URI malformed")*:
+  `[[50% off]]`, `![[50% off]]` and `[x](50%25%20off.md)` find `50% off.md`;
+  `[[Note#50% off]]` finds `## 50% off`; `[x](50%%20off.md)` (a lone `%`
+  before an escape) finds `50% off.md`; `![x](50%.png)` finds `50%.png`
+  and becomes `![x](assets/50.png)` (the name rule of US-2.5).
 
 ## Epic 4 — TextMapper diagrams
 
@@ -1176,7 +1358,8 @@ the compiler at v0.11.0 (2026-10-27).
 **Out of scope (for now)**
 - Renumbering or rewriting the numeric prefix text in headings.
 - Changing the filename-based numbering convention itself.
-- Making anchors unique when two embedded files have the same title (OD-7).
+- Making anchors unique when two embedded files have the same title (OD-7);
+  links to such headings follow US-2.3 AC-6.
 
 ### US-6.4 Preamble heading injection
 *(Specified only in the ticket backlog as "US-7.2" until 2026-10-27.)*
@@ -1343,8 +1526,9 @@ marked as not measured.
 - **OD-7 Duplicate titles.** Two embedded files with the same title (`1 Intro.md`,
   `2 Intro.md`) give two headings with the same anchor, so a link to the second
   goes to the first. Measured 2026-10-27: no two prefixed notes in the vault
-  share a title after the prefix is removed. Not decided; see SCAR-011.
-  Tracked in [#85](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/85).
+  share a title after the prefix is removed. Decided 2026-11-01: US-2.3
+  AC-6 (heading paths; a warning where no path separates them). Tracked in
+  [#85](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/85).
 
 ### Known defects (found 2026-10-27)
 
@@ -1362,8 +1546,9 @@ marked as not measured.
   Authors' links such as `[Zeal](#Zeal)` or
   `[Brawling pool](#The%20Brawling%20and%20Fortune%20Pools)` are left as
   written, so they do not match the slugified anchor of the heading
-  (`#zeal`). 23 such links in the example vault (2026-10-27). Not decided;
-  touches US-2.3 and US-3.1. Tracked in [#83](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/83).
+  (`#zeal`). 23 such links in the example vault (2026-10-27). Decided
+  2026-11-01: US-2.3 AC-2 and AC-5 (Obsidian anchors; Obsidian finds these
+  links as written, the compiler checks and normalises them). Tracked in [#83](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/83).
 
 ### US-6.6 Tidy empty lines in the compiled output
 **As a** reader  
@@ -1614,6 +1799,12 @@ external websites, or anchor targets in the compiled output
   the location never change which section a section embed finds:
   `![x](Here.md#Notes on [[Other]])` with `Here.md` = `# Here` / `` /
   `## Notes on [[Other]]` / `` / `body` embeds that section.
+
+  Several links on one line each report their own note and line *(added
+  2026-11-01; found with v0.18.0, [#98](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/98))*: `Grit.md` line 3 =
+  `See [[Gone]], [[Lost]], [x](Away.md).`, embedded → three warnings, each
+  with file `Grit.md` and line 3. v0.18.0 gives the second and third a file
+  name that contains marker text (`Grit.md -->[[Gone]], <!-- __vl__:3:Grit.md`).
 
 ### US-8.5 Each problem is reported once, where it was written
 **As a** vault owner  

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-vault-compiler",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Obsidian community plugin for compiling a vault into one markdown file",
   "main": "main.js",
   "type": "module",

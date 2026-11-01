@@ -1,4 +1,5 @@
 import { App, TFile } from 'obsidian';
+import { decodeLink } from './utils.ts';
 
 export class ObsidianLinkResolver {
   constructor(private app: App) {}
@@ -8,7 +9,7 @@ export class ObsidianLinkResolver {
     let link = trimmed;
     if (link.startsWith('!')) link = link.slice(1);
     if (link.includes('#')) link = link.split('#')[0];
-    link = decodeURIComponent(link);
+    link = decodeLink(link);
 
     try {
       const metadataCache = this.app.metadataCache as {

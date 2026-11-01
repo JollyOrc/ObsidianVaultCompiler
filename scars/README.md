@@ -48,6 +48,7 @@ Each SCAR covers:
 | [SCAR-030](SCAR-030-dependency-defaults-applied-after-user-input.md) | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | Requirements / Integration | Medium |
 | [SCAR-031](SCAR-031-lookup-with-side-effects.md) | A lookup also reports, so every caller that only looks fills the report | Design / Verification | Medium |
 | [SCAR-032](SCAR-032-in-band-markers-read-by-other-steps.md) | Invisible markers written into the text are read by steps they were not meant for | Design / Verification | Medium |
+| [SCAR-033](SCAR-033-output-format-for-an-unnamed-reader.md) | An output format is specified without naming the program that reads it | Requirements / Integration | High |
 
 ## Recurring themes
 
@@ -138,7 +139,15 @@ Every sentence in a story about what a dependency does is split into its
 parts, and each part has a test with the real tool, or is marked as not
 measured. Where a tool merges the user's input with its own defaults, the
 merge order and which definition of a name wins are measured too; a line that
-parses may still have no effect (SCAR-030).
+parses may still have no effect (SCAR-030). Where the tool can produce the
+form itself (autocomplete, export), its own output is the first measurement.
+
+**Name the reader of every output** (SCAR-033)
+A story that defines an output format names the program that reads it and
+measures the format there, with examples that tell the candidate rules
+apart. The measurement becomes a model in the tests, guarded by a replay of
+the measurement; output is checked against the model, not only against the
+rule that made it.
 
 **Visual output at reading size** (SCAR-025)
 A result judged by looking at it is inspected at its printed or reading size,

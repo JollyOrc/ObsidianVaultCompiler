@@ -12,7 +12,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { slugify, titleFromBasename } from '../../plugin/src/utils.ts';
+import { titleFromBasename } from '../../plugin/src/utils.ts';
 
 describe('US-6.4 title rule: titleFromBasename', () => {
   it('removes the numeric prefix and the extension', () => {
@@ -41,9 +41,5 @@ describe('US-6.4 title rule: titleFromBasename', () => {
 
   it('keeps a name that is only a number', () => {
     assert.equal(titleFromBasename('1.2.md'), '1.2');
-  });
-
-  it('gives the anchor slug used by links (US-2.3)', () => {
-    assert.equal(slugify(titleFromBasename('1.2 Third-Level.md')), 'third-level');
   });
 });
