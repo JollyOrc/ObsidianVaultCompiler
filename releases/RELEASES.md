@@ -4,11 +4,11 @@ Last 5 releases of **Obsidian Vault Compiler**.
 
 | Version | Release Notes | Download |
 |---------|---------------|----------|
+| v0.20.1 | [release notes](v0.20.1.md) | [⬇ zip](obsidian-vault-compiler-v0.20.1.zip) |
 | v0.20.0 | [release notes](v0.20.0.md) | [⬇ zip](obsidian-vault-compiler-v0.20.0.zip) |
 | v0.19.0 | [release notes](v0.19.0.md) | [⬇ zip](obsidian-vault-compiler-v0.19.0.zip) |
 | v0.18.0 | [release notes](v0.18.0.md) | [⬇ zip](obsidian-vault-compiler-v0.18.0.zip) |
 | v0.17.1 | [release notes](v0.17.1.md) | [⬇ zip](obsidian-vault-compiler-v0.17.1.zip) |
-| v0.17.0 | [release notes](v0.17.0.md) | [⬇ zip](obsidian-vault-compiler-v0.17.0.zip) |
 
 ## Installation
 

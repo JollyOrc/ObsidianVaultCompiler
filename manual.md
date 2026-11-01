@@ -212,12 +212,15 @@ This uses the starting note, output folder and file name from the settings.
      **Browse** to pick a folder.
    - **Output filename** — the name of the document, for example
      `My Rulebook.md`.
-   - The line *Resolved output path* shows where the file will actually go.
-4. Click **Compile** (or **Cancel** to stop).
+   - The line *Resolved output path* shows where the file will actually go,
+     and changes as you type.
+4. Click **Compile** or press **Enter** (or **Cancel** or **Escape** to stop).
 
-> **Note:** The note you right-clicked, and the folder and file name you typed,
-> are saved in the settings. The next time you use **Compile vault** from the
-> command palette, it uses these again.
+> **Note:** Everything you choose here — the note you right-clicked, the
+> folder (also one picked with **Browse**) and the file name — is used for
+> this one compilation only. Your settings stay as they are, so **Compile
+> vault** from the command palette still uses the starting note, folder and
+> file name from the settings.
 
 ### While it runs
 
@@ -541,7 +544,7 @@ Open **Settings → Obsidian Vault Compiler**.
 | **Starting file** | The note the compilation begins with. Write its path inside the vault, including folders and `.md`, e.g. `Books/Rulebook index.md`. | `index2compile.md` |
 | **Output folder** | Where the document is saved. Empty means the top level of your vault. Type a folder in the vault such as `Exports` or `Exports/2026` (use `/` between folders), or click **Browse**. In the desktop app you may also choose a folder **outside** the vault, such as your Desktop. | empty |
 | **Output filename** | The name of the compiled document, e.g. `My Rulebook.md`. Just the name, no folders. | `compiledtext.md` |
-| **Resolved output path** | Not a setting — it shows where the document will actually be saved, or why the current choice won't work. | — |
+| **Resolved output path** | Not a setting — it shows where the document will actually be saved, or why the current choice won't work. It changes as you type. | — |
 | **Enable TextMapper rendering** | On: hex maps become pictures. Off: maps stay as text blocks. | On |
 | **Map font** | Font for text on compiled maps, e.g. `Georgia, serif`. Leave empty to use the same font Obsidian shows your notes in. | empty |
 | **Tidy map labels** | On: compiled maps have no hex numbers and their names are centred and wrapped. | On |

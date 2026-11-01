@@ -6,11 +6,14 @@ import { ObsidianAssetManager } from './assets.ts';
 import { computeContentHash } from './utils.ts';
 import {
   joinOutputPath,
+  outputPathText,
   resolveOutputLocation,
   vaultRelativeFromAbsolute,
   type OutputLocationResult,
 } from './output-location.ts';
 import { OutputWriter, type WriterFs } from './output-writer.ts';
+import { DelayedSave } from './delayed-save.ts';
+import { isConfirmKey } from './prompt-keys.ts';
 import {
   getTextMapperPlugin,
   mapImageKey,
@@ -38,6 +41,19 @@ interface VaultCompilerSettings {
   tidyMapLabels: boolean;
 }
 
+/**
+ * US-7.2 | AC-3, US-7.3 | AC-3: the values one compile runs with — from the
+ * settings, or from the export prompt for that run only.
+ */
+interface CompileRun {
+  startingFile: string;
+  outputFolder: string;
+  outputFile: string;
+}
+
+/** US-7.1 | AC-S1: how long a settings text field waits before it is saved. */
+const SAVE_DELAY_MS = 500;
+
 const DEFAULT_SETTINGS: VaultCompilerSettings = {
   startingFile: 'index2compile.md',
   outputFolder: '',
@@ -50,6 +66,8 @@ const DEFAULT_SETTINGS: VaultCompilerSettings = {
 
 export default class VaultCompilerPlugin extends Plugin {
   settings: VaultCompilerSettings;
+  /** US-7.1 | AC-S1: saves the settings text fields after typing stops. */
+  settingsSaver = new DelayedSave(() => this.saveSettings(), SAVE_DELAY_MS);
 
   async onload() {
     await this.loadSettings();
@@ -68,9 +86,8 @@ export default class VaultCompilerPlugin extends Plugin {
               .setTitle('Compile vault from this file')
               .setIcon('document')
               .onClick(() => {
-                this.settings.startingFile = file.path;
-                void this.saveSettings();
-                new ExportPathModal(this.app, this).open();
+                // US-7.2 | AC-3: one-shot — the chosen note is used for this run only.
+                new ExportPathModal(this.app, this, { ...this.settingsRun(), startingFile: file.path }).open();
               });
           });
         }
@@ -80,7 +97,19 @@ export default class VaultCompilerPlugin extends Plugin {
     this.addSettingTab(new VaultCompilerSettingTab(this.app, this));
   }
 
-  onunload() {}
+  /** US-7.1 | AC-S1: a value typed just before switching off is still saved. */
+  onunload() {
+    void this.settingsSaver.flush();
+  }
+
+  /** US-7.2 | AC-3: the run values stored in the settings. */
+  settingsRun(): CompileRun {
+    return {
+      startingFile: this.settings.startingFile,
+      outputFolder: this.settings.outputFolder,
+      outputFile: this.settings.outputFile,
+    };
+  }
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -99,9 +128,8 @@ export default class VaultCompilerPlugin extends Plugin {
    * US-0.3 | AC-OL-1 to AC-OL-6: The output path shown in the settings and
    * the export prompt, or why the current values are refused.
    */
-  getOutputPath(): string {
-    const resolved = this.resolveOutputLocation();
-    return resolved.ok ? resolved.location.outputPath : `not usable: ${resolved.reason}`;
+  getOutputPath(run: CompileRun = this.settingsRun()): string {
+    return outputPathText(this.resolveOutputLocation(run));
   }
 
   /**
@@ -124,12 +152,12 @@ export default class VaultCompilerPlugin extends Plugin {
    * US-0.3 | AC-OL-1 to AC-OL-6: Resolves the configured folder and filename
    * into the output location of this compile, or the reason to refuse it.
    */
-  resolveOutputLocation(): OutputLocationResult {
+  resolveOutputLocation(run: CompileRun = this.settingsRun()): OutputLocationResult {
     const fs = this.getNodeFs();
     return resolveOutputLocation({
-      folder: this.settings.outputFolder,
-      file: this.settings.outputFile,
-      startingFile: this.settings.startingFile,
+      folder: run.outputFolder,
+      file: run.outputFile,
+      startingFile: run.startingFile,
       configDir: this.app.vault.configDir,
       vaultRoot: fs ? this.getVaultRoot() : null,
       folderExists: absolute => fs !== null && fs.existsSync(absolute),
@@ -141,8 +169,8 @@ export default class VaultCompilerPlugin extends Plugin {
    * resolved output location. A refused location stops before anything is
    * read, confirmed or written; every write goes through `OutputWriter`.
    */
-  async compileVault() {
-    const resolved = this.resolveOutputLocation();
+  async compileVault(run: CompileRun = this.settingsRun()) {
+    const resolved = this.resolveOutputLocation(run);
     if (!resolved.ok) {
       new Notice(`Compilation not started: ${resolved.reason}`);
       return;
@@ -150,7 +178,7 @@ export default class VaultCompilerPlugin extends Plugin {
     const location = resolved.location;
     const writer = new OutputWriter(location, this.app.vault, this.getNodeFs());
 
-    const startingFile = this.app.vault.getAbstractFileByPath(this.settings.startingFile);
+    const startingFile = this.app.vault.getAbstractFileByPath(run.startingFile);
     if (!(startingFile instanceof TFile)) {
       new Notice('Starting file not found.');
       return;
@@ -193,7 +221,7 @@ export default class VaultCompilerPlugin extends Plugin {
         resolve: (raw: string, currentFile: string) => resolver.resolve(raw, currentFile),
       });
 
-      const result = compiler.compile(this.settings.startingFile);
+      const result = compiler.compile(run.startingFile);
 
       const outputDir = location.folder;
       await writer.ensureFolder(location.assetsFolder);
@@ -330,10 +358,12 @@ export default class VaultCompilerPlugin extends Plugin {
 
   /**
    * US-0.3 | AC-OL-7: Lets the user pick the output folder. A folder inside
-   * the vault is stored vault-relative, one outside as its absolute path.
-   * Returns the stored folder, or `null` when nothing was chosen.
+   * the vault is given vault-relative, one outside as its absolute path.
+   * Returns the folder, or `null` when nothing was chosen. It saves nothing:
+   * the settings tab stores it, the export prompt uses it for one run
+   * (US-7.3 | AC-4).
    */
-  async chooseOutputFolder(): Promise<string | null> {
+  async pickOutputFolder(current: string): Promise<string | null> {
     let remoteDialog: any;
     try {
       remoteDialog = (window as any).require?.('@electron/remote')?.dialog;
@@ -347,63 +377,86 @@ export default class VaultCompilerPlugin extends Plugin {
         const absolute: string = result.filePaths[0];
         const vaultRoot = this.getVaultRoot();
         const relative = vaultRoot === null ? null : vaultRelativeFromAbsolute(absolute, vaultRoot);
-        this.settings.outputFolder = relative ?? absolute;
-        await this.saveSettings();
-        return this.settings.outputFolder;
+        return relative ?? absolute;
       }
       return null;
     }
-    const entered = window.prompt('Output folder', this.settings.outputFolder);
-    if (entered === null) return null;
-    this.settings.outputFolder = entered;
-    await this.saveSettings();
-    return entered;
+    return window.prompt('Output folder', current);
   }
 }
 
+/**
+ * US-7.2, US-7.3 | AC-1 to AC-6: the export prompt of a file-menu compile.
+ * Its values are used for this run only and never saved.
+ */
 class ExportPathModal extends Modal {
   private plugin: VaultCompilerPlugin;
-  private folderInput: any;
-  private fileInput: any;
+  private run: CompileRun;
 
-  constructor(app: App, plugin: VaultCompilerPlugin) {
+  constructor(app: App, plugin: VaultCompilerPlugin, run: CompileRun) {
     super(app);
     this.plugin = plugin;
+    this.run = run;
   }
 
+  /** US-7.3 | AC-1 to AC-6: folder and filename, the live path, Compile and Cancel. */
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl('h2', { text: 'Export compiled markdown' });
 
-    new Setting(contentEl)
-      .setName('Output folder')
-      .setDesc(`Resolved output path: ${this.plugin.getOutputPath()}`)
+    const folder = new Setting(contentEl).setName('Output folder');
+    // US-7.3 | AC-6: the resolved path is computed from this prompt's values.
+    const showPath = () => folder.setDesc(`Resolved output path: ${this.plugin.getOutputPath(this.run)}`);
+    showPath();
+    let folderInput: { setValue(value: string): unknown } | null = null;
+    folder
       .addText(text => {
-        this.folderInput = text;
-        text.setValue(this.plugin.settings.outputFolder);
+        folderInput = text;
+        text.setValue(this.run.outputFolder).onChange(value => {
+          this.run.outputFolder = value;
+          showPath();
+        });
+        this.confirmOnEnter(text.inputEl);
       })
       .addButton(button => button.setButtonText('Browse').onClick(async () => {
-        const chosen = await this.plugin.chooseOutputFolder();
-        if (chosen !== null) this.folderInput.setValue(chosen);
+        // US-7.3 | AC-4: the picked folder goes into this prompt only.
+        const chosen = await this.plugin.pickOutputFolder(this.run.outputFolder);
+        if (chosen === null) return;
+        this.run.outputFolder = chosen;
+        folderInput?.setValue(chosen);
+        showPath();
       }));
 
     new Setting(contentEl)
       .setName('Output filename')
       .addText(text => {
-        this.fileInput = text;
-        text.setValue(this.plugin.settings.outputFile);
+        text.setValue(this.run.outputFile).onChange(value => {
+          this.run.outputFile = value;
+          showPath();
+        });
+        this.confirmOnEnter(text.inputEl);
       });
 
     new Setting(contentEl)
-      .addButton(button => button.setButtonText('Compile').setCta().onClick(async () => {
-        this.plugin.settings.outputFolder = this.folderInput.getValue();
-        this.plugin.settings.outputFile = this.fileInput.getValue();
-        await this.plugin.saveSettings();
-        this.close();
-        await this.plugin.compileVault();
-      }))
+      .addButton(button => button.setButtonText('Compile').setCta().onClick(() => this.compile()))
       .addButton(button => button.setButtonText('Cancel').onClick(() => this.close()));
+  }
+
+  /** US-7.3 | AC-3: compiles with this prompt's values; nothing is saved. */
+  private compile(): void {
+    const run = { ...this.run };
+    this.close();
+    void this.plugin.compileVault(run);
+  }
+
+  /** US-7.3 | AC-5: Enter in a field compiles, not while an input method composes. */
+  private confirmOnEnter(input: HTMLInputElement): void {
+    input.addEventListener('keydown', event => {
+      if (!isConfirmKey(event)) return;
+      event.preventDefault();
+      this.compile();
+    });
   }
 
   onClose() {
@@ -419,9 +472,29 @@ class VaultCompilerSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  /** US-7.1 | AC-S1: a value typed just before the window closes is still saved. */
+  hide() {
+    void this.plugin.settingsSaver.flush();
+  }
+
+  /**
+   * US-0.3, US-7.1 | AC-S1, AC-S2: the settings. Text fields are saved after
+   * typing stops; the resolved output path follows every change at once.
+   */
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    const FOLDER_DESC =
+      'Vault-relative folder for the compiled master file, or an absolute folder outside the vault ' +
+      '(desktop app only). Resolved output path: ';
+    let folder: Setting | null = null;
+    let resolved: Setting | null = null;
+    // US-7.1 | AC-S2: both places that show the resolved path.
+    const showPaths = () => {
+      const path = this.plugin.getOutputPath();
+      folder?.setDesc(FOLDER_DESC + path);
+      resolved?.setDesc(path);
+    };
 
     new Setting(containerEl)
       .setName('Starting file')
@@ -430,29 +503,31 @@ class VaultCompilerSettingTab extends PluginSettingTab {
         text
           .setPlaceholder('index2compile.md')
           .setValue(this.plugin.settings.startingFile)
-          .onChange(async value => {
+          .onChange(value => {
             this.plugin.settings.startingFile = value;
-            await this.plugin.saveSettings();
+            this.plugin.settingsSaver.request();
+            showPaths();
           })
       );
 
-    new Setting(containerEl)
+    folder = new Setting(containerEl)
       .setName('Output folder')
-      .setDesc(
-        'Vault-relative folder for the compiled master file, or an absolute folder outside the vault ' +
-        `(desktop app only). Resolved output path: ${this.plugin.getOutputPath()}`
-      )
       .addText(text =>
         text
           .setPlaceholder('')
           .setValue(this.plugin.settings.outputFolder)
-          .onChange(async value => {
+          .onChange(value => {
             this.plugin.settings.outputFolder = value;
-            await this.plugin.saveSettings();
+            this.plugin.settingsSaver.request();
+            showPaths();
           })
       )
       .addButton(button => button.setButtonText('Browse').onClick(async () => {
-        if ((await this.plugin.chooseOutputFolder()) !== null) this.display();
+        const chosen = await this.plugin.pickOutputFolder(this.plugin.settings.outputFolder);
+        if (chosen === null) return;
+        this.plugin.settings.outputFolder = chosen;
+        await this.plugin.saveSettings();
+        this.display();
       }));
 
     new Setting(containerEl)
@@ -462,13 +537,15 @@ class VaultCompilerSettingTab extends PluginSettingTab {
         text
           .setPlaceholder('compiledtext.md')
           .setValue(this.plugin.settings.outputFile)
-          .onChange(async value => {
+          .onChange(value => {
             this.plugin.settings.outputFile = value;
-            await this.plugin.saveSettings();
+            this.plugin.settingsSaver.request();
+            showPaths();
           })
       );
 
-    new Setting(containerEl).setName('Resolved output path').setDesc(this.plugin.getOutputPath());
+    resolved = new Setting(containerEl).setName('Resolved output path');
+    showPaths();
 
     new Setting(containerEl)
       .setName('Enable TextMapper rendering')
@@ -492,9 +569,9 @@ class VaultCompilerSettingTab extends PluginSettingTab {
         text
           .setPlaceholder('Obsidian note font')
           .setValue(this.plugin.settings.mapFont)
-          .onChange(async value => {
+          .onChange(value => {
             this.plugin.settings.mapFont = value;
-            await this.plugin.saveSettings();
+            this.plugin.settingsSaver.request();
           })
       );
 

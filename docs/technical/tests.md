@@ -437,6 +437,39 @@ Heading rules of 2026-10-27 (US-6.1, US-6.3 to US-6.5, US-2.3; v0.11.0):
 - Output and assets are written through Obsidian APIs when the output folder
   is in the vault; an outside folder uses Node.js `fs` (US-0.3 AC-OL-2).
 
+Settings and the export prompt (US-7.1 AC-S1/AC-S2, US-7.2 AC-3, US-7.3
+AC-3 to AC-6; #81, #82; written 2026-11-01 before the code):
+- `tests/unit/delayed-save.test.ts` (mocked timers): one save for
+  `/Users/me/Exports` typed in one go, nothing before half a second, flush at
+  once without a second save, no save on an empty flush, a new wait after a
+  save.
+- `tests/unit/prompt-keys.test.ts`: Enter confirms; not while composing, not
+  as keyCode 229; a letter and Escape do not; the resolved-path text for a
+  usable and a refused location.
+- `tests/unit/settings-writes.test.ts`: text checks over `main.ts` (it needs
+  Obsidian to run) — the file-menu handler and the prompt neither assign nor
+  save settings, the plugin assigns them only while loading, the prompt
+  compiles with its own values, confirms through `isConfirmKey` and shows the
+  path from its own values; the four text fields request a delayed save, the
+  three switches and Browse save at once, closing the settings window and
+  switching the plugin off flush.
+- Behaviour in Obsidian: M19.
+- Before the code: 19 `todo` tests, all failing on v0.20.0. Added while
+  coding: the settings' path-affecting fields refresh both resolved-path
+  places (AC-S2), Enter wired to compiling in both prompt fields (the whole
+  statement), a compile reads its run, not the stored values — 21 tests.
+- Mutation check 2026-11-01 (#104): 17 mutants (the saver keeping its old
+  timer, flush keeping it, flush saving with nothing waiting; Enter while
+  composing and keyCode 229; the path text; the file menu saving again; the
+  prompt compiling from or showing the settings, or without Enter; no flush
+  on hide or unload; a field saving directly; no live path; the row not
+  refreshed; Browse in the settings not saving; a compile starting from the
+  stored file). Two first survived — Enter's wiring and the compile's
+  starting file — for want of a check matching the whole statement; checks
+  strengthened, all 17 caught.
+- The manual described the old behaviour (the prompt's values saved in the
+  settings) as intended; corrected with the stories.
+
 ### Epic 8 — Data safety and failsafes
 - Source vault file hashes are unchanged after compilation.
 - Temporary/rendering artifacts are not written into the source vault unless they
@@ -825,3 +858,33 @@ No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
 5. Repeat steps 2–3 with "Normalise headings" off.
 6. Is anything missing, odd or ugly that this list did not ask about? Report
    it even if it seems unrelated.
+
+### M19 — Settings and the export prompt (US-7.1, US-7.2, US-7.3, #81, #82)
+
+Result 2026-11-01 with v0.20.1: passed (reported by the user).
+
+On the fixture vault. No step edits a note (CLAUDE.md agent rule 10); every
+compile writes below `Export/`, which git ignores.
+
+1. The plugin list shows the version under test.
+2. Settings: starting file `index2compile.md`, output folder `Export`,
+   filename `compiledtext.md`. Close the settings window.
+3. Right-click `Smoke/Smoke book.md` → **Compile vault from this file**. The
+   prompt shows `Export` and `compiledtext.md`, and the resolved path
+   `Export/compiledtext.md`.
+4. In the folder field type `Export/Run` — the resolved path follows each
+   key press — then filename `ch2.md` → `Export/Run/ch2.md`.
+5. Press **Enter** in the filename field (do not click). The book compiles to
+   `Export/Run/ch2.md`, starting from the smoke book.
+6. Open the settings: still `index2compile.md`, `Export`, `compiledtext.md`.
+7. Right-click the smoke book again, press **Escape**: nothing compiles. Again,
+   click **Browse**, pick any folder: the prompt's folder field changes; press
+   Cancel. The settings are still as in step 6.
+8. Run **Compile vault** from the command palette: it starts from
+   `index2compile.md` and writes `Export/compiledtext.md`.
+9. In the settings, type `Export2` in the folder field: both places that show
+   the resolved path follow each key press. Close the settings window at once
+   (within a second) and open it again: the field shows `Export2`. Set it back
+   to `Export`.
+10. Is anything missing, odd or ugly that this list did not ask about? Report
+    it even if it seems unrelated.

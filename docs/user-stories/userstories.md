@@ -1775,6 +1775,23 @@ plugin
 - Plugin commands are available from the command palette to run a compilation.
 - Plugin settings let the user choose the vault-relative starting file and output
   file paths.
+- **AC-S1 Saving settings** *(decided 2026-11-01,
+  [#82](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/82))*. A text
+  field in the settings (starting file, output folder, output filename, map
+  font) is saved half a second after the last key press, not on every key
+  press; switches and Browse save at once. Whatever was typed is saved at the
+  latest when the settings window closes or the plugin is switched off, also
+  within that half second. Example: typing `/Users/me/Exports` in one go
+  writes `data.json` once, with the whole value; typing `Ex`, closing the
+  settings window at once → `Ex` is saved. *(v0.20.0: one write per key
+  press, 17 for that example.)*
+- **AC-S2 The resolved output path follows typing** (SCAR-016). Both places
+  that show it — the end of the output folder's description and the row
+  `Resolved output path` — are updated on every change of the starting
+  file, folder or filename field, before saving:
+  settings `Exports`, `compiledtext.md`; type `/Drafts` in the folder field →
+  the line shows the result for `/Drafts` at once. *(v0.20.0: only after
+  Browse or reopening the settings.)*
 - Plugin settings include an option to disable TextMapper rendering.
 - Compiled output and the `assets/` folder are written using Obsidian's vault
   and file APIs when the output folder is in the vault; a folder outside the
@@ -1788,12 +1805,20 @@ plugin
 **So that** I can avoid manually configuring the starting file first.
 
 **Acceptance criteria**
-- A file explorer context-menu item is available for markdown files.
-- Selecting it opens the export-path prompt (US-7.3) with the chosen file
-  pre-set as the starting file and the configured output path pre-filled.
-- The selected starting file is **not** saved to plugin settings; the
-  context-menu action is a one-shot compile that does not change the
-  default starting file stored in settings.
+- **AC-1** A file explorer context-menu item is available for markdown files.
+- **AC-2** Selecting it opens the export-path prompt (US-7.3) with the chosen
+  file pre-set as the starting file and the configured output path
+  pre-filled.
+- **AC-3 One-shot** *(examples added 2026-11-01,
+  [#81](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/81))*. The
+  selected starting file is **not** saved to plugin settings, whether the
+  prompt is confirmed or cancelled. Example: settings `index2compile.md`,
+  `Exports`, `compiledtext.md`; right-click `Chapter 2.md` → Compile (or
+  Cancel). Afterwards the settings still show `index2compile.md`, `Exports`,
+  `compiledtext.md`, `data.json` is unchanged, and the command-palette
+  `Compile vault` starts from `index2compile.md` into
+  `Exports/compiledtext.md`. *(v0.20.0: the starting file was saved as soon
+  as the menu item was chosen, even before Cancel.)*
 
 ### US-7.3 Prompt for export path on context-menu compilation
 **As an** Obsidian user  
@@ -1802,13 +1827,31 @@ before running
 **So that** each compile can choose its destination without changing global
 settings first.
 
-**Acceptance criteria**
-- Starting from the context menu opens a prompt with output folder and
-  filename fields.
-- Fields default to the preset output folder and filename.
-- Confirming the prompt starts compilation using those values for this run
-  only; the values are **not** persisted to plugin settings.
-- Cancelling the prompt does not start compilation.
+**Acceptance criteria** *(AC-3 to AC-6 made concrete 2026-11-01, #81; AC-5
+and AC-6 decided the same day)*
+- **AC-1** Starting from the context menu opens a prompt with output folder
+  and filename fields.
+- **AC-2** Fields default to the preset output folder and filename.
+- **AC-3 This run only.** Confirming the prompt starts compilation using
+  those values for this run only; the values are **not** persisted to plugin
+  settings. Example: settings `Exports`, `compiledtext.md`; in the prompt
+  type `Drafts` and `ch2.md`, Compile → writes `Drafts/ch2.md` (and
+  `Drafts/assets/`); the settings still show `Exports`, `compiledtext.md`.
+  *(v0.20.0: both were saved.)*
+- **AC-4 Browse** in the prompt puts the chosen folder into the prompt's
+  folder field only; it is not saved. *(v0.20.0: it was saved.)*
+- **AC-5 Cancelling** — the Cancel button or Escape — does not start
+  compilation and saves nothing. **Enter** in either field does what Compile
+  does; Enter while an input method is still composing a character (IME)
+  does not (SCAR-013).
+- **AC-6 The resolved output path follows the fields** (SCAR-016). The line
+  `Resolved output path: …` under the folder field is computed from the
+  prompt's own values — the chosen starting file, the folder and filename
+  fields — after every change to a field and after Browse: open the prompt
+  (`Exports/compiledtext.md`), type `Drafts` → `Drafts/compiledtext.md`, then
+  `ch2.md` as filename → `Drafts/ch2.md`. Values that are refused show
+  `not usable: <reason>` as today (US-0.3). *(v0.20.0: computed once from
+  the settings when the prompt opened.)*
 
 ## Epic 8 — Data safety and failsafes
 

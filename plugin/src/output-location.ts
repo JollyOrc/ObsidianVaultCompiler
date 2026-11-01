@@ -125,6 +125,14 @@ function vaultLocation(folder: string, shownFolder: string, request: OutputLocat
 }
 
 /**
+ * US-7.3 | AC-6, US-7.1 | AC-S2: the resolved output path as the settings and
+ * the export prompt show it — the path, or why the values are refused.
+ */
+export function outputPathText(result: OutputLocationResult): string {
+  return result.ok ? result.location.outputPath : `not usable: ${result.reason}`;
+}
+
+/**
  * US-0.3 | AC-OL-1 to AC-OL-6: Resolves the output folder and filename into
  * the location a compile writes to, or the reason it must not run.
  *
