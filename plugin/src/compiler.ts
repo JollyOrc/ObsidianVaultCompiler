@@ -1,5 +1,10 @@
 import {
+  codeLines,
+  codeRanges,
   decodeLink,
+  inlineCodeRanges,
+  inRanges,
+  unclosedFence,
   titleFromBasename,
   tidyBlankLines,
   codeBlockMask,
@@ -64,6 +69,13 @@ export function parseEmbedDestination(raw: string): { path: string; title: strin
  */
 const LINK = /(?<!!)\[\[([^\]|]+)(?:\|([^\]]*))?\]\]|(?<!!)\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)/g;
 
+/**
+ * US-1.4 | AC-1: where a note starts in the assembled document counts as a
+ * blank line when finding code — a note starts fresh, as on its own. Where
+ * it ends does not: there the embedding note goes on after its embed line.
+ */
+const isProvenanceLine = (line: string) => /^<!-- __vs__:.*? -->$/.test(line);
+
 /** US-8.4 | AC-5: the location markers of `markLinks`. */
 const LINE_MARKER = /<!-- __vl__:\d+:.*? -->/g;
 
@@ -71,7 +83,8 @@ const LINE_MARKER = /<!-- __vl__:\d+:.*? -->/g;
  * US-8.4 | AC-5: replaces every match of `pattern` in `content` (default: by
  * nothing) and keeps `lineMap` — the source line of each line — in step: the
  * lines a match spans become the lines of its replacement, all mapped to the
- * line the match starts on.
+ * line the match starts on. US-1.4 | AC-2: a match that starts inside code
+ * (a block shown inside another code block) is kept.
  */
 function replaceKeepingLines(
   content: string,
@@ -89,7 +102,9 @@ function replaceKeepingLines(
     pieces.push(text);
     for (let k = newlines(text); k > 0; k--) map.push(lineMap[++inputLine]);
   };
+  const code = codeRanges(content);
   for (const match of content.matchAll(pattern)) {
+    if (inRanges(code, match.index ?? 0)) continue;
     copy(content.slice(last, match.index));
     const startLine = inputLine;
     pieces.push(replacement);
@@ -201,6 +216,8 @@ export class InMemoryVaultCompiler {
   private headingMap = new Map<string, string>();
   private warnings: string[] = [];
   private warningDetails: WarningDetail[] = [];
+  /** US-1.4 | AC-6: problems already reported by `reportOnce`. */
+  private reported = new Set<string>();
   private stats = {
     filesProcessed: 0,
     assetsCopied: 0,
@@ -491,6 +508,17 @@ export class InMemoryVaultCompiler {
   }
 
   /**
+   * US-1.4 | AC-6: reports a problem of a note once, however often the note
+   * is processed (embedded twice, or for a section embed).
+   */
+  private reportOnce(message: string, link: string, file: string, line: number): void {
+    const key = `${message}\u0000${file}\u0000${line}`;
+    if (this.reported.has(key)) return;
+    this.reported.add(key);
+    this.report(message, link, file, line);
+  }
+
+  /**
    * US-5.2 | AC-1: the text of a note as every rule sees it, with its YAML
    * frontmatter removed. The only place that reads note text from `files`
    * (a text check in the frontmatter tests keeps it so). `lines` is the
@@ -640,10 +668,17 @@ export class InMemoryVaultCompiler {
     ({ content, lineMap } = replaceKeepingLines(content, lineMap, /<!--\s*SerializedQuery:[\s\S]*?-->/g));
 
     let inSerializedQuery = false;
+    // US-1.4 | AC-2: a marker shown inside code stays.
+    const serializerCode = codeRanges(content);
+    let lineStart = 0;
     content = content
       .split('\n')
       .map(line => {
-        if (/SerializedQuery|QueryToSerialize/i.test(line)) {
+        const keyword = line.search(/SerializedQuery|QueryToSerialize/i);
+        const at = lineStart;
+        lineStart += line.length + 1;
+        if (keyword !== -1 && inRanges(serializerCode, at + keyword)) return line;
+        if (keyword !== -1) {
           inSerializedQuery = true;
           if (line.includes('-->')) {
             inSerializedQuery = false;
@@ -663,18 +698,26 @@ export class InMemoryVaultCompiler {
     // so we can skip bare [[link]] list items that would otherwise duplicate an embed.
     const explicitEmbeds = new Set<string>();
     // Pre-scan: collect explicitly-embedded paths; resolve reports nothing (US-8.5 AC-1).
-    content.replace(/!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, (_, link: string) => {
+    // US-1.4 | AC-4: an embed inside code is not an embed.
+    const scanCode = codeRanges(content);
+    content.replace(/!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, (_, link: string, offset: number) => {
+      if (inRanges(scanCode, offset)) return '';
       const r = this.resolve(link.trim(), path);
       if (!r.missing) explicitEmbeds.add(r.path);
       return '';
     });
-    content.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, _alt: string, rawPath: string) => {
+    content.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, _alt: string, rawPath: string, offset: number) => {
+      if (inRanges(scanCode, offset)) return '';
       const r = this.resolve(parseEmbedDestination(rawPath).path, path);
       if (!r.missing && this.isMarkdownPath(r.path)) explicitEmbeds.add(r.path);
       return '';
     });
 
+    // US-1.4 | AC-1: which lines are block code is read from the note as
+    // written, before ToC items lose their bullets (`    - [[A]]` → `    ![[A]]`).
+    const blockCode = codeLines(content);
     content = this.expandTocLists(content, path, explicitEmbeds);
+    let blockCodeShift = 0;
 
     // ── Heading normalisation (applied before embed expansion) ──────────────────────
     // When normaliseHeadings is on, compute this file's depth and rewrite its
@@ -705,6 +748,7 @@ export class InMemoryVaultCompiler {
       // An injected (not replacing) title adds lines above the source text.
       const added = normContent.split('\n').length - content.split('\n').length;
       if (added > 0) lineMap = [...Array<number>(added).fill(lineMap[0]), ...lineMap];
+      if (added > 0) blockCodeShift = added;
       content = normContent;
       this.headingMap.set(path, title);
       effectiveDepth = Math.min(6, depth);
@@ -720,12 +764,23 @@ export class InMemoryVaultCompiler {
     // above its own line (US-6.3 AC-4, US-6.4 AC-10). Headings arriving from
     // embeds never update the tracker because they are inserted, not scanned;
     // the file's own title is skipped.
+    // US-1.4 | AC-6: a block the note leaves open is closed at its end.
+    const unclosed = unclosedFence(content.split('\n'));
+    if (unclosed !== null) {
+      this.reportOnce('Code block not closed; closed at the end of the note', unclosed.fence, path, lineMap[unclosed.line]);
+    }
     {
       let lastOriginal = 0;
       let skipTitle = titleInjected;
       const contentLines = content.split('\n');
       const inCode = codeBlockMask(contentLines);
+      // US-1.4 | AC-2: nothing inside code is marked or embedded.
+      const inline = inlineCodeRanges(content);
+      let lineStart = 0;
       content = contentLines.map((line, index) => {
+        const at = lineStart;
+        lineStart += line.length + 1;
+        if (blockCode[index - blockCodeShift] === true) return line;
         // KD-3: a line inside a code block is never a heading.
         const heading = inCode[index] ? null : matchHeading(line);
         if (heading) {
@@ -734,9 +789,21 @@ export class InMemoryVaultCompiler {
         }
         const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index] };
         // US-8.4 | AC-5: links carry their note and source line to link conversion.
-        const marked = this.markLinks(line, path, lineMap[index]);
-        const withWiki = this.processWikiEmbeds(marked, path, context);
-        return this.processMarkdownEmbeds(withWiki, path, context);
+        const expand = (text: string) => {
+          const marked = this.markLinks(text, path, lineMap[index]);
+          const withWiki = this.processWikiEmbeds(marked, path, context);
+          return this.processMarkdownEmbeds(withWiki, path, context);
+        };
+        let out = '';
+        let from = 0;
+        for (const [start, end] of inline) {
+          if (end <= at || start >= at + line.length) continue;
+          const codeFrom = Math.max(start, at) - at;
+          const codeTo = Math.min(end, at + line.length) - at;
+          out += expand(line.slice(from, codeFrom)) + line.slice(codeFrom, codeTo);
+          from = codeTo;
+        }
+        return out + expand(line.slice(from));
       }).join('\n');
     }
 
@@ -750,9 +817,14 @@ export class InMemoryVaultCompiler {
       if (originalFirstIsHeading) {
         body = stripLeadingHeading(body);
       }
-      content = `${heading}\n\n${body.trim()}\n`;
+      // US-1.4 | AC-2: only empty lines are trimmed, so indented code keeps its spaces.
+      content = `${heading}\n\n${body.replace(/^(?:[ \t]*\n)+/, '').trimEnd()}\n`;
     } else if (!this.headingMap.has(path)) {
       this.headingMap.set(path, titleFromBasename(this.basename(path)));
+    }
+
+    if (unclosed !== null) {
+      content = `${content.replace(/\n+$/, '')}\n${unclosed.fence}\n`;
     }
 
     this.processedStack.pop();
@@ -824,16 +896,25 @@ export class InMemoryVaultCompiler {
   private expandTocLists(content: string, currentFile: string, explicitEmbeds: Set<string>): string {
     const ITEM = /^\s*(?:[-*]|\d+\.)\s+/;
     const lines = content.split('\n');
+    // US-1.4 | AC-2: a line that is code is never a list item.
+    const code = codeRanges(content);
+    const starts: number[] = [];
+    let at = 0;
+    for (const line of lines) {
+      starts.push(at);
+      at += line.length + 1;
+    }
+    const isItem = (i: number) => ITEM.test(lines[i]) && !inRanges(code, starts[i] + lines[i].search(/\S/));
     const out: string[] = [];
     let i = 0;
     while (i < lines.length) {
-      if (!ITEM.test(lines[i])) {
+      if (!isItem(i)) {
         out.push(lines[i]);
         i += 1;
         continue;
       }
       const run: string[] = [];
-      while (i < lines.length && ITEM.test(lines[i])) run.push(lines[i++]);
+      while (i < lines.length && isItem(i)) run.push(lines[i++]);
       const items = run.map(line => this.classifyTocItem(line, currentFile));
       const isToc = items.every(item => item.kind !== 'other' && item.note);
       for (const item of items) {
@@ -1413,7 +1494,10 @@ export class InMemoryVaultCompiler {
   private sanitizeOutput(content: string): string {
     const portable = (target: string) =>
       target.startsWith('#') || target.startsWith('assets/') || /^https?:\/\//i.test(target) || target.startsWith('mailto:');
+    // US-1.4 | AC-2: links inside code stay as written.
+    let code = codeRanges(content, isProvenanceLine);
     let result = content.replace(/<a\s+href="([^"]+)"/g, (_m, target, offset, source) => {
+      if (inRanges(code, offset as number)) return _m;
       const clean = target.trim();
       if (portable(clean)) return _m;
       const message = 'Invalid output link';
@@ -1422,7 +1506,9 @@ export class InMemoryVaultCompiler {
       this.warningDetails.push({ message, link: clean, file: loc.file, line: loc.line });
       return '<!-- Warning: Invalid output link -->';
     });
+    code = codeRanges(result, isProvenanceLine);
     result = result.replace(/(?<!!)\[([^\]]*)\]\(([^)]+)\)/g, (_m, text, target, offset, source) => {
+      if (inRanges(code, offset as number)) return _m;
       const clean = target.trim().replace(/^<|>$/g, '');
       if (portable(clean)) return _m;
       const message = 'Invalid markdown link';
@@ -1456,10 +1542,12 @@ export class InMemoryVaultCompiler {
    */
   private convertLinkPhase(content: string, headingLines: boolean, sourceTexts: string[]): string {
     const doc = this.outlineOf(content);
+    // US-1.4 | AC-2: links inside code stay as written.
+    const code = codeRanges(content, isProvenanceLine);
     return content.replace(LINK, (m, rawLink?: string, display?: string, text?: string, rawPath?: string, ...rest: unknown[]) => {
       const offset = rest[rest.length - 2] as number;
       const source = rest[rest.length - 1] as string;
-      if (doc.isHeadingLine(offset) !== headingLines) return m;
+      if (doc.isHeadingLine(offset) !== headingLines || inRanges(code, offset)) return m;
       const at: LinkPlace = { doc, sourceTexts, headingLines, offset, source };
       return rawLink !== undefined
         ? this.convertWikiLink(rawLink, display, at)

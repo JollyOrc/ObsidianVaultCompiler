@@ -304,6 +304,131 @@ Definitions:
   glossary entries `Talentweb Strand` and `Swift Talents`, decided
   2026-10-27).
 
+### US-1.4 Code is copied as written
+*(Written 2026-11-01 from [#84](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/84),
+KD-4; decisions of the same day: inline code counts, a broken link in code
+is not reported, indented code as measured in Obsidian, an unclosed block
+ends with its note — #102.)*
+
+**As a** vault owner whose notes show markdown or Obsidian syntax as examples
+**I want** everything inside code to reach the compiled document exactly as I
+wrote it
+**So that** an example such as `` `![[Chapter 1]]` `` is shown, not carried
+out — as Obsidian shows it.
+
+Measured with v0.19.0 (2026-11-01, `A.md` = `# A` / `AAA text`, `B.md`
+embedded below each case): a fenced ToC list `- [[A]]` / `- [[B]]` pastes
+note A into the code block; ```` ``` ```` / `![[A]]` / ```` ``` ```` pastes
+note A into the block (also with `~~~`); `![x](pic.png)` in a fence is copied
+and rewritten; `See [[A]].`, `[[Nope]]` and `[x](#Gone)` in a fence become
+warning comments with warnings; inline `` `[[A]]` `` becomes a warning
+comment inside the backticks, and inline `` `![[A]]` `` pastes note A between
+the backticks; a ```` ```dataview ```` example shown inside a ```` ````md ````
+fence is deleted.
+
+**Acceptance criteria**
+
+- **AC-1 What is code.**
+  - *A fenced block:* the KD-3 definition (US-6.6), with one correction: a
+    fence of three or more backticks or tildes is closed only by a line that
+    starts with at least as many of the same character. ```` ````md ```` /
+    ```` ```dataview ```` / `LIST` / ```` ``` ```` / ```` ```` ```` is one block
+    of five lines; the inner ```` ``` ```` does not close it. *(v0.19.0: the
+    inner fence closed it.)*
+  - *Inline code:* a run of backticks opens it, the next run of exactly as
+    many backticks closes it: `` `[[A]]` ``, ``` ``a `[[A]]` b`` ```. It may
+    continue on the next lines of the same paragraph (measured H7:
+    `` A sentence with `code that starts here `` / `` [[Code target]] and ends
+    here` in it. `` shows the brackets as text); a blank line ends the
+    paragraph. A backtick that is never closed in its paragraph is plain
+    text: with A embedded, ``Write ` then [[A]].`` → ``Write ` then [A](#A).``
+  - *Indented code* (measured in Obsidian 2026-11-01, the code check): a
+    line indented by four or more spaces (a tab counts as four) whose line
+    before is blank or indented code. Outside a list:
+
+    | Note | Code? |
+    | --- | --- |
+    | `A paragraph.` / `` / `    [[X]]` (H1) | yes |
+    | `A paragraph.` / `    [[X]]` (H2, no blank line) | no — the paragraph goes on |
+    | `A paragraph.` / `` / tab `[[X]]` (H3) | yes |
+
+    Inside a list — from a list item to the first non-blank line indented
+    less than that item's text — a line needs four spaces *more* than the
+    item's text (`- ` → six, `1. ` → seven):
+
+    | Note | Code? |
+    | --- | --- |
+    | `- [[X]]` / `    - [[X]]` (H4, a nested item) | no |
+    | `- an item` / `` / `    [[X]]` (H5) | no — the item goes on |
+    | `- an item` / `` / `        [[X]]` (H6, eight spaces) | yes |
+    | `- an item` / `` / `Text.` / `` / `    [[X]]` (a paragraph ended the list) | yes |
+
+    So a nested ToC (`- [[1 Basics]]` / `    - [[1.1 Moving]]`, also with blank
+    lines between the items) is never code. A heading or a fenced block is
+    no paragraph, so four spaces right under one are code, as in standard
+    markdown (not measured in Obsidian). This matters because the compiler
+    writes each note's title directly above its first line: `G.md` =
+    `    See [[A]].` (code: the note starts with it) → `## G` /
+    `    See [[A]].`, still code, and stays as written — with "Normalise
+    headings" off too, where the indentation used to be trimmed away.
+    Observed in M18 (2026-11-01): Obsidian draws an indented line that holds
+    only a wiki link or embed oddly, in the source note as in the compiled
+    book; the compiler copies it as written either way. A note
+    starts fresh, so the root note may start with indented code; after an
+    embed line, four spaces continue the paragraph as they do in the note
+    (`![[A]]` / `    See [[B]].` → `See [B](#B).`).
+- **AC-2 Nothing happens inside code.** No step changes text inside code or
+  reports anything for it: no embed, no ToC expansion, no link conversion, no
+  copied asset, no map or Dataview block removed or drawn, no Dataview
+  Serializer marker removed (`<!-- SerializedQuery: LIST -->` in a fence),
+  no warning. Each
+  case of the measurement above comes out exactly as written, with no
+  warning and no copied file. The map and control rules (US-4, US-5) apply to
+  their own fences, not to fences shown inside another code block:
+  ```` ````md ```` / ```` ```text-mapper ```` / `0101 grass` / ```` ``` ```` /
+  ```` ```` ```` stays as written, without a map picture.
+- **AC-3 Outside code nothing changes.** Text before and after code on the
+  same line is handled as before: ``Write `[[A]]`, see [[B]].`` →
+  ``Write `[[A]]`, see [B](#B).`` The compiled fixture books are
+  byte-identical to v0.19.0 (they hold no code).
+- **AC-4 Composed cases.**
+  - An embed inside code does not count as "already embedded" for a ToC
+    (US-1.3 AC-5): ```` ``` ```` / `![[A]]` / ```` ``` ```` / `- [[A]]` /
+    `- [[B]]` → the code block unchanged, then notes A and B.
+  - A ToC list item holding inline code is not a link item, so the list is
+    not a ToC (US-1.3, as today): `` - `[[A]]` `` / `- [[B]]` stays a list;
+    the first item is copied as written, the second stays a link (here
+    with the `not embedded` comment, since B is embedded nowhere).
+  - Code in an embedded note, in a section embed (US-1.2) and in a
+    pass-through target (US-6.5) is copied as written; with "Normalise
+    headings" on and off.
+  - Headings in code stay as in KD-3.
+- **AC-5 Location markers** (US-8.4 AC-5) are never written inside code, so
+  none reaches the output there (SCAR-032).
+
+- **AC-6 An unclosed code block ends with its note** *(decided 2026-11-01,
+  [#102](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/102))*. As
+  in Obsidian, where an unclosed fence ends with its note, the compiler adds
+  the closing fence — the opening fence's character, as many times — on its
+  own line at the end of the part of the note it copies, so the block cannot
+  reach what follows. v0.19.0: `U.md` = `# U` / `` / ```` ``` ```` /
+  `![[A]]` (never closed; the fence is line 3), embedded in `index.md` = `# Book` / `![[U]]` / `See [[B]].`
+  / `![[B]]` → everything from U's fence to the end of the book is one code
+  block. Now:
+  - → `## U` / ```` ``` ```` / `![[A]]` / ```` ``` ```` / `See [B](#B).` /
+    `## B` …; `![[A]]` is code and stays as written (AC-2).
+  - A ```` ````md ```` block is closed with ```` ```` ````, a `~~~` block with
+    `~~~`.
+  - A section embed (`![[U#U]]`) and a pass-through target are closed at the
+    end of the copied part; the root note at the end of the document.
+  - A note whose fences are all closed is unchanged (the fixture books are
+    byte-identical).
+  - Each unclosed block is reported once:
+    `Code block not closed; closed at the end of the note`, with the note
+    and the line of its opening fence (`U.md`, line 3).
+
+**Not in scope:** math blocks and HTML comments.
+
 ## Epic 2 — Asset handling and deduplication
 ### US-2.1 Copy embedded media to `assets/`
 **As a** vault owner  
@@ -1634,7 +1759,7 @@ are shown as ```` ``` ````):
 not know code blocks either — a list of links inside a code block can be
 expanded as a ToC (US-1.3), `![[…]]` inside a code block is embedded, and
 links inside code are converted (US-2.3). The book has no code blocks
-(measured 2026-10-27). Not fixed; tracked in [#84](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/84).
+(measured 2026-10-27). Specified 2026-11-01 as US-1.4; tracked in [#84](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/84).
 
 ## Epic 7 — Obsidian plugin delivery
 

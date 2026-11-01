@@ -161,7 +161,8 @@ the default is also asked for the other values.
 **Test tooling must prove its undo** (SCAR-018)
 Back up by full path with a checksum list, check it after every restore, stop
 the run on a failed check, and count a mutant only on a tree verified before
-and after it. A survivor is a finding about the tests (SCAR-023). The backup
+and after it. A survivor is a finding about the tests (SCAR-023). A file
+meant to be new is written only to a path checked to be free. The backup
 holds the state to return to: for a manual check, the state as handed over.
 After a manual check, `git status` comes first; commits stage files by name.
 

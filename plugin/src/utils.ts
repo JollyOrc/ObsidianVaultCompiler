@@ -76,25 +76,190 @@ export function matchHeading(line: string): { level: number; rest: string } | nu
 const FENCE = /^\s*(```|~~~)/;
 
 /**
- * KD-3 (US-6.6): the only definition of "inside a code block". For each line,
- * true when it lies after a line opening a block (``` or ~~~ after optional
- * spaces) up to and including the line closing it (the next line starting
- * with the same fence); an unclosed block runs to the end. Opening lines are
- * not inside.
+ * KD-3 (US-6.6); US-1.4 | AC-1: the fence a line opens or closes with — its
+ * character and how many of them — or null.
+ */
+function fenceOf(line: string): { char: string; length: number } | null {
+  if (!FENCE.test(line)) return null;
+  const run = line.trimStart().match(/^(`+|~+)/)![1];
+  return { char: run[0], length: run.length };
+}
+
+/**
+ * KD-3 (US-6.6); US-1.4 | AC-1: the only definition of "inside a fenced code
+ * block". For each line, true when it lies after a line opening a block
+ * (``` or ~~~ after optional spaces) up to and including the line closing it
+ * — the next line starting with the same character at least as many times,
+ * so ```` holds an inner ``` — an unclosed block runs to the end. Opening
+ * lines are not inside.
  */
 export function codeBlockMask(lines: string[]): boolean[] {
   const mask: boolean[] = [];
-  let fence: string | null = null;
+  let open: { char: string; length: number } | null = null;
   for (const line of lines) {
-    if (fence !== null) {
+    if (open !== null) {
       mask.push(true);
-      if (line.match(FENCE)?.[1] === fence) fence = null;
+      const fence = fenceOf(line);
+      if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
       continue;
     }
     mask.push(false);
-    fence = line.match(FENCE)?.[1] ?? null;
+    open = fenceOf(line);
   }
   return mask;
+}
+
+/**
+ * US-1.4 | AC-6: the fenced block `lines` leave open at their end — the index
+ * of its opening line and the fence that closes it (its character, as many
+ * times) — or null when every block is closed.
+ */
+export function unclosedFence(lines: string[]): { line: number; fence: string } | null {
+  let open: { line: number; char: string; length: number } | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const fence = fenceOf(lines[index]);
+    if (open !== null) {
+      if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
+    } else if (fence !== null) {
+      open = { line: index, ...fence };
+    }
+  }
+  return open === null ? null : { line: open.line, fence: open.char.repeat(open.length) };
+}
+
+/** US-1.4 | AC-1: the width of a line's leading whitespace, a tab as four. */
+function indentWidth(text: string): number {
+  return [...(text.match(/^[ \t]*/)?.[0] ?? '')].reduce((width, c) => width + (c === '\t' ? 4 : 1), 0);
+}
+
+/**
+ * US-1.4 | AC-1: reads which parts of `text` are code, as Obsidian shows them
+ * (measured 2026-11-01):
+ * - block code, by line (`lines`): the lines inside a fenced block
+ *   (`codeBlockMask`), not its opening line; and indented code — a line
+ *   indented by four or more (a tab as four) after a blank line, a heading,
+ *   a fenced block or indented code — not under a paragraph line; inside a list (from an item to the first line after a blank line
+ *   indented less than the item's text) four more than the item's text;
+ * - inline code (`inline`, sorted `[start, end)` ranges): a run of backticks
+ *   up to the next run of exactly as many in the same paragraph (lines up to
+ *   a blank line, a heading, a list item or a block); a run never closed is
+ *   text.
+ * Lines for which `blank` is true (provenance comments in the assembled
+ * document) count as blank lines.
+ */
+function scanCode(text: string, blank: (line: string) => boolean): { lines: boolean[]; inline: Array<[number, number]> } {
+  const textLines = text.split('\n');
+  const fenced = codeBlockMask(textLines);
+  const lines: boolean[] = [];
+  const inline: Array<[number, number]> = [];
+  let paragraph: [number, number] | null = null;
+  const endParagraph = () => {
+    if (paragraph !== null) inline.push(...inlineCode(text, paragraph[0], paragraph[1]));
+    paragraph = null;
+  };
+  let afterBlank = true;
+  let afterCode = false;
+  let itemText: number | null = null;
+  let offset = 0;
+  textLines.forEach((line, i) => {
+    const start = offset;
+    const end = offset + line.length;
+    offset = end + 1;
+    lines.push(false);
+    if (fenced[i] || fenceOf(line) !== null) {
+      endParagraph();
+      lines[i] = fenced[i];
+      // A block is no paragraph: indented code may follow it directly.
+      afterBlank = true;
+      afterCode = false;
+      return;
+    }
+    if (line.trim() === '' || blank(line)) {
+      endParagraph();
+      afterBlank = true;
+      return;
+    }
+    const indent = indentWidth(line);
+    if ((afterBlank || afterCode) && indent >= (itemText === null ? 4 : itemText + 4)) {
+      endParagraph();
+      lines[i] = true;
+      afterBlank = false;
+      afterCode = true;
+      return;
+    }
+    afterCode = false;
+    const item = line.match(/^([ \t]*)([-*+]|\d+[.)])([ \t]+)\S/);
+    if (item !== null) {
+      endParagraph();
+      itemText = indentWidth(item[1]) + item[2].length + item[3].length;
+    } else if (itemText !== null && afterBlank && indent < itemText) {
+      itemText = null;
+    }
+    afterBlank = false;
+    if (matchHeading(line) !== null) {
+      endParagraph();
+      inline.push(...inlineCode(text, start, end));
+      // A heading is no paragraph: indented code may follow it directly.
+      afterBlank = true;
+      return;
+    }
+    paragraph = paragraph === null ? [start, end] : [paragraph[0], end];
+  });
+  endParagraph();
+  return { lines, inline };
+}
+
+/** US-1.4 | AC-1: for each line of `text`, whether it is block code (fenced or indented). */
+export function codeLines(text: string, blank: (line: string) => boolean = () => false): boolean[] {
+  return scanCode(text, blank).lines;
+}
+
+/** US-1.4 | AC-1: the inline code spans of `text`, sorted `[start, end)` ranges. */
+export function inlineCodeRanges(text: string, blank: (line: string) => boolean = () => false): Array<[number, number]> {
+  return scanCode(text, blank).inline;
+}
+
+/**
+ * US-1.4 | AC-1: every part of `text` that is code — whole lines of block
+ * code and inline spans — as sorted `[start, end)` character ranges.
+ */
+export function codeRanges(text: string, blank: (line: string) => boolean = () => false): Array<[number, number]> {
+  const { lines, inline } = scanCode(text, blank);
+  const ranges: Array<[number, number]> = [...inline];
+  let offset = 0;
+  text.split('\n').forEach((line, i) => {
+    if (lines[i]) ranges.push([offset, offset + line.length]);
+    offset += line.length + 1;
+  });
+  return ranges.sort((a, b) => a[0] - b[0]);
+}
+
+/** US-1.4 | AC-1: the inline code spans of `text` between `start` and `end`. */
+function inlineCode(text: string, start: number, end: number): Array<[number, number]> {
+  const runs = [...text.slice(start, end).matchAll(/`+/g)];
+  const spans: Array<[number, number]> = [];
+  for (let k = 0; k < runs.length; k++) {
+    let m = k + 1;
+    while (m < runs.length && runs[m][0].length !== runs[k][0].length) m++;
+    if (m < runs.length) {
+      spans.push([start + (runs[k].index ?? 0), start + (runs[m].index ?? 0) + runs[m][0].length]);
+      k = m;
+    }
+  }
+  return spans;
+}
+
+/** US-1.4 | AC-2: whether `pos` lies in one of the sorted `ranges`. */
+export function inRanges(ranges: Array<[number, number]>, pos: number): boolean {
+  let lo = 0;
+  let hi = ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (ranges[mid][1] <= pos) lo = mid + 1;
+    else if (ranges[mid][0] > pos) hi = mid - 1;
+    else return true;
+  }
+  return false;
 }
 
 /**

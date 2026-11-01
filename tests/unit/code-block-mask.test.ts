@@ -24,6 +24,14 @@ describe('KD-3: codeBlockMask', () => {
   it('two blocks one after the other', () => {
     assert.deepEqual(codeBlockMask(['```', 'a', '```', '```', 'b', '```']), [false, true, true, false, true, true]);
   });
+
+  it('a longer fence is closed only by one at least as long (US-1.4 AC-1)', () => {
+    assert.deepEqual(
+      codeBlockMask(['````md', '```dataview', 'LIST', '```', '````', 'after']),
+      [false, true, true, true, true, false],
+    );
+    assert.deepEqual(codeBlockMask(['```', 'x', '````']), [false, true, true], 'a longer fence closes a shorter one');
+  });
 });
 
 describe('KD-3: matchHeading', () => {

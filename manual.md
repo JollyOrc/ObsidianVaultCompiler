@@ -258,6 +258,16 @@ Pandoc.
 You don't need to know this to use the plugin, but it helps you understand the
 result.
 
+**Code stays code.** Anything that Obsidian shows as code is copied exactly as
+you wrote it, and none of the steps below touch it: a code block between
+` ``` ` or `~~~` lines, code indented by four spaces (or a tab) after an
+empty line, and inline code between backticks. So a note that explains
+Obsidian can show `` `![[Chapter 1]]` `` or a whole table of contents as an
+example without the plugin carrying it out, and a broken link inside an
+example gives no warning. If a note opens a code block and never closes it,
+the plugin closes it at the end of the note — otherwise everything after the
+note would turn into code — and tells you in the warnings file.
+
 **Step 1 — Read the starting note.** The plugin reads your starting note. Its
 own text and headings stay as you wrote them.
 
@@ -597,6 +607,7 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | **Heading depth clamped** | A heading would be deeper than level 6, or a note was placed below its parent. | Usually fine; otherwise check the file-name numbering. |
 | **Circular dependency avoided** | Notes embed each other in a circle. | Remove one of the embeds. |
 | **TextMapper …** | A map couldn't be drawn. | See [section 9](#9-hex-maps-text-mapper). |
+| **Code block not closed; closed at the end of the note** | A note opens a code block (` ``` `) and never closes it. | Add the closing ` ``` ` line in the note. |
 | **Map directive "…" is unknown and was ignored** | A word in a `# vault-compiler:` line is misspelt. | Use `no-outlines` or `no-glow` (see [section 9](#9-hex-maps-text-mapper)). |
 
 ### Messages in the corner of the screen

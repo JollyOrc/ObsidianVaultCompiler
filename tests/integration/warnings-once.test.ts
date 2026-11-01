@@ -188,11 +188,13 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
   // #99 (v0.19.0): only `[B](#b)` → `[B](#B)` (US-2.3 AC-2), asserted below.
   // The smoke book gained `3 Heading links.md` for M17; a line diff against
   // v0.18.0 showed only that note's six links (US-2.3) and no other change.
+  // #103 (v0.20.0) added `4 Code examples.md` for M18; a line diff against
+  // v0.19.0 showed only that note and the start note's list of checks.
   const BEFORE: Array<[string, boolean, string]> = [
     ['index2compile.md', false, '6f08f48986a530b4'],
     ['index2compile.md', true, '61fc2cd03fc90d87'],
-    ['Smoke/Smoke book.md', false, 'c4b3972c089fc6af'],
-    ['Smoke/Smoke book.md', true, '0524bc309e091948'],
+    ['Smoke/Smoke book.md', false, 'f563479e034c9b27'],
+    ['Smoke/Smoke book.md', true, '435e9a13b67cc075'],
   ];
   for (const [start, normaliseHeadings, hash] of BEFORE) {
     it(`${start}, "Normalise headings" ${normaliseHeadings ? 'on' : 'off'}: byte-identical`, () => {
@@ -222,9 +224,11 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
     assert.deepEqual(index.warningDetails, [{ message: 'Missing include', link: 'missing.md', file: 'index2compile.md', line: 6 }]);
   });
 
-  it('fixture warnings: the smoke book none', () => {
+  it('fixture warnings: the smoke book has only the unclosed block of its code note (US-1.4 AC-6)', () => {
     const smoke = compileFixture('Smoke/Smoke book.md', false);
-    assert.deepEqual(smoke.warnings, []);
-    assert.deepEqual(smoke.warningDetails, []);
+    assert.deepEqual(smoke.warnings, ['Warning: Code block not closed; closed at the end of the note']);
+    assert.deepEqual(smoke.warningDetails, [
+      { message: 'Code block not closed; closed at the end of the note', link: '```', file: 'Smoke/4 Code examples.md', line: 33 },
+    ]);
   });
 });

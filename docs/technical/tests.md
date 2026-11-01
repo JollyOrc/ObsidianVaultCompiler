@@ -89,6 +89,50 @@ Code blocks are never headings (KD-3, v0.16.1; `tests/integration/code-blocks.te
 - The example book compiles byte-identical to v0.16.0 (it has no code blocks
   that reach this step).
 
+Code is copied as written (US-1.4, #84, #102; `tests/integration/code-as-written.test.ts`,
+written 2026-11-01 before the code):
+- AC-1/AC-2: each case measured with v0.19.0 inside a fence (ToC list,
+  embed with ``` and ~~~, picture, wiki link, missing link, same-note link,
+  markdown note link, a Dataview block shown in a ```` fence) comes out as
+  written, with nothing embedded, copied or reported; a map shown in a ````
+  fence (already right: guard). A ```` fence with an inner ``` holds a
+  `# heading` line (KD-3 helper; unit case in `code-block-mask.test.ts`).
+- Inline code: single and double backticks, over two lines of a paragraph
+  (H7); guards: a backtick never closed, a blank line ending the paragraph.
+- Indented code: the measured rows H1–H6 plus numbered items (seven spaces
+  code, six not) and a nested ToC with blank lines; each row checks that the
+  embed in it happens or not.
+- AC-3 text beside inline code; AC-4 an embed in code for a ToC, a list item
+  with inline code (guard), code in an embedded note and a section embed with
+  both heading settings, a pass-through target.
+- AC-6 (#102): the closing fence at the end of the note with its warning,
+  ```` and ~~~ closed with their own fence, a section embed, the root note;
+  guard: closed fences unchanged.
+- Guard search: the KD-3 text check allows the fence pattern only in
+  `utils.ts`; the KD-3 test of an unclosed block checks only that the block's
+  start is kept, which AC-6 keeps.
+- Before the code: 28 `todo` tests (27 here, 1 unit), all failing on v0.19.0.
+- Found while coding (v0.20.0): ToC expansion drops a nested item's bullet
+  (`    - [[A]]` → `    ![[A]]`), which then looked like indented code; block
+  code is now read before the expansion. With "Normalise headings" off the
+  title rule trimmed a note's first line, so indented code at the start of a
+  note lost its spaces; only empty lines are trimmed now. A heading or fence
+  ends a block, so indented code may follow it (standard markdown; the
+  compiler writes titles straight above notes). In the assembled document a
+  note's start marker counts as a blank line, its end marker not.
+- Mutation check 2026-11-01 (#103): 27 mutants (fence length, the unclosed
+  fence found / closed / closed with its length / reported once, each step's
+  code skip — control and serializer removal, both pre-scans, ToC, embed
+  loop for block and inline code, link conversion, both sanitize passes —,
+  the block-code snapshot and its shift, the list rule, the blank line
+  before indented code, tab width, inline runs, inline code over lines, the
+  heading as block end, lists ending, the provenance lines, US-6.1 trimming).
+  Seven first survived: a serializer marker in code, a markdown embed in code
+  above a ToC, the root note starting with code, an embed line followed by
+  four spaces, a list ended by a paragraph, code right under a heading, and
+  (a wrong rule) the end marker counted as blank. Tests added, rule fixed,
+  all 27 caught.
+
 ### Epic 2 — Asset handling and deduplication
 - Images, PDFs, audio, video and generic files are copied to `assets/`.
 - Asset reference is rewritten to `assets/filename.ext`.
@@ -524,6 +568,7 @@ Every note name is unique in the vault (SCAR-012). Start note:
 | `Appendix.md` | headingless; `[text](path)` ToC list, a section embed `![[1.1 Moving#Climbing]]` (US-1.2), `![[media.png]]` |
 | `Glossary of the Vale.md`, `Map key.md` | `Map key` holds a pointy-top map (`option horizontal`) |
 | `3 Heading links.md` | links to a note, to a heading of another note, to a heading of its own with spaces and brackets (also written by hand in lower case), to a heading text another note has too, and to the second of two equal headings (`[[#Part Two#Notes]]`); M17 (US-2.3, added 2026-11-01) |
+| `4 Code examples.md` | inline code, a ToC list in a fence, indented code after an empty line and right under a heading, a Dataview example in a ```` fence, an unclosed last block; M18 (US-1.4, added 2026-11-01) |
 | `Skill tree.md` | map with `# vault-compiler: no-outlines no-glow` and `option global`: seven hexes of a custom type `skill-moss` with a filtered green outline, checkbox, checkmark, watercolour and `Dice` symbols, the linked label `Fog Lantern\|Lantern Lore`, the path label `Old Road`, the hyphenated label `Thorn-weaving Hands` (US-4.10, added 2026-10-31) |
 
 `tests/integration/smoke-vault.test.ts` compiles the smoke book with
@@ -748,4 +793,35 @@ No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
 4. The warnings file of both compilations has no entry for
    `3 Heading links.md`.
 5. Is anything missing, odd or ugly that this list did not ask about? Report
+   it even if it seems unrelated.
+
+### M18 — Code in the compiled book (US-1.4, #84, #102)
+
+Result 2026-11-01 with v0.20.0: passed (reported by the user), "Normalise
+headings" on and off. Observed: Obsidian draws an indented line that holds
+only a wiki link or embed oddly (`![[ 1.1 Moving]]`, `Appendix]]`, the
+heading above and the next line restyled) — the same in the source note, so
+it is Obsidian's drawing, not the compiler's output, which is the note as
+written. The warnings table shows the ```` ``` ```` cell normally.
+
+No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
+`Smoke/Smoke book.md`, output folder `Export`.
+
+1. The plugin list shows the version under test.
+2. Compile with "Normalise headings" on. Open the compiled book in reading
+   view and find **Code examples**. Every example shows as code (grey,
+   monospace, brackets visible), none is carried out:
+   - the inline `![[1.1 Moving]]` and `[[Appendix]]`;
+   - the list `- [[1.1 Moving]]` / `- [[1.2 Dueling]]` in a code block;
+   - the indented `![[1.1 Moving]]`;
+   - the `[[Appendix]]` indented right under the heading **Indented right
+     under a heading** (standard markdown; not yet measured in Obsidian);
+   - the Dataview example, shown with its ```` ```dataview ```` lines;
+   - the last block, `![[1.2 Dueling]]`, closed by the compiler.
+3. After that last block, **Appendix** and the rest of the book are normal
+   text, not code.
+4. The warnings file has one entry: `Code block not closed; closed at the end
+   of the note` for `4 Code examples.md`, line 33.
+5. Repeat steps 2–3 with "Normalise headings" off.
+6. Is anything missing, odd or ugly that this list did not ask about? Report
    it even if it seems unrelated.

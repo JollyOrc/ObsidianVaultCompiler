@@ -15,6 +15,8 @@
  *     directives) become three PNG references
  *   - US-2.3 links to headings: another note's, the same note's, a heading
  *     text two notes share, the second of two equal headings (M17)
+ *   - US-1.4 code copied as written: inline, fenced ToC, indented, under a
+ *     heading, a Dataview example in a longer fence, an unclosed block (M18)
  *
  * The fixture notes sit in a subfolder so the top-level fixture test
  * (fixture-vault.test.ts) is unaffected. Its warnings (none) are asserted in
@@ -84,6 +86,8 @@ describe('smoke book — "Normalise headings" on', () => {
       '### Notes',
       '## Part Two',
       '### Notes',             // the second Notes (US-2.3 AC-6)
+      '# Code examples',       // US-1.4 (M18): prefix 4
+      '## Indented right under a heading',
       '## Appendix',           // headingless, `[text](path)` item of a mixed list
       '### Glossary of the Vale', // `[text](path)` ToC list
       '### Map key',
@@ -123,7 +127,10 @@ for (const normaliseHeadings of [true, false]) {
     });
 
     it('US-1.3: no ToC link is left as a link', () => {
-      assert.doesNotMatch(result.content, /\[\[|\]\((?:Appendix|Glossary|Map%20key)/);
+      // `4 Code examples` keeps its links on purpose (US-1.4).
+      const outsideCode = result.content.replace(/^# Code examples\n[\s\S]*?(?=^## Appendix$)/m, '');
+      assert.notEqual(outsideCode, result.content, 'the code note was found and left out');
+      assert.doesNotMatch(outsideCode, /\[\[|\]\((?:Appendix|Glossary|Map%20key)/);
     });
 
     it('US-4.x: all three maps become distinct PNG references, no fence is left', () => {
@@ -135,6 +142,20 @@ for (const normaliseHeadings of [true, false]) {
 
     it('US-2.1: the image from the vault root is copied as an asset', () => {
       assert.match(result.content, /!\[\]\(assets\/media\.png\)/);
+    });
+
+    it('US-1.4: the examples of `4 Code examples` stay code (M18)', () => {
+      for (const code of [
+        'Inline: `![[1.1 Moving]]` and `[[Appendix]]`.',
+        '```\n- [[1.1 Moving]]\n- [[1.2 Dueling]]\n```',
+        '\n    ![[1.1 Moving]]\n',
+        '## Indented right under a heading\n    [[Appendix]]',
+        '````md\n```dataview\nLIST FROM "Smoke"\n```\n````',
+        '```\n![[1.2 Dueling]]\n```\n',
+      ]) {
+        assert.ok(result.content.includes(code), code);
+      }
+      assert.equal((result.content.match(/^## Dueling$|^# Dueling$/gm) ?? []).length, 1, 'Dueling is embedded once, by the ToC');
     });
 
     it('US-2.3: the links of `3 Heading links` (M17)', () => {

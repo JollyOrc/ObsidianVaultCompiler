@@ -67,6 +67,15 @@ the restore is wrong, every later mutant tests something else, and the report
   empty note left by the manual check went into a commit through
   `git add -A`; the publish copy showed them, and they were taken out before
   the push.
+- Before a tool writes a file meant to be new (a test file, a fixture, a
+  generated note), check that its path is free (`test -e`, or a tool that
+  refuses to overwrite) and pick another name if it is not. A name that fits
+  the topic is the name an earlier file on the same topic already has.
+  Example (2026-11-01, Vault Compiler #103): the tests for "code is copied as
+  written" were written to `code-blocks.test.ts`, which held the KD-3 tests;
+  the overwrite was seen from the tool's "updated" message, the file restored
+  from git and proven equal to the commit, and the new tests moved to
+  `code-as-written.test.ts` before anything was committed.
 - Applies next to: every mutation run, every scripted refactor, probe setups
   that write into the project, install scripts, manual-check fixtures,
-  commits and publishes after a manual check.
+  commits and publishes after a manual check, new files written by a tool.
