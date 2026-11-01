@@ -1,11 +1,12 @@
 # Smoke book
 
 Start note for the manual smoke tests (`docs/technical/tests.md` §6, M14,
-M15, M16, M17, M18). Compile it from the file menu with the output folder `Export`.
+M15, M16, M17, M18, M20). Compile it from the file menu with the output folder `Export`.
 
 - [[1 Basics]]
 - [[2 Charms]]
 - [[Skill tree]]
 - [[3 Heading links]]
 - [[4 Code examples]]
+- [[5 Quotes]]
 - [Appendix](Appendix.md)

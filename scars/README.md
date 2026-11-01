@@ -49,6 +49,7 @@ Each SCAR covers:
 | [SCAR-031](SCAR-031-lookup-with-side-effects.md) | A lookup also reports, so every caller that only looks fills the report | Design / Verification | Medium |
 | [SCAR-032](SCAR-032-in-band-markers-read-by-other-steps.md) | Invisible markers written into the text are read by steps they were not meant for | Design / Verification | Medium |
 | [SCAR-033](SCAR-033-output-format-for-an-unnamed-reader.md) | An output format is specified without naming the program that reads it | Requirements / Integration | High |
+| [SCAR-034](SCAR-034-line-start-rules-blind-to-containers.md) | A rule that reads the start of a line does not see past a container's marker | Specification / Verification | Medium |
 
 ## Recurring themes
 
@@ -83,6 +84,12 @@ asynchronous read moves into the action after the click (SCAR-022).
 A rule that holds in the probe may fail where the output is really used.
 Test every position (start, middle, end, before and after a line break)
 against the real consumer; text moved into a new container starts a new block.
+
+**Containers** (SCAR-034)
+A rule that reads the start of a line reads it after the container's marker
+(quote, list item), through one function; a container that ends closes the
+blocks inside it; text inserted into a container carries its marker on every
+line. Test each rule inside each container and a nested one.
 
 **Joins between generated pieces** (SCAR-010)
 When output is built by concatenation, list what a neighbouring character can

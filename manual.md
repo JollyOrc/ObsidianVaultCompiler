@@ -169,6 +169,36 @@ keeps it, so a list of pictures stays a list:
 - ![Back](back.png)          →   - ![Back](assets/back.png)
 ```
 
+### Quoting a note
+
+Put an embed on a quote line to show a whole note as a quotation:
+
+```markdown
+As the sage said:
+
+> ![[Sage sayings]]
+```
+
+The whole note goes into that one quote. It opens with the note's name in
+bold (**Sage sayings**), and its headings stay exactly as you wrote them,
+inside the quote: they are not renumbered and do not become part of the
+document's structure, whatever the "Normalise headings" setting. Notes that
+the quoted note embeds go into the same quote, each with its name in bold.
+This works in nested quotes (`> > ![[Sage sayings]]`) and in callouts:
+
+```markdown
+> [!quote] On fog
+> ![[Sage sayings#Fog]]
+> — the Vale almanac
+```
+
+A section embed (`#Fog`) shows just that section, without the bold name.
+Lists of links inside a quoted note stay lists; they are not expanded like a
+table of contents. A note that appears only as a quote is not part of the
+document, so a link to it elsewhere gives the warning *link target … not
+embedded*. The embed must be the only thing on its quote line; an embed in
+the middle of a sentence is not supported yet.
+
 ### Links can be written any way Obsidian understands
 
 Short links (`[[Combat]]`), full paths (`[[Rules/Chapters/Combat]]`) and
@@ -267,7 +297,7 @@ you wrote it, and none of the steps below touch it: a code block between
 empty line, and inline code between backticks. So a note that explains
 Obsidian can show `` `![[Chapter 1]]` `` or a whole table of contents as an
 example without the plugin carrying it out, and a broken link inside an
-example gives no warning. If a note opens a code block and never closes it,
+example gives no warning. Code inside a quote (`> ~~~`) counts too. If a note opens a code block and never closes it,
 the plugin closes it at the end of the note — otherwise everything after the
 note would turn into code — and tells you in the warnings file.
 

@@ -427,7 +427,209 @@ fence is deleted.
     `Code block not closed; closed at the end of the note`, with the note
     and the line of its opening fence (`U.md`, line 3).
 
+- **AC-7 Code inside a quote** *(found 2026-11-01 in the class search of
+  US-1.5; [#105](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/105))*. A line with a quote prefix (US-1.5 definitions) is read for code
+  by what follows its prefix: `> ~~~` opens a fenced block, `>` alone is an
+  empty line. A change of quote depth ends an open block and a paragraph (the
+  quote ends the block, as in standard markdown); such a block is never
+  "unclosed" (AC-6). Measured with v0.20.1, root `# Book` / … and note A
+  existing but embedded nowhere:
+  - `> ~~~` / `> [[A]]` / `> ![[A]]` / `> ~~~` → as written, no warning.
+    *(v0.20.1: `> [A](#A)`, then note A pasted, which ended the quote.)*
+  - `> ```` ```` / `> [[A]]` / `>` / ``> x ``` y`` / `> [[A]]` / `> ```` ```` →
+    as written, no warning. *(v0.20.1: the second `[[A]]` became a warning
+    comment; the first block was protected only because its backticks paired
+    up as inline code.)*
+  - `> > ```` ```` / `> > [[A]]` / `> > ```` ```` and a callout
+    `> [!example]` / `> ```` ```` / `> [[A]]` / `> ```` ```` → as written.
+  - The quote ends the block: `> ```` ```` / `> code` / `` / `See [[A]].` →
+    `See` becomes the US-8.3 comment as for any link outside code; no
+    `Code block not closed` warning.
+  - Inline code in a quote, `` > `[[A]]` ``, stays as written (guard; already
+    so in v0.20.1); also when it runs over three quote lines and the middle
+    one is an embed: `` > Write `start `` / `> ![[A]]` / `` > end` here. ``
+  - Indented code in a quote: `> Text.` / `>` / `>     [[A]]` (four spaces
+    after the marker's space) → as written.
+  - A deeper quote starts a new paragraph: `` > Write `[[A]] `` /
+    `` > > and` [[A]]. `` → both links are converted (the backticks do not
+    pair across the two paragraphs). A line with fewer markers is not
+    specified here (standard markdown may continue the paragraph lazily).
+
 **Not in scope:** math blocks and HTML comments.
+
+### US-1.5 Embed a note as a quote
+*(Written 2026-11-01 from the author's request; decisions of the same day:
+a bold filename title opens the quote, headings as written, inner embeds
+quoted, ToC lists not expanded, links treated as to a note not in the book,
+mid-line embeds out of scope. Tracked in
+[#106](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/106).)*
+
+**As an** author
+**I want** to embed a note inside a quote (`> ![[Sage]]`)
+**So that** the whole note is shown as one quotation, without its headings
+becoming part of the book's heading structure — it is a quote, not a part of
+the text that builds the book.
+
+Measured with v0.20.1 (2026-11-01): root `# Book` / `## Chapter` /
+`As the sage said:` / `> ![[Sage]]` / `After.`; `Sage.md` = `# Wisdom` / `` /
+`First line.` / `Second line.` / `` / `## Detail` / `` / `More.`. With
+"Normalise headings" on:
+```
+> ### Sage
+First line.
+Second line.
+
+#### Detail
+More.
+```
+Only the injected title is inside the quote; the rest of the note falls out
+of it and is normalised. Off: `> ## Sage`, the rest out of the quote, `##
+Detail` unshifted. The same with `> ![s](Sage.md)`, inside a callout
+(`> [!quote] The sage` / `> ![[Sage]]`) and for notes Sage embeds. A
+section embed `> ![[Sage#Detail]]` leaves an empty `> ` line and puts
+`## Detail` / `More.` after it, outside the quote.
+
+Definitions:
+- A **quote prefix** is the run of quote markers at the start of a line; a
+  marker is at most three spaces, `>` and one optional space or tab:
+  `> `, `>`, `> > `, `>> `. Its **depth** is the number of markers. A callout (`> [!quote] Title`) is a quote
+  with the same prefix.
+- A **quoted embed** is a line that is its quote prefix followed by exactly
+  one note embed (either syntax, with or without `#Heading`, trailing spaces
+  allowed): `> ![[Sage]]`, `>![[Sage]]`, `> > ![s](Sage.md)`,
+  `> ![[Sage#Detail]]`. Embeds of files that are not notes (images, web
+  addresses) are not quoted embeds; they keep today's rules (US-2.1, US-2.6).
+- The **quoted content** is everything a quoted embed brings in, including
+  the notes that note embeds, at any depth.
+- The **quote title** is `**` + the title (title rule of US-6.4) + `**`,
+  with every `*` and `_` in the title escaped by a backslash.
+
+Examples use the root and `Sage.md` of the measurement unless said
+otherwise; `` stands for an empty line. Every AC holds with "Normalise
+headings" on and off (SCAR-019).
+
+**Acceptance criteria**
+
+- **AC-1 One quote container.** Every line of the quoted content is written
+  with the quote prefix of the quoted embed line. An empty line becomes the
+  prefix without trailing spaces (`>`, `> >`), so the quote does not break.
+  Runs of two or more empty quote lines become one; the quoted content does
+  not start or end with an empty quote line.
+  - Root as measured → `## Chapter` / `As the sage said:` / `` /
+    `> **Sage**` / `>` / `> # Wisdom` / `>` / `> First line.` /
+    `> Second line.` / `>` / `> ## Detail` / `>` / `> More.` / `` / `After.`
+  - `> ![s](Sage.md)` gives the same quote.
+  - `> > ![[Sage]]` → each line starts with `> > `, empty lines are `> >`;
+    `>![[Sage]]` → `>**Sage**` / `>` / `># Wisdom` / … (the prefix as
+    written).
+  - A line in Sage that is already a quote, `> x`, becomes `> > x`.
+- **AC-2 Text around the embed stays in the quote.** Quote lines written
+  before and after the quoted embed keep their place in the same container.
+  - `> [!quote] The sage` / `> ![[Sage]]` / `> — said at dawn` →
+    `> [!quote] The sage` / `> **Sage**` / `>` / `> # Wisdom` / … /
+    `> More.` / `> — said at dawn`.
+- **AC-3 Quote title.** A whole-note quoted embed opens with the quote title,
+  then an empty quote line; the note's first heading is kept, not replaced.
+  - `1.2 Sage.md` (same text) → `> **Sage**` / `>` / `> # Wisdom` / …
+  - `My *notes*.md` → `> **My \*notes\***`; `snake_case_rules.md` →
+    `> **Snake\_case\_rules**`.
+  - A headingless note `Sage.md` = `Wise words.` → `> **Sage**` / `>` /
+    `> Wise words.`
+- **AC-4 Headings as written.** Headings in the quoted content keep their
+  level and text: no filename title as a heading (US-6.1, US-6.4), no shift
+  (US-6.3), no clamp warning. They do not count as the last original heading
+  for later embeds (US-6.3 AC-4).
+  - Toggle on, root `# Book` / `## Chapter` / `> ![[Sage]]` / `![[X]]`,
+    `X.md` = `X text.` → the quote as in AC-1, then `### X` (the heading
+    above is `## Chapter`, not Sage's `## Detail`).
+  - Toggle off, the same root → the same quote, then `## X` (US-6.1).
+  - A quote line in the root is not a heading either: root `# Book` /
+    `> ## Aside` / `![[X]]` → `## X` with the toggle on.
+- **AC-5 Section embed.** `> ![[Sage#Detail]]` (or `> ![d](Sage.md#Detail)`)
+  quotes the section (US-1.2) with no quote title, its heading as written:
+  root `## Chapter` / `> ![[Sage#Detail]]` → `## Chapter` / `> ## Detail` /
+  `>` / `> More.` (no empty line after the heading, US-6.6 AC-3). A missing heading gives the US-1.2 warning
+  inside the quote:
+  `> <!-- Warning: Missing heading anchor: Sage.md#Gone -->`. Only the
+  note's own headings end the section; headings of notes it embeds do not
+  (they are not shifted below it): `Sage.md` = `## Detail` / `![[Inner]]` /
+  `## Next` / `x`, `Inner.md` = `# Inner` / `text` → `> ## Detail` / `>` /
+  `> **Inner**` / `>` / `> # Inner` / `>` / `> text`, without `Next`.
+- **AC-6 Embeds inside the quoted note.** They are expanded into the same
+  container, by the same rules (AC-1 to AC-5); each whole note gets its own
+  quote title.
+  - `Sage.md` = `Intro.` / `![[Inner]]`; `Inner.md` = `# Inner` / `text` →
+    `> **Sage**` / `>` / `> Intro.` / `>` / `> **Inner**` / `>` /
+    `> # Inner` / `>` / `> text`.
+  - A pass-through wrapper (US-6.5) adds no quote title and shows its
+    target's: `Sage.md` = `![[Real]]`, `Real.md` = `# R` / `text` →
+    `> **Real**` / `>` / `> # R` / `>` / `> text`. A wrapper around a section
+    embed shows the section without a quote title (AC-5). A wrapper that is
+    no pass-through (its target is a preamble note) keeps its title:
+    `Real.md` = `text` → `> **Sage**` / `>` / `> **Real**` / `>` / `> text`.
+  - A circular embed and a missing note give today's comments inside the
+    quote: `> <!-- Circular dependency avoided: Sage.md -->`,
+    `> <!-- Warning: Missing include -->`.
+- **AC-7 ToC lists are not expanded in a quote.** A list of note links in
+  the quoted content stays a list (US-1.3 does not apply); its links follow
+  AC-8.
+  - `Sage.md` = `- [[A]]` / `- [[B]]`, A and B embedded elsewhere →
+    `> **Sage**` / `>` / `> - [A](#A)` / `> - [B](#B)`.
+  - An embed item in the quoted content is still an embed and is quoted
+    (AC-6), as in US-1.3 AC-2: `Sage.md` = `Intro.` / `- ![[A]]`, `A.md` =
+    `# A` / `AAA` → `> **Sage**` / `>` / `> Intro.` / `>` / `> **A**` / `>` /
+    `> # A` / `>` / `> AAA`. (`Sage.md` = `- ![[A]]` alone is a pass-through
+    wrapper, AC-6, as outside quotes.)
+- **AC-8 Links.** A note counts as embedded in the book (US-8.3, US-2.3)
+  only where it is embedded outside a quote; headings inside a quote are no
+  link targets.
+  - Sage only quoted: `See [[Sage]].` elsewhere →
+    `See <!-- Warning: link target 'Sage' not embedded in compiled output -->.`
+    and `See [[Sage#Detail]].` →
+    `See <!-- Warning: link target 'Sage#Detail' not embedded in compiled output -->.`,
+    each with its warning — exactly as for a note embedded nowhere (measured
+    with v0.20.1).
+  - Links inside the quoted content are converted as anywhere else.
+  - A file that quotes a note and also lists it in a ToC embeds it from the
+    ToC: `> ![[A]]` / `` / `- [[A]]` / `- [[B]]` → the quote of A, then A
+    and B in full (a quoted embed does not count for US-1.3 AC-5).
+    Links to it go to the copy in full: `See [[Sage]] and [[Sage#Detail]].`
+    with Sage quoted and listed → `See [Sage](#Sage) and [Detail](#Detail).`,
+    no warning.
+  - A heading inside a quote makes no duplicate (US-2.3 AC-6): `# Book` /
+    `> ![[Q]]` / `## Chapter` / `See [[#Chapter]].`, `Q.md` = `## Chapter` →
+    `See [Chapter](#Chapter).`, no warning.
+- **AC-9 Everything else applies inside the quote.** Frontmatter (US-5.2)
+  and control commands (US-5.1) are removed; images are copied and their
+  links rewritten (`> ![](assets/pic.png)`); maps are drawn (US-4.1); code is
+  copied as written (US-1.4), fence lines carrying the prefix, and an
+  unclosed block is closed with `> ` + the fence (US-1.4 AC-6). Each warning
+  is reported once with the note and line where it is written (US-8.5).
+- **AC-10 Nothing internal reaches the output.** No sentinel or location
+  marker (US-8.4 AC-5) is left in or around the quote (SCAR-032); the quote
+  prefix is never added to a marker line.
+- **AC-11 Empty lines (US-6.6).** A quote line is not an empty line and not a
+  heading for US-6.6, so its rules do not change the quote; AC-1 decides the
+  empty quote lines.
+
+**Measured in Obsidian (2026-11-01, v0.21.0, reading view):** headings,
+fenced code, a nested `> >` quote, a quote line inside the quoted note, a
+callout continued over `>` lines, an escaped title, a list and an image all
+show inside one quote container; an unquoted line after an empty line is
+outside it. A heading inside a quote is no link target: `[link](#Detail)` to
+a quoted `## Detail` gives "Unable to find" — hence AC-8. In a quote, a `~~~`
+block and indented code show as code, and a quote that ends closes its
+` ``` ` block (US-1.4 AC-7). Not measured: whether the outline lists quoted
+headings.
+
+**Not in scope:** an embed in a list item inside a quote (`> - ![[Sage]]`),
+and KD-5.
+
+**Known defect KD-5 (found 2026-11-01): an embed in the middle of a line.**
+`He said ![[Sage]] and left`, `Sage.md` = `Wise words.` → `He said ## Sage` /
+`Wise words.` / ` and left` (toggle off), inside and outside a quote; the
+title lands in the middle of the sentence. Not part of US-1.5; tracked in
+[#107](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/107) (`needs-decision`).
 
 ## Epic 2 — Asset handling and deduplication
 ### US-2.1 Copy embedded media to `assets/`

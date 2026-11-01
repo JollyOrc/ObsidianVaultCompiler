@@ -85,46 +85,84 @@ function fenceOf(line: string): { char: string; length: number } | null {
   return { char: run[0], length: run.length };
 }
 
+/** US-1.5 | Definitions: one quote marker — at most three spaces, `>`, one optional space or tab. */
+const QUOTE_MARKER = /^ {0,3}>[ \t]?/;
+
 /**
- * KD-3 (US-6.6); US-1.4 | AC-1: the only definition of "inside a fenced code
- * block". For each line, true when it lies after a line opening a block
+ * US-1.5 | Definitions; US-1.4 | AC-7: the only reader of a line's quote
+ * prefix. Removes up to `max` quote markers from the start of `line` and
+ * returns them (`prefix`), how many there were (`depth`) and the rest
+ * (`body`). Nothing else changes: `> > x` → `> > `, 2, `x`; `>>x` → `>>`, 2,
+ * `x`; `x` → ``, 0, `x`.
+ */
+export function splitQuote(line: string, max = Infinity): { prefix: string; depth: number; body: string } {
+  let depth = 0;
+  let at = 0;
+  while (depth < max) {
+    const marker = line.slice(at).match(QUOTE_MARKER);
+    if (marker === null) break;
+    at += marker[0].length;
+    depth += 1;
+  }
+  return { prefix: line.slice(0, at), depth, body: line.slice(at) };
+}
+
+/**
+ * KD-3 (US-6.6); US-1.4 | AC-1, AC-7: walks the fenced blocks of `lines`,
+ * calls `onLine` with whether each line is inside one, and returns the block
+ * still open after the last line (its opening line, fence and quote depth),
+ * or null. See `codeBlockMask` for the rule.
+ */
+function walkFences(
+  lines: string[],
+  onLine: (inside: boolean) => void,
+): { line: number; char: string; length: number; depth: number } | null {
+  let open: { line: number; char: string; length: number; depth: number } | null = null;
+  lines.forEach((line, index) => {
+    if (open !== null) {
+      const quote = splitQuote(line, open.depth);
+      if (quote.depth === open.depth) {
+        onLine(true);
+        const fence = fenceOf(quote.body);
+        if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
+        return;
+      }
+      open = null;
+    }
+    onLine(false);
+    const quote = splitQuote(line);
+    const fence = fenceOf(quote.body);
+    open = fence === null ? null : { line: index, ...fence, depth: quote.depth };
+  });
+  return open;
+}
+
+/**
+ * KD-3 (US-6.6); US-1.4 | AC-1, AC-7: the only definition of "inside a fenced
+ * code block". For each line, true when it lies after a line opening a block
  * (``` or ~~~ after optional spaces) up to and including the line closing it
  * — the next line starting with the same character at least as many times,
  * so ```` holds an inner ``` — an unclosed block runs to the end. Opening
- * lines are not inside.
+ * lines are not inside. A line is read by what follows its quote prefix
+ * (`splitQuote`): `> ~~~` opens a block at quote depth 1, and a later line
+ * with fewer markers than its block's depth ends the block (the quote ended);
+ * inside a block opened outside a quote, `>` lines are code text.
  */
 export function codeBlockMask(lines: string[]): boolean[] {
   const mask: boolean[] = [];
-  let open: { char: string; length: number } | null = null;
-  for (const line of lines) {
-    if (open !== null) {
-      mask.push(true);
-      const fence = fenceOf(line);
-      if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
-      continue;
-    }
-    mask.push(false);
-    open = fenceOf(line);
-  }
+  walkFences(lines, inside => mask.push(inside));
   return mask;
 }
 
 /**
- * US-1.4 | AC-6: the fenced block `lines` leave open at their end — the index
- * of its opening line and the fence that closes it (its character, as many
- * times) — or null when every block is closed.
+ * US-1.4 | AC-6, AC-7: the fenced block `lines` leave open at their end — the
+ * index of its opening line and the fence that closes it (its character, as
+ * many times) — or null when every block is closed. A block inside a quote
+ * is closed by its quote, so it is never left open.
  */
 export function unclosedFence(lines: string[]): { line: number; fence: string } | null {
-  let open: { line: number; char: string; length: number } | null = null;
-  for (let index = 0; index < lines.length; index++) {
-    const fence = fenceOf(lines[index]);
-    if (open !== null) {
-      if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
-    } else if (fence !== null) {
-      open = { line: index, ...fence };
-    }
-  }
-  return open === null ? null : { line: open.line, fence: open.char.repeat(open.length) };
+  const open = walkFences(lines, () => undefined);
+  return open === null || open.depth > 0 ? null : { line: open.line, fence: open.char.repeat(open.length) };
 }
 
 /** US-1.4 | AC-1: the width of a line's leading whitespace, a tab as four. */
@@ -145,7 +183,9 @@ function indentWidth(text: string): number {
  *   a blank line, a heading, a list item or a block); a run never closed is
  *   text.
  * Lines for which `blank` is true (provenance comments in the assembled
- * document) count as blank lines.
+ * document) count as blank lines. A line inside a quote is read by what
+ * follows its quote prefix (`splitQuote`; `>` alone is a blank line), and a
+ * change of quote depth ends a paragraph and a list (US-1.4 AC-7).
  */
 function scanCode(text: string, blank: (line: string) => boolean): { lines: boolean[]; inline: Array<[number, number]> } {
   const textLines = text.split('\n');
@@ -160,21 +200,37 @@ function scanCode(text: string, blank: (line: string) => boolean): { lines: bool
   let afterBlank = true;
   let afterCode = false;
   let itemText: number | null = null;
+  let depth = 0;
   let offset = 0;
-  textLines.forEach((line, i) => {
+  textLines.forEach((rawLine, i) => {
     const start = offset;
-    const end = offset + line.length;
+    const end = offset + rawLine.length;
     offset = end + 1;
     lines.push(false);
-    if (fenced[i] || fenceOf(line) !== null) {
+    if (fenced[i]) {
       endParagraph();
-      lines[i] = fenced[i];
+      lines[i] = true;
+      afterBlank = true;
+      afterCode = false;
+      return;
+    }
+    // US-1.4 | AC-7: a line is read by what follows its quote prefix; a
+    // change of quote depth ends the paragraph and any list.
+    const quote = splitQuote(rawLine);
+    if (quote.depth !== depth) {
+      endParagraph();
+      itemText = null;
+      depth = quote.depth;
+    }
+    const line = quote.body;
+    if (fenceOf(line) !== null) {
+      endParagraph();
       // A block is no paragraph: indented code may follow it directly.
       afterBlank = true;
       afterCode = false;
       return;
     }
-    if (line.trim() === '' || blank(line)) {
+    if (line.trim() === '' || blank(rawLine)) {
       endParagraph();
       afterBlank = true;
       return;

@@ -4,6 +4,7 @@ import {
   decodeLink,
   inlineCodeRanges,
   inRanges,
+  splitQuote,
   unclosedFence,
   titleFromBasename,
   tidyBlankLines,
@@ -75,6 +76,12 @@ const LINK = /(?<!!)\[\[([^\]|]+)(?:\|([^\]]*))?\]\]|(?<!!)\[([^\]]*)\]\(((?:[^(
  * it ends does not: there the embedding note goes on after its embed line.
  */
 const isProvenanceLine = (line: string) => /^<!-- __vs__:.*? -->$/.test(line);
+
+/** US-1.5 | AC-10: a begin or end provenance line, which never gets a quote prefix. */
+const isSentinelLine = (line: string) => /^<!-- __v[se]__:.*? -->$/.test(line);
+
+/** US-1.5 | Definitions: a line body that is exactly one embed (either syntax). */
+const SOLE_EMBED = /^[ \t]*(!\[\[[^\]|]+(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\([^)]+\))[ \t]*$/;
 
 /** US-8.4 | AC-5: the location markers of `markLinks`. */
 const LINE_MARKER = /<!-- __vl__:\d+:.*? -->/g;
@@ -156,6 +163,8 @@ interface EmbedContext {
   lastOriginal: number;
   /** Line number in the embedding file's processed content, for warnings. */
   line: number;
+  /** US-1.5: the embed is part of a quote, so the note is a quotation. */
+  quoted: boolean;
 }
 
 /** US-6.5 | Definitions: the single embed of a pass-through wrapper. */
@@ -582,6 +591,7 @@ export class InMemoryVaultCompiler {
     parentDepth = 0,
     lastOriginalHeadingLevelInParent = 0,
     forcedDepth: number | null = null,
+    quoted = false,
   ): string {
     if (!this.files.has(path)) {
       this.stats.missingReferences += 1;
@@ -700,13 +710,15 @@ export class InMemoryVaultCompiler {
     // Pre-scan: collect explicitly-embedded paths; resolve reports nothing (US-8.5 AC-1).
     // US-1.4 | AC-4: an embed inside code is not an embed.
     const scanCode = codeRanges(content);
-    content.replace(/!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, (_, link: string, offset: number) => {
+    // US-1.5 | AC-8: a quoted embed does not count as "already embedded".
+    const scanned = content.split('\n').map(line => (this.quotedNoteEmbed(line, path) === null ? line : ' '.repeat(line.length))).join('\n');
+    scanned.replace(/!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, (_, link: string, offset: number) => {
       if (inRanges(scanCode, offset)) return '';
       const r = this.resolve(link.trim(), path);
       if (!r.missing) explicitEmbeds.add(r.path);
       return '';
     });
-    content.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, _alt: string, rawPath: string, offset: number) => {
+    scanned.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, _alt: string, rawPath: string, offset: number) => {
       if (inRanges(scanCode, offset)) return '';
       const r = this.resolve(parseEmbedDestination(rawPath).path, path);
       if (!r.missing && this.isMarkdownPath(r.path)) explicitEmbeds.add(r.path);
@@ -716,7 +728,8 @@ export class InMemoryVaultCompiler {
     // US-1.4 | AC-1: which lines are block code is read from the note as
     // written, before ToC items lose their bullets (`    - [[A]]` → `    ![[A]]`).
     const blockCode = codeLines(content);
-    content = this.expandTocLists(content, path, explicitEmbeds);
+    // US-1.5 | AC-7: in a quote, link lists stay lists.
+    content = this.expandTocLists(content, path, explicitEmbeds, !quoted);
     let blockCodeShift = 0;
 
     // ── Heading normalisation (applied before embed expansion) ──────────────────────
@@ -727,7 +740,19 @@ export class InMemoryVaultCompiler {
     let effectiveDepth = 0;
     let titleInjected = false; // the first heading line of `content` is this file's title
 
-    if (normalise && autoHeading) {
+    if (quoted && autoHeading) {
+      // US-1.5 | AC-6: a pass-through wrapper adds no quote title.
+      const passThrough = this.matchPassThrough(content, path);
+      if (passThrough !== null) {
+        const expanded = passThrough.anchor === null
+          ? this.processMarkdown(passThrough.target, true, 0, 0, null, true)
+          : this.quotedSection(passThrough.target, passThrough.anchor, passThrough.rawPath, path, lineMap[0]);
+        this.processedStack.pop();
+        return this.wrapWithSentinel(expanded, path);
+      }
+    }
+
+    if (normalise && autoHeading && !quoted) {
       const base = this.basename(path);
       const depth = forcedDepth ?? this.fileDepth(base, path, parentDepth, lastOriginalHeadingLevelInParent);
 
@@ -787,13 +812,18 @@ export class InMemoryVaultCompiler {
           if (skipTitle) skipTitle = false;
           else lastOriginal = heading.level;
         }
-        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index] };
+        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index], quoted };
         // US-8.4 | AC-5: links carry their note and source line to link conversion.
-        const expand = (text: string) => {
+        const expand = (text: string, embedContext = context) => {
           const marked = this.markLinks(text, path, lineMap[index]);
-          const withWiki = this.processWikiEmbeds(marked, path, context);
-          return this.processMarkdownEmbeds(withWiki, path, context);
+          const withWiki = this.processWikiEmbeds(marked, path, embedContext);
+          return this.processMarkdownEmbeds(withWiki, path, embedContext);
         };
+        // US-1.5 | AC-1: a quoted embed becomes one quote of the whole note.
+        const quotedEmbed = this.quotedNoteEmbed(line, path);
+        if (quotedEmbed !== null && !inline.some(([start, end]) => start < at + line.length && end > at)) {
+          return this.quoteLines(expand(quotedEmbed.embed, { ...context, quoted: true }), quotedEmbed.prefix);
+        }
         let out = '';
         let from = 0;
         for (const [start, end] of inline) {
@@ -807,7 +837,13 @@ export class InMemoryVaultCompiler {
       }).join('\n');
     }
 
-    if (autoHeading && !normalise) {
+    if (quoted) {
+      // US-1.5 | AC-3, AC-8: a quote title, and no place in the book for links.
+      if (autoHeading) {
+        const title = titleFromBasename(this.basename(path)).replace(/[*_]/g, '\\$&');
+        content = `**${title}**\n\n${content.replace(/^(?:[ \t]*\n)+/, '')}`;
+      }
+    } else if (autoHeading && !normalise) {
       // US-6.1: one filename heading per embedded file when normalisation is off.
       const base = this.basename(path);
       const title = titleFromBasename(base);
@@ -891,9 +927,10 @@ export class InMemoryVaultCompiler {
    * bullet — unless this file already embeds that note explicitly (AC-5).
    * Otherwise link items stay as written. Embed items of notes lose their
    * bullet in any list; an item that embeds a file that is not a note stays as
-   * written (US-1.3 AC-2, decided 2026-10-31).
+   * written (US-1.3 AC-2, decided 2026-10-31). With `links` false (a quoted
+   * note, US-1.5 AC-7) link items always stay as written.
    */
-  private expandTocLists(content: string, currentFile: string, explicitEmbeds: Set<string>): string {
+  private expandTocLists(content: string, currentFile: string, explicitEmbeds: Set<string>, links = true): string {
     const ITEM = /^\s*(?:[-*]|\d+\.)\s+/;
     const lines = content.split('\n');
     // US-1.4 | AC-2: a line that is code is never a list item.
@@ -922,7 +959,7 @@ export class InMemoryVaultCompiler {
           out.push(item.line);
         } else if (item.kind === 'embed') {
           out.push(`${item.indent}${item.text}`);
-        } else if (item.kind === 'link' && isToc && !explicitEmbeds.has(item.target)) {
+        } else if (item.kind === 'link' && links && isToc && !explicitEmbeds.has(item.target)) {
           out.push(`${item.indent}!${item.text}`);
         } else {
           out.push(item.line);
@@ -1247,6 +1284,86 @@ export class InMemoryVaultCompiler {
   }
 
   /**
+   * US-1.5 | Definitions: the quote prefix and the embed of a quoted embed —
+   * a line that is a quote prefix followed by exactly one embed of a note (a
+   * missing target counts when it names no other kind of file) — or null.
+   * Resolving reports nothing (US-8.5 AC-1).
+   */
+  private quotedNoteEmbed(line: string, currentFile: string): { prefix: string; embed: string } | null {
+    const quote = splitQuote(line);
+    if (quote.depth === 0) return null;
+    const match = quote.body.match(SOLE_EMBED);
+    if (match === null) return null;
+    const embed = match[1];
+    const wiki = embed.match(/^!\[\[([^\]|]+)/);
+    const raw = (wiki ? wiki[1] : parseEmbedDestination(embed.slice(embed.indexOf('](') + 2, -1)).path).trim();
+    if (isWebAddress(raw)) return null;
+    const resolved = this.resolve(raw, currentFile);
+    const note = resolved.missing
+      ? !/\.[A-Za-z0-9]+$/.test(raw.split('#')[0].trim()) || this.isMarkdownPath(raw.split('#')[0].trim())
+      : this.isMarkdownPath(resolved.path);
+    return note ? { prefix: quote.prefix, embed } : null;
+  }
+
+  /**
+   * US-1.5 | AC-1, AC-11: writes `text` (a quoted note, with its provenance
+   * lines) into one quote with `prefix`. Runs of empty lines become one empty
+   * quote line (`prefix` without trailing spaces), and none stands at the
+   * start or end. Provenance lines are kept as they are, without the prefix
+   * (AC-10).
+   */
+  private quoteLines(text: string, prefix: string): string {
+    const kept: string[] = [];
+    let started = false;
+    let lastEmpty = false;
+    for (const line of text.split('\n')) {
+      if (isSentinelLine(line)) {
+        kept.push(line);
+        continue;
+      }
+      const empty = line.trim() === '';
+      if (empty && (!started || lastEmpty)) continue;
+      kept.push(line);
+      started = true;
+      lastEmpty = empty;
+    }
+    let end = kept.length;
+    while (end > 0 && (isSentinelLine(kept[end - 1]) || kept[end - 1].trim() === '')) end--;
+    const tail = kept.slice(end).filter(isSentinelLine);
+    const empty = prefix.replace(/[ \t]+$/, '');
+    return [...kept.slice(0, end), ...tail]
+      .map(line => (isSentinelLine(line) ? line : line.trim() === '' ? empty : prefix + line))
+      .join('\n');
+  }
+
+  /**
+   * US-1.5 | AC-3 to AC-6: a note embedded in a quote — the whole note with
+   * its quote title, or the named section without one — in quote mode, so
+   * nothing in it is normalised or registered as a place in the book.
+   */
+  private quotedNote(path: string, anchor: string | null, rawLink: string, currentFile: string, line: number): string {
+    if (anchor === null) return this.processMarkdown(path, true, 0, 0, null, true);
+    return this.quotedSection(path, anchor, rawLink, currentFile, line);
+  }
+
+  /**
+   * US-1.5 | AC-5: the section `anchor` of note `path` as written, for a
+   * quote; a missing heading gives the US-1.2 warning comment.
+   */
+  private quotedSection(path: string, anchor: string, rawLink: string, currentFile: string, line: number): string {
+    const processed = this.processMarkdown(path, false, 0, 0, null, true);
+    const section = this.extractSection(processed, anchor, true);
+    if (section === null) {
+      const anchorRef = `${path}#${anchor}`;
+      const message = `Missing heading anchor: ${anchorRef}`;
+      this.warnings.push(`Warning: ${message}`);
+      this.warningDetails.push({ message, link: anchorRef, file: currentFile, line });
+      return `\n<!-- Warning: ${message} -->\n`;
+    }
+    return `\n${this.wrapWithSentinel(section, path)}\n`;
+  }
+
+  /**
    * US-6.5 | Definitions: returns the wrapped embed when `content` is a
    * pass-through wrapper, otherwise null.
    *
@@ -1371,6 +1488,9 @@ export class InMemoryVaultCompiler {
       if (resolved.ambiguity !== null) {
         this.report(resolved.ambiguity, link, currentFile, context.line);
       }
+      if (this.isMarkdownPath(resolved.path) && context.quoted) {
+        return this.quotedNote(resolved.path, resolved.anchor, link, currentFile, context.line);
+      }
       if (this.isMarkdownPath(resolved.path)) {
         if (resolved.anchor !== null) {
           // Heading-anchored embed: process the whole file without auto-heading so
@@ -1404,18 +1524,26 @@ export class InMemoryVaultCompiler {
    * (but not including) the next heading of equal or higher level.
    *
    * Heading text matching is case-insensitive. Returns null when no heading matches.
+   * With `ownOnly`, only the headings of the note itself (not of the notes it
+   * embeds, inside nested sentinels) start or end the section (US-1.5 AC-5).
    */
-  private extractSection(content: string, anchor: string): string | null {
+  private extractSection(content: string, anchor: string, ownOnly = false): string | null {
     const lines = content.split('\n');
     const inCode = codeBlockMask(lines);
     const normalizedAnchor = anchor.toLowerCase().trim();
 
     let startIdx = -1;
     let targetLevel = 0;
+    let nesting = 0;
 
     for (let i = 0; i < lines.length; i++) {
       // Ignore provenance sentinel comment lines
-      if (/<!-- __v[se]__:[^\s>]+ -->/.test(lines[i])) continue;
+      if (/<!-- __v[se]__:[^\s>]+ -->/.test(lines[i])) {
+        nesting += lines[i].startsWith(InMemoryVaultCompiler.SB) ? 1 : -1;
+        continue;
+      }
+      // US-1.5 | AC-5: with `ownOnly`, headings of embedded notes do not count.
+      if (ownOnly && nesting > 1) continue;
 
       // KD-3: a line inside a code block is never a heading.
       const heading = inCode[i] ? null : matchHeading(lines[i].replace(LINE_MARKER, ''));
@@ -1463,6 +1591,9 @@ export class InMemoryVaultCompiler {
       }
       if (resolved.ambiguity !== null) {
         this.report(resolved.ambiguity, destination.path, currentFile, context.line);
+      }
+      if (this.isMarkdownPath(resolved.path) && context.quoted) {
+        return this.quotedNote(resolved.path, resolved.anchor, destination.path, currentFile, context.line);
       }
       if (this.isMarkdownPath(resolved.path)) {
         if (resolved.anchor !== null) {

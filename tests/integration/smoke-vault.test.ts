@@ -17,6 +17,8 @@
  *     text two notes share, the second of two equal headings (M17)
  *   - US-1.4 code copied as written: inline, fenced ToC, indented, under a
  *     heading, a Dataview example in a longer fence, an unclosed block (M18)
+ *   - US-1.5 a note quoted whole, a section quoted in a callout; US-1.4 AC-7
+ *     code inside a quote (M20)
  *
  * The fixture notes sit in a subfolder so the top-level fixture test
  * (fixture-vault.test.ts) is unaffected. Its warnings (none) are asserted in
@@ -88,6 +90,7 @@ describe('smoke book — "Normalise headings" on', () => {
       '### Notes',             // the second Notes (US-2.3 AC-6)
       '# Code examples',       // US-1.4 (M18): prefix 4
       '## Indented right under a heading',
+      '# Quotes',              // US-1.5 (M20): prefix 5; the quoted headings are no headings
       '## Appendix',           // headingless, `[text](path)` item of a mixed list
       '### Glossary of the Vale', // `[text](path)` ToC list
       '### Map key',
@@ -127,7 +130,7 @@ for (const normaliseHeadings of [true, false]) {
     });
 
     it('US-1.3: no ToC link is left as a link', () => {
-      // `4 Code examples` keeps its links on purpose (US-1.4).
+      // `4 Code examples` and `5 Quotes` keep links in code on purpose (US-1.4).
       const outsideCode = result.content.replace(/^# Code examples\n[\s\S]*?(?=^## Appendix$)/m, '');
       assert.notEqual(outsideCode, result.content, 'the code note was found and left out');
       assert.doesNotMatch(outsideCode, /\[\[|\]\((?:Appendix|Glossary|Map%20key)/);
@@ -156,6 +159,19 @@ for (const normaliseHeadings of [true, false]) {
         assert.ok(result.content.includes(code), code);
       }
       assert.equal((result.content.match(/^## Dueling$|^# Dueling$/gm) ?? []).length, 1, 'Dueling is embedded once, by the ToC');
+    });
+
+    it('US-1.5: `5 Quotes` holds one quote per embed, headings as written (M20)', () => {
+      for (const block of [
+        '\n> **Sage sayings**\n>\n> # Sayings of the hedge sage\n>\n> Patience mends more than charms.\n',
+        '\n> ## Fog\n>\n> Fog hides the path, never the walker.\n>\n> ```\n> [[Appendix]]\n> ```\n>\n> See [Appendix](#Appendix) for the rest.\n',
+        '\n> [!quote] On fog\n> ## Fog\n',
+        '\n> See [Appendix](#Appendix) for the rest.\n> — the Vale almanac\n',
+        '\n> ~~~\n> ![[1.1 Moving]]\n> ~~~\n',
+      ]) {
+        assert.ok(result.content.includes(block), block);
+      }
+      assert.equal((result.content.match(/^#+ Moving$/gm) ?? []).length, 1, 'Moving is embedded once, by the ToC');
     });
 
     it('US-2.3: the links of `3 Heading links` (M17)', () => {

@@ -231,3 +231,29 @@ describe('US-1.4 AC-6: an unclosed code block ends with its note (#102)', () => 
     assert.deepEqual(r.warningDetails, []);
   });
 });
+
+describe('US-1.4 AC-7: code inside a quote', () => {
+  const CASES: Array<[string, string]> = [
+    ['a tilde fence', '> ~~~\n> [[A]]\n> ![[A]]\n> ~~~'],
+    ['an empty quote line and a backtick run inside the block', '> ```\n> [[A]]\n>\n> x ``` y\n> [[A]]\n> ```'],
+    ['a nested quote', '> > ```\n> > [[A]]\n> > ```'],
+    ['a callout', '> [!example]\n> ```\n> [[A]]\n> ```'],
+    ['inline code in a quote (guard)', '> `[[A]]`'],
+    ['indented code in a quote', '> Text.\n>\n>     [[A]]'],
+    ['a quoted embed line inside inline code over three lines', '> Write `start\n> ![[A]]\n> end` here.'],
+  ];
+  for (const [name, code] of CASES) {
+    it(name, () => {
+      assertCopied(compile(code), code);
+    });
+  }
+  it('a deeper quote ends the paragraph: backticks in two paragraphs are no inline code', () => {
+    const r = compile('> Write `[[A]]\n> > and` [[A]].');
+    assert.equal((r.content.match(/not embedded in compiled output -->/g) ?? []).length, 2, r.content);
+  });
+  it('the quote ends the block: a link after it is converted, nothing reported as unclosed', () => {
+    const r = compile('> ```\n> code\n\nSee [[A]].');
+    assert.ok(r.content.includes("> ```\n> code\n\nSee <!-- Warning: link target 'A' not embedded in compiled output -->."), r.content);
+    assert.deepEqual(r.warningDetails.map(w => w.message), ["link target 'A' not embedded in compiled output"]);
+  });
+});

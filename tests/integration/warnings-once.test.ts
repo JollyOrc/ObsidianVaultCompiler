@@ -190,11 +190,15 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
   // v0.18.0 showed only that note's six links (US-2.3) and no other change.
   // #103 (v0.20.0) added `4 Code examples.md` for M18; a line diff against
   // v0.19.0 showed only that note and the start note's list of checks.
+  // #106 (v0.21.0) added `5 Quotes.md` and `Sage sayings.md` for M20; a line
+  // diff against v0.20.1 on the same notes showed only that note's two quotes
+  // (US-1.5) and its `> ~~~` block, where v0.20.1 pasted `1.1 Moving`
+  // (US-1.4 AC-7, #105).
   const BEFORE: Array<[string, boolean, string]> = [
     ['index2compile.md', false, '6f08f48986a530b4'],
     ['index2compile.md', true, '61fc2cd03fc90d87'],
-    ['Smoke/Smoke book.md', false, 'f563479e034c9b27'],
-    ['Smoke/Smoke book.md', true, '435e9a13b67cc075'],
+    ['Smoke/Smoke book.md', false, '5969c3fde82c4d82'],
+    ['Smoke/Smoke book.md', true, '65519756a67322bb'],
   ];
   for (const [start, normaliseHeadings, hash] of BEFORE) {
     it(`${start}, "Normalise headings" ${normaliseHeadings ? 'on' : 'off'}: byte-identical`, () => {

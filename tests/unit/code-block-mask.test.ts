@@ -2,7 +2,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { codeBlockMask, matchHeading } from '../../plugin/src/utils.ts';
+import { codeBlockMask, codeLines, matchHeading, unclosedFence } from '../../plugin/src/utils.ts';
 
 describe('KD-3: codeBlockMask', () => {
   it('marks the lines after an opening fence up to and including the closing one', () => {
@@ -31,6 +31,27 @@ describe('KD-3: codeBlockMask', () => {
       [false, true, true, true, true, false],
     );
     assert.deepEqual(codeBlockMask(['```', 'x', '````']), [false, true, true], 'a longer fence closes a shorter one');
+  });
+});
+
+describe('US-1.4 AC-7: code inside a quote', () => {
+  it('a fence after a quote prefix opens and closes a block', () => {
+    assert.deepEqual(codeBlockMask(['> ~~~', '> x', '> ~~~', 'b']), [false, true, true, false]);
+    assert.deepEqual(codeBlockMask(['>```', '>x', '>```']), [false, true, true]);
+    assert.deepEqual(codeBlockMask(['> > ```', '> > x', '> > ```']), [false, true, true]);
+  });
+  it('a change of quote depth ends an open block', () => {
+    assert.deepEqual(codeBlockMask(['> ```', '> x', '', 'y']), [false, true, false, false]);
+    assert.deepEqual(codeBlockMask(['> > ```', '> x']), [false, false]);
+    assert.deepEqual(codeBlockMask(['```', '> x', '```']), [false, true, true], 'outside a quote, `>` lines are code text');
+  });
+  it('a block the quote ends is not unclosed', () => {
+    assert.equal(unclosedFence(['> ```', '> code', '', 'text']), null);
+    assert.equal(unclosedFence(['> ```', '> code']), null);
+    assert.deepEqual(unclosedFence(['```', '> code']), { line: 0, fence: '```' });
+  });
+  it('codeLines: an empty quote line does not end the block', () => {
+    assert.deepEqual(codeLines('> ```\n> [[A]]\n>\n> x ``` y\n> [[A]]\n> ```'), [false, true, true, true, true, true]);
   });
 });
 

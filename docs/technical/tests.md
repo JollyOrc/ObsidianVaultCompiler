@@ -133,6 +133,54 @@ written 2026-11-01 before the code):
   (a wrong rule) the end marker counted as blank. Tests added, rule fixed,
   all 27 caught.
 
+Code inside a quote (US-1.4 AC-7, #105; `tests/unit/code-block-mask.test.ts`,
+`tests/integration/code-as-written.test.ts`, written 2026-11-01 before the code):
+- Unit: `codeBlockMask` with `> ~~~`, `>```` and `> > ````; a change of quote
+  depth ends a block; `>` lines inside a block opened outside a quote stay
+  code; `unclosedFence` never reports a block its quote ends; `codeLines`
+  keeps a block across an empty `>` line.
+- Integration: a tilde fence, an empty quote line plus a backtick run, a
+  nested quote, a callout, indented code in a quote, a quoted embed line
+  inside three-line inline code, inline code (guard), a deeper quote ending
+  a paragraph, the quote ending a block (no unclosed warning).
+- Before the code: 5 red on v0.20.1; the others passed only because quoted
+  backtick runs paired up as inline code.
+
+Embed a note as a quote (US-1.5, #106; `tests/integration/quoted-embed.test.ts`,
+written 2026-11-01 before the code):
+- AC-1 to AC-11 with the story's examples, both "Normalise headings" values
+  where the setting could matter: the measured root (both syntaxes, the
+  prefix as written, nested `> >`, a quote line in the quoted note, empty-line
+  runs), a callout with a line after the embed, the quote title (prefixed,
+  escaped `*` and `_`, headingless), headings as written (last original
+  heading, US-6.1 off, no clamp warning), section embeds (both syntaxes, a
+  missing heading, a section whose embedded note starts with `# Inner`),
+  inner embeds (own title, pass-through and preamble wrappers, a wrapped
+  section, circular, missing with its line), ToC lists not expanded, an embed
+  item, links (only quoted → US-8.3 warning; converted inside; quoted and in
+  a ToC → embedded in full, links to it go to that copy; a quoted heading
+  makes no duplicate), frontmatter, images, code, an unclosed block, no
+  sentinel or marker and no trailing space, `compileAsync`.
+- Guards (green on v0.20.1): a quote line in the root is no heading; an
+  image on a quote line keeps US-2.1.
+- Smoke book: `Smoke/5 Quotes.md` and `Smoke/Sage sayings.md` (M20); the
+  smoke book hashes changed once (line diff in `warnings-once.test.ts`).
+- Text check: the quote marker is read only in `utils.ts` (`splitQuote`),
+  proven by two mutants (`/^>/`, `/^\s*>/` in `compiler.ts`).
+- Before the code: 45 of 47 red on v0.20.1.
+- After the quote check in Obsidian (AC-8, 4 tests): links to a note quoted
+  and in the book, and a quoted heading as no duplicate; they pass on the
+  v0.21.0 code, and a mutant that reads headings past the quote marker in
+  the output outline fails all 4.
+- Mutation check 2026-11-01: 22 mutants over `splitQuote`, the fence walker,
+  `unclosedFence`, `scanCode`, the quote title and its escaping, ToC links in
+  quotes, the pre-scan, `quoteLines` (collapse, leading and trailing empties,
+  the empty prefix, sentinels), quoted pass-throughs and sections, quote mode
+  in both embed passes, missing targets, the inline-code guard, normalisation
+  and the heading map. Three first survived (a deeper quote ending a
+  paragraph, indented code in a quote, a quoted embed inside inline code);
+  tests added, all 22 caught.
+
 ### Epic 2 — Asset handling and deduplication
 - Images, PDFs, audio, video and generic files are copied to `assets/`.
 - Asset reference is rewritten to `assets/filename.ext`.
@@ -888,3 +936,33 @@ compile writes below `Export/`, which git ignores.
    to `Export`.
 10. Is anything missing, odd or ugly that this list did not ask about? Report
     it even if it seems unrelated.
+
+### M20 — Quoted notes and code in quotes (US-1.5, US-1.4 AC-7, #105, #106)
+
+Result 2026-11-01 with v0.21.0: passed (reported by the user; the outline
+question of step 3 was not answered). Before it, the quote check (Q1–Q9 in
+`tests/fixtures/basic-vault/Export/Quote check.md`, ignored by git, reading
+view) measured how Obsidian shows the forms US-1.5 writes (SCAR-024): all as
+written, except that a heading inside a quote is no link target — recorded
+in US-1.5 AC-8.
+
+On the fixture vault, from `Smoke/Smoke book.md`, output folder `Export`.
+No step edits a note (CLAUDE.md agent rule 10).
+
+1. The plugin list shows the version under test.
+2. Compile with "Normalise headings" on. Open the compiled book in reading
+   view and find **Quotes**:
+   - the first quote is one box from **Sage sayings** (bold) down to *See
+     Appendix for the rest.*; inside it the headings *Sayings of the hedge
+     sage* and *Fog*, the code block with `[[Appendix]]` as code, and a
+     working link *Appendix*;
+   - the callout *On fog* holds *Fog*, its text, the code block and the link,
+     and ends with *— the Vale almanac*;
+   - the last box is a code block showing `![[1.1 Moving]]`, not the note.
+3. Does the outline (right sidebar) list *Sayings of the hedge sage* or
+   *Fog* under **Quotes**? Report what it shows (not measured yet; US-1.5
+   AC-8 makes them no link targets either way).
+4. The warnings file holds only the entry for `4 Code examples.md` (M18).
+5. Repeat steps 2–4 with "Normalise headings" off.
+6. Is anything missing, odd or ugly that this list did not ask about? Report
+   it even if it seems unrelated.
