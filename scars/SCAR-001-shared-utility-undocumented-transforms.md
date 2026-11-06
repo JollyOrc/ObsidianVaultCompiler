@@ -14,7 +14,7 @@ new one. The reuse happened without checking what every transformation the
 function applies actually does, so the new call site silently produced
 wrong output.
 
-In this project: `titleFromFilename` was used to derive injected section
+In the Obsidian Vault Compiler: `titleFromFilename` was used to derive injected section
 headings. Its hyphen→space conversion is right for human-readable link labels
 but wrong for heading text that should preserve filename punctuation.
 

@@ -36,7 +36,15 @@ Follow this order strictly — do not skip ahead:
 
    **After** a problem is resolved or a requirement is refined, ask: can the
    root cause be generalised beyond this specific case? If yes, add a new SCAR
-   to `scars/` (following the existing format) and update `scars/README.md`.
+   in the shared repository (following the existing format) and update its
+   `README.md`. The SCARs are shared with the other
+   two plugins: `scars/` is the git submodule of
+   <https://github.com/JollyOrc/scars>. Edit SCARs only there, never in
+   `scars/`, then `git submodule update --remote scars` and commit the new
+   pointer. A new SCAR takes the next free number.
+   Numbers changed on 2026-11-05 (this project's SCAR-026 to 034 are now
+   SCAR-033 to 041); history keeps the old numbers, mapped in
+   `scars/README.md`.
    A SCAR is warranted when the same underlying failure mode could recur on
    any future feature, not just the one just fixed.
 
@@ -165,7 +173,7 @@ private applyHeadingNormalisation(
    real use never go into this repository, its fixtures or its tests — not
    even temporarily. Measurements on a real vault are recorded as numbers,
    not as copied content. The example vault `Example Vault/` was removed on
-   2026-10-30 because it held real data (SCAR-028); leftovers in tests and
+   2026-10-30 because it held real data (SCAR-035); leftovers in tests and
    documents: [#87](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/87).
 4. Keep generated compiler code in `plugin/`.
 5. Prefer TypeScript and the Obsidian plugin API.

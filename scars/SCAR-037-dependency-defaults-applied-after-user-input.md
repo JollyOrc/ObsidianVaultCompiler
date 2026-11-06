@@ -1,4 +1,4 @@
-# SCAR-030 — A dependency applies its defaults after the user's input, and the user's settings silently do nothing
+# SCAR-037 — A dependency applies its defaults after the user's input, and the user's settings silently do nothing
 
 **Area:** Requirements / Integration
 **Severity:** Medium — a false statement stood in a Done story for four days; a map author's style lines are accepted without a word and ignored
@@ -15,7 +15,7 @@ parsed, and it has no effect. A user-defined name that happens to equal a
 built-in one is replaced as well, with a result that looks like a bug in the
 user's own definition.
 
-In this project: the Text Mapper plugin appends its Gnomeyland and
+In the Obsidian Vault Compiler: the Text Mapper plugin appends its Gnomeyland and
 Apocalypse libraries to the map source. A map's own `default attributes`,
 `glow` and `label` lines are overridden, and a custom type called `red` is
 replaced by Gnomeyland's debug type `red` (a half-size filled red hex). US-4.9

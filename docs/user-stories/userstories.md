@@ -404,7 +404,7 @@ fence is deleted.
     headings" on and off.
   - Headings in code stay as in KD-3.
 - **AC-5 Location markers** (US-8.4 AC-5) are never written inside code, so
-  none reaches the output there (SCAR-032).
+  none reaches the output there (SCAR-039).
 
 - **AC-6 An unclosed code block ends with its note** *(decided 2026-11-01,
   [#102](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/102))*. As
@@ -606,7 +606,7 @@ headings" on and off (SCAR-019).
   unclosed block is closed with `> ` + the fence (US-1.4 AC-6). Each warning
   is reported once with the note and line where it is written (US-8.5).
 - **AC-10 Nothing internal reaches the output.** No sentinel or location
-  marker (US-8.4 AC-5) is left in or around the quote (SCAR-032); the quote
+  marker (US-8.4 AC-5) is left in or around the quote (SCAR-039); the quote
   prefix is never added to a marker line.
 - **AC-11 Empty lines (US-6.6).** A quote line is not an empty line and not a
   heading for US-6.6, so its rules do not change the quote; AC-1 decides the
@@ -1190,7 +1190,7 @@ confirmed in Obsidian by M15 the same day):
   (`stroke="white" stroke-width="5pt"`), then the label; a label written
   `"Link|Label"` has its second `<text>` inside an `<a href="Link">`. Both
   carry `font-size="20pt"` (26.7 units) and `dy="5px"` unless the label has
-  its own size (`"Moss" 14`). *(Corrected 2026-10-31, SCAR-030: it said "unless
+  its own size (`"Moss" 14`). *(Corrected 2026-10-31, SCAR-037: it said "unless
   the map sets its own label attributes or a size per label"; a map's own
   `label …` line has no effect, because the plugin's Gnomeyland `label` line
   comes after it — measured with the plugin's code in Node, see US-4.10.)*

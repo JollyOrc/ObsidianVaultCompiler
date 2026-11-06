@@ -13,7 +13,7 @@ callback must add its items before it returns, so no read can finish in
 time. The story, its tests and two tickets carried the assumption until the
 code that wires the callback was written.
 
-In this project: US-022 let the editor menu check an image's first bytes while
+In Obsidian2Typst: US-022 let the editor menu check an image's first bytes while
 it was built; Obsidian's `editor-menu` and `file-menu` callbacks are
 synchronous and file bytes come only from `vault.readBinary` (moved from
 SCAR-008 on 2026-10-22).

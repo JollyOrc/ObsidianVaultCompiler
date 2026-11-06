@@ -12,7 +12,7 @@ case (a standalone top-level document) without considering what happens when
 the same feature is used in a nested or composed context. The implementation
 faithfully matched the spec — and was wrong for every nested use.
 
-In this project: US-7.2 specified that an injected heading defaults to `h1`.
+In the Obsidian Vault Compiler: US-7.2 specified that an injected heading defaults to `h1`.
 That's correct at the document root. When the same file is embedded inside
 an already-headed section the injected heading must be `parentDepth + 1`, not
 always `h1`. The nested case wasn't mentioned and so wasn't implemented.
@@ -54,3 +54,22 @@ during spec writing.
   of a page number after a link named footnotes, callouts and cells but not a
   bold link; whether the number goes inside or after the bold was an open
   decision found only when the examples were run.
+- After a decision changes a rule, measure again every example of the story
+  that passes through that rule, not only the criterion the decision names.
+  Example (2026-10-28, US-025): decision 1 let the first block break; AC-5 was
+  rewritten, but a page table in AC-2 still showed the old pages and was found
+  only when its test was written.
+- When a story builds on another story's output, list the decisions and rules
+  of that story that shape the shared output; each gets one composed example
+  in the new story, and a behaviour the other story leaves unstated is asked,
+  not assumed by a test. Example (2026-10-29, US-027): US-026 decision 7 (text
+  before the first chapter is front matter) had no contents example, so text
+  before the first chapter ran on into the contents without a page break until
+  a sharpened test showed it; whether a printed colophon heading carries a
+  number was stated nowhere, and the composed test assumed it did not
+  (decided: it does, US-026 decision 8).
+- A defect fix measures every criterion its changed code path serves, not
+  only the one it fixes, before it is declared done. Example (2026-10-29,
+  TICKET-095): the fix of the image look wrapped the helper's output in a
+  block; the look was measured 71 of 71, but the floats the same helper
+  places stopped floating, found only when M18 was prepared (TICKET-096).

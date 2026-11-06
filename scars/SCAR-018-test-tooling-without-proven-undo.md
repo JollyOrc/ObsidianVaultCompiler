@@ -57,6 +57,11 @@ the restore is wrong, every later mutant tests something else, and the report
   M13): the preset note was backed up before the ticket added its
   `template:` line, so the backup could not serve the compare after the
   check; split into `before/` and `handover/`.
+- The file list of a scripted edit is checked, before the run, against files
+  that change only with the user's approval (`CLAUDE.md`, the state files);
+  those are left out and edited by hand on the user's go. Example
+  (2026-10-27, TICKET-072): `CLAUDE.md` was in a scan's file list and the
+  first run changed it; restored at once from the backup.
 - After a manual check, the first step back is `git status`: any change the
   check left in the sources or fixtures (a test note, an added line) is shown
   to the tester and set aside or restored before anything is committed. Stage

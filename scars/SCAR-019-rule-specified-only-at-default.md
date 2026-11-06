@@ -12,7 +12,7 @@ value, then generalised in words to every allowed value. All examples, all
 tests and the first implementation used the default. A value the rule allows
 but no example used behaved differently from what the author wanted.
 
-In this project: the running header of US-019 shows a chapter title for a
+In Obsidian2Typst: the running header of US-019 shows a chapter title for a
 heading level `L` (default 2). The rule was decided for level 2 ("the last H2,
 else the H1 title") and written as "the last level-`L` heading, else the last
 level-`(L − 1)` heading". For `L = 3` the pages of a new `#` section showed a
@@ -40,6 +40,11 @@ structure differently (here: level `L − 1` is no longer the top level when
   the end-to-end test runs one composed note with non-default settings.
 - The dry run before a manual check uses every preset the check uses, not only
   the default one, and its output is read page by page against the rule.
+- A manual check step that depends on a setting reads the setting's value
+  where the check runs before the step is written. Example (2026-10-31,
+  webpage-export US-002 M10): the folding step assumed `allowFoldingHeadings` on; the
+  author's vault has it off, so the site showed no arrows and AC-8 was
+  amended after the run.
 - Applies next to: page-number position and format (US-018), heading levels,
   numbering patterns, thresholds such as `cropWarningPercent`, column counts
   and any future per-preset rule.

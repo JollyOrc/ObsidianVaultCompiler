@@ -24,7 +24,7 @@ or Python script.
 2. Preserve the fixture vault. Never modify notes under
    `tests/fixtures/basic-vault/` except configured compiler output and assets.
    No real data (notes, books, vaults, names from real use) goes into this
-   repository, its fixtures or its tests (see `CLAUDE.md`, SCAR-028).
+   repository, its fixtures or its tests (see `CLAUDE.md`, SCAR-035).
 3. Keep generated compiler code in a dedicated plugin project directory, for
    example `plugin/` or `obsidian-vault-compiler/`, rather than cluttering the
    vault root.

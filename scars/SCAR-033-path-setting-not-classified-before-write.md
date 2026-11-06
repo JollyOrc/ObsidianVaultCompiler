@@ -1,4 +1,4 @@
-# SCAR-026 — A path from the user is joined as text, and the write lands somewhere nobody chose
+# SCAR-033 — A path from the user is joined as text, and the write lands somewhere nobody chose
 
 **Area:** Data safety / Specification
 **Severity:** High — the compile wrote its output, assets and logfile into the source vault that the plugin promises never to change

@@ -58,7 +58,7 @@ into `main.js`. It should avoid external runtime dependencies where possible.
 |---|---|
 | Engine | `app.plugins.plugins['text-mapper']` (installed and enabled). Missing → placeholder per map and one notice (US-4.2 AC-5). |
 | Drawing | `processMarkdown(source, div, { docId, addChild })` on a `div` that is never attached; the plugin draws one `<svg>` into it at once. Read from the plugin's v1.1.0 `main.js`; to be confirmed in Obsidian by M14. |
-| Terrain | The plugin always adds its built-in Gnomeyland and Apocalypse definitions; `include` lines are ignored (US-4.6). They come *after* the map source and the last definition wins, so a map's own `default attributes`, `glow` and `label` lines, and types named like built-in ones (`red`), have no effect (measured 2026-10-31 in Node, SCAR-030). |
+| Terrain | The plugin always adds its built-in Gnomeyland and Apocalypse definitions; `include` lines are ignored (US-4.6). They come *after* the map source and the last definition wins, so a map's own `default attributes`, `glow` and `label` lines, and types named like built-in ones (`red`), have no effect (measured 2026-10-31 in Node, SCAR-037). |
 | Changes to the plugin's SVG | Background `rect` removed (transparent PNG); `font-family` from the "Map font" setting or Obsidian's note font list (plus `sans-serif` when no generic family is listed) set on the root; the `@font-face` rules Obsidian defines for those families embedded as `data:` URLs in a `<style>` (US-4.2 AC-4, US-4.8). |
 | Tidy labels (US-4.9) | With "Tidy map labels" on, the compiler also removes the plugin's coordinates group and rewrites its label groups (centred, wrapped lines) in the returned SVG; it relies on the shape of Text Mapper v1.1.0's output and skips a map with a notice when that shape differs. |
 | Map directives (US-4.10, v0.17.0) | A map line `# vault-compiler: no-outlines no-glow` (a comment, which the plugin skips) makes the compiler remove the plugin's `regions-` group and the glow texts of `labels-` and `path-labels-` from the returned SVG; the same shape check and notice as for tidy labels. |
@@ -74,7 +74,7 @@ into `main.js`. It should avoid external runtime dependencies where possible.
   outlines, a serif font and labels like `Fog Mantle|Fog Mantle`. Removed in
   v0.14.0 (T-4.2-B); US-4.3 (bundled fallback parser) was withdrawn.
   The release zips v0.10.0 to v0.13.0, which carried that package, were
-  withdrawn on 2026-10-30 (#89, SCAR-029): the Unlicense cannot carry AGPL
+  withdrawn on 2026-10-30 (#89, SCAR-036): the Unlicense cannot carry AGPL
   or CC-BY-SA code. Since v0.14.0 `main.js` is built from `plugin/src` only.
 - Option B of ADR-011 (external Node rendering) stays rejected.
 

@@ -14,7 +14,7 @@ overlapped: the strip drawn last covered the others. The programmatic checks
 (colours present, gradients counted) could not see it either, because every
 colour and every gradient was there.
 
-In this project: the "A5 MU Print" template (US-023, M13, 2026-10-22); fixed by
+In Obsidian2Typst: the "A5 MU Print" template (US-023, M13, 2026-10-22); fixed by
 fading each strip to transparent.
 
 ## Root cause

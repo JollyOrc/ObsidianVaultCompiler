@@ -36,7 +36,7 @@ indistinguishable from a current one.
 - Say in the handover exactly where the test runs (which vault, which folder)
   and what the human still has to do (for example restart the app) and why.
 - Every build handed over for a test has its own unique version, visible where
-  the human looks (the plugin list and, for this project, the settings tab and
+  the human looks (the plugin list and, for an Obsidian plugin, the settings tab and
   the check commands). A new test round, or any new build after a test was
   handed over, gets a new version. The check text states the version to expect
   as its first step, so a mismatch is found before any other step is run.
@@ -49,5 +49,10 @@ indistinguishable from a current one.
   images chosen for the check existed twice in the test vault, once in a
   folder the check must not touch; a listing before the fixture was written
   found it.
+- Every number a manual check names is measured through the plugin's own path
+  with all of its inputs (the font catalog, the vault's files), or marked as
+  depending on an input the measurement did not have. Example (2026-10-28,
+  M15): the warning count was measured without the font catalog and said 148;
+  the export lists 149, and four checks had copied the number.
 - Applies next to: every manual check (M1, M2, M3, later ones), release
   candidates, builds sent to other testers.

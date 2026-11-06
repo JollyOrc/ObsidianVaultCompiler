@@ -24,9 +24,10 @@ failing — covering features that were considered delivered.
 
 - The build/release command must run the full test suite and **block on any
   failure**. A release that skips this step is not a release; it is a gamble.
-  (Recorded here as fixed in v0.10.0, but on 2026-10-27 `npm run build` still
-  ran no tests and no lint; the gate was really added in v0.10.1 and proven
-  with a deliberately failing test.)
+  (Obsidian2Typst: fixed in v0.10.0, `npm run build` now runs tests first.
+  Vault Compiler: recorded as fixed in v0.10.0, but on 2026-10-27
+  `npm run build` still ran no tests and no lint; the gate was really added
+  in v0.10.1 and proven with a deliberately failing test.)
 - A fix to the process is checked like a fix to the code: run it once with a
   failure that it must stop, and note that run where the fix is recorded. A
   gate that was only written down is not a gate.
@@ -35,6 +36,6 @@ failing — covering features that were considered delivered.
   trust in the suite.
 - Record the pass count in release notes ("360/360 tests passing"). This
   creates an auditable baseline and makes regressions immediately visible.
-- Do not accumulate "will fix later" without a ticket (in this project: a
+- Do not accumulate "will fix later" without a ticket (in every project: a
   GitHub issue). If it is worth fixing,
   it is worth tracking. If it is not worth tracking, it is not worth deferring.

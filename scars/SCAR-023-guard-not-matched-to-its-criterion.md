@@ -22,14 +22,14 @@ Six times a test did not match the criterion it named:
    story's legitimate write turned the baseline red (US-022).
 5. A fixture wrote an empty SVG group as `<g id="labels-…"></g>`; the browser's
    serialiser writes `<g id="labels-…"/>`, and the code reported every map
-   without labels as "not tidied" while the test passed (US-4.9, #91).
+   without labels as "not tidied" while the test passed (Vault Compiler US-4.9, #91).
 6. A text check asserted that a call came after another and was not inside an
    `if` block; a mutant that made the call's argument depend on the same
-   condition passed it (US-4.10, #92).
+   condition passed it (Vault Compiler US-4.10, #92).
 
 Items 1 to 3, 5 and 6 pass when the rule is broken; item 4 fails when nothing
 is wrong. (Items 1 to 4 gathered from SCAR-010, SCAR-017 and SCAR-018 on
-2026-10-22; 5 and 6 added 2026-10-31.)
+2026-10-22, Obsidian2Typst; 5 and 6 added 2026-10-31, Vault Compiler.)
 
 ## Root cause
 
@@ -51,8 +51,8 @@ more blocks the next correct change.
   cannot carry it, the fake is extended to follow the measured behaviour of
   the real consumer. Checking where a call is (after X, outside block Y) is
   not checking the statement: match it whole, with its arguments, at the
-  nesting level the criterion asks for. Example (2026-10-31, US-4.10): the
-  check now matches `\n  const directives = applyMapDirectives(svg,
+  nesting level the criterion asks for. Example (2026-10-31, Vault Compiler
+  US-4.10): the check now matches `\n  const directives = applyMapDirectives(svg,
   mapDocId(code), parseMapDirectives(code));` at function level.
 - Every test input is one the real producer can give (a list the store always
   sorts stays sorted) and is named for the branch it reaches. A surviving
@@ -73,9 +73,9 @@ more blocks the next correct change.
   encoding, normalisation), not written by hand. Hand-written fixtures pick
   the readable form, which may be one the producer never emits — empty
   elements self-closed, attribute order, escaping, line endings. Example
-  (2026-10-31, US-4.10): the new fixtures are the plugin's own output, run
+  (2026-10-31, Vault Compiler US-4.10): the new fixtures are the plugin's own output, run
   outside the app, serialised with self-closed empty elements; that is how
-  the defect of item 5 was found.
+  the defect of item 5 was found (Vault Compiler).
 - A test input must be able to tell the rule from its rivals. Example
   (2026-10-27, US-6.3): "the first heading is replaced by the filename" was
   tested only with notes whose first heading already equalled the filename
@@ -88,7 +88,8 @@ more blocks the next correct change.
   pin an exception that the change takes away. Example (2026-10-27, Vault
   Compiler T-4.2-B): the ticket said "no guard affected" without a search;
   three write-call guards allowed exactly the five temp-folder writes the
-  ticket removed, and failed on the first run. A guard that is wider than the acceptance criterion it names is
+  ticket removed, and failed on the first run. A guard that is wider than the
+  acceptance criterion it names is
   narrowed to that criterion, with the reason, in the ticket.
 - A test that one side wins over another also asserts that the losing side
   was in effect (a mark it leaves elsewhere); otherwise "it wins" cannot be
@@ -98,6 +99,36 @@ more blocks the next correct change.
   also sets the page fill, and each test asserts it.
 - Prove a guard with a mutation check: switch the rule off and see the guard
   fail.
+- A test that output is the same on every run runs the code from two fresh
+  starts (separate processes), so state taken at load time (a clock, a
+  random seed) differs between the runs. Example (2026-10-27, TICKET-069): two
+  generations inside one import could not see a seed taken from the clock; a
+  mutant showed it.
+- The search before tickets also lists every test that pins the whole
+  membership of a list or object the ticket grows (the keys of the effective
+  settings, the plugin's names, the rows); each is extended or narrowed in the
+  ticket. Example (2026-10-28, TICKET-075): two tests of the effective
+  settings were missed and went red with the new setting.
+- That search is run by the names of the functions whose result the ticket
+  widens (every `toEqual` over their return value), not only by the keys of
+  the data. Example (2026-10-29, TICKET-086): the search looked for the new
+  `toc` keys and missed a test that pinned the whole view `activePresetView`
+  returns; it went red when the view gained the Defaults.
+- When a criterion allows an exception at an edge, the guard checks that the
+  exception occurs only there (for example only at the last case of a run of
+  a sweep), never as an allowance granted to every case. Example (2026-10-29,
+  TICKET-096): the float check accepted "the text after it is on the next
+  page" for every float because AC-8 allows it at the tightest edge; a helper
+  under which no float ever filled its gap passed all 35 PDF tests.
+- When code or rows move (into another file, a modal, a new module), the
+  search also runs by the moved text: the labels, call sequences, file paths
+  and statements that text checks pin, not only by function names; every
+  test that reads the old place is listed in the ticket with what it pins.
+  Example (2026-10-31, US-029 #112, #113): the search ran by `detailRows`,
+  `pageRows`, `setButtonText`; seven text checks went red later — the
+  `showGlobals`/`restoreScroll` sequence, `addDefaultRows(` in each screen,
+  the Bleed row of the panel (moved into a modal), the panel's order, the
+  name dialog's keys and the delete path (both moved out of the tab).
 - A test can protect a defect: when it describes what the code did instead of
   what its story says, fixing the code turns it red. Read every test against
   the criterion it names, and when the two disagree, the story wins. Example
@@ -106,5 +137,16 @@ more blocks the next correct change.
   standard `[text](…)` syntax"), so `index2compile.md` silently lost two
   chapters; a second test wrote a link as a one-item list without meaning a
   ToC.
+- A test sample of a producer's output is taken from or checked against the
+  real output, not written from memory. Example (2026-10-30, webpage-export
+  US-001 #3): the HTML reader's script sample had no `<`, so a mutant that read
+  script content as markup survived; 4 of 7 inline scripts of a real exported
+  page contain `<`; a test with that shape was added.
+- A DOM test input built from an HTML string goes through the parser,
+  which reshapes some markup (a block closes an open `<p>`); when the real
+  producer builds the DOM without parsing, the test builds it the same way.
+  Example (2026-10-31, webpage-export #8): 7 unit tests failed on inputs the
+  parser had emptied, not on the code; `tests/support/dom.ts` builds the
+  render's shape.
 - Applies next to: text checks over source files, guards over generated
   output, wiring tests, fakes of a framework.

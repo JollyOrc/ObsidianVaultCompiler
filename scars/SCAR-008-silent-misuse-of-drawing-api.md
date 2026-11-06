@@ -14,7 +14,7 @@ result was "the renderer does not draw", which would have been recorded as a
 finding about the library. The user, who ran the harness, saw the blank
 popup; the harness itself had no check that anything was drawn.
 
-In this project: spike S8 (TICKET-001) of the bundled Typst renderer. The
+In Obsidian2Typst: spike S8 (TICKET-001) of the bundled Typst renderer. The
 fault was in the spike's own code; with the right context, a sized canvas, and
 a pixel check, page 3 drew in 53 ms and looked correct.
 

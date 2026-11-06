@@ -15,7 +15,7 @@ call, a `;` after it is swallowed, and a `*` delimiter next to a `/` becomes a
 comment marker. The tests for the pieces could not see any of this, because a
 piece never has a neighbour in its own test.
 
-In this project: US-013 AC-12 (the emphasis wrapper, "Done") only looked at
+In Obsidian2Typst: US-013 AC-12 (the emphasis wrapper, "Done") only looked at
 letters and digits next to the mark. The hazards above were found by writing
 the exact output examples for the inline emitter, then measuring them with the
 compiler (`~~gone~~.Next` → `#strike[gone].Next` fails; `a/**b**` → `a/*b*`

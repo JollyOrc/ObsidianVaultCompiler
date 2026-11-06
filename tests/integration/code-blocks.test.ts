@@ -84,7 +84,7 @@ describe('KD-3: one helper decides what a heading is (SCAR-017)', () => {
     assert.deepEqual(hits, ['utils.ts'], `found in: ${hits.join(', ')}`);
   });
 
-  it('US-1.5, SCAR-034: the quote marker is read only in utils.ts (splitQuote)', () => {
+  it('US-1.5, SCAR-041: the quote marker is read only in utils.ts (splitQuote)', () => {
     // A regex literal that reads `>` at a line start: `/^>`, `/^ {0,3}>`, `/^\s*>`.
     const hits = sources.flatMap(s => [...s.text.matchAll(/\/\^(?: \{0,3\}|\\s\*)?>/g)].map(() => s.name));
     assert.deepEqual(hits, ['utils.ts'], `found in: ${hits.join(', ')}`);

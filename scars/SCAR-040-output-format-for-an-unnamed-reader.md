@@ -1,4 +1,4 @@
-# SCAR-033 — An output format is specified without naming the program that reads it
+# SCAR-040 — An output format is specified without naming the program that reads it
 
 **Area:** Requirements / Integration
 **Severity:** High — every converted link to a heading of more than one word was broken for the real reader from the first build (2026-10-14) to v0.18.0; found only when the decision for two other issues forced a click-through
@@ -21,7 +21,7 @@ lower case), which hid the problem in small examples. It surfaced when two
 issues about heading links asked "which viewer?", and the answer was
 measured by clicking links in that viewer.
 
-In this project: US-2.3 (slug anchors since the first releases), found
+In the Obsidian Vault Compiler: US-2.3 (slug anchors since the first releases), found
 2026-11-01 while deciding #83 and #85; replaced by Obsidian's own heading
 form, #99.
 

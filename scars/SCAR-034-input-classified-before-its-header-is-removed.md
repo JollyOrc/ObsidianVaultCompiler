@@ -1,4 +1,4 @@
-# SCAR-027 — A file is classified by its first line before its metadata header is removed
+# SCAR-034 — A file is classified by its first line before its metadata header is removed
 
 **Area:** Specification / Verification
 **Severity:** Medium — every note with a metadata header was misclassified, and the header leaked into the output as content

@@ -1,4 +1,4 @@
-# SCAR-034 — A rule that reads the start of a line does not see past a container's marker
+# SCAR-041 — A rule that reads the start of a line does not see past a container's marker
 
 **Area:** Specification / Verification
 **Severity:** Medium — content inside a container is silently treated as something else, and inserted text breaks the container

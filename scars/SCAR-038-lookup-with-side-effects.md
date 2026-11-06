@@ -1,4 +1,4 @@
-# SCAR-031 — A lookup also reports, so every caller that only looks fills the report
+# SCAR-038 — A lookup also reports, so every caller that only looks fills the report
 
 **Area:** Design / Verification
 **Severity:** Medium — false and repeated warnings in every compile for months; a real warning never reached the user
@@ -23,7 +23,7 @@ listed two or three times, and the one useful message — "this name matches
 several files, I picked one" — produced up to three times but never written
 where the user reads warnings.
 
-In this project: `resolve` in the compiler, found through #88 (a false
+In the Obsidian Vault Compiler: `resolve` in the compiler, found through #88 (a false
 "Missing include" per map) on 2026-10-31; fixed by US-8.5 (#93, v0.17.1).
 
 ## Root cause

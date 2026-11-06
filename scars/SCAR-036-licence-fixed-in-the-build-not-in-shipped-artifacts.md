@@ -1,4 +1,4 @@
-# SCAR-029 — A licence conflict is fixed in the build, but the artifacts already shipped keep it
+# SCAR-036 — A licence conflict is fixed in the build, but the artifacts already shipped keep it
 
 **Area:** Process / Licensing
 **Severity:** High — five published release archives carried copyleft code under a public-domain licence for days after the build itself was clean

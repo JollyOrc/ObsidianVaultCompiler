@@ -15,7 +15,7 @@ The missed AC was not caught until later because:
 2. Tests were written alongside the code rather than against the full AC list.
 3. There was no "every AC ticked before merge" gate.
 
-In this project: US-7.2 AC-10 required the heading tracker to skip re-counting
+In the Obsidian Vault Compiler: US-7.2 AC-10 required the heading tracker to skip re-counting
 injected titles. This was missed in v0.8.0. It was only discovered during the
 v0.10.0 session when the full test suite was audited.
 

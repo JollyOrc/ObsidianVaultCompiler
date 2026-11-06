@@ -13,7 +13,7 @@ from how it should behave. The user chose the unmeasured one. When it was
 measured afterwards, it failed in a case the description had not mentioned,
 and the decision had to be reopened.
 
-In this project: US-018 offered page numbers after internal links either
+In Obsidian2Typst: US-018 offered page numbers after internal links either
 always or "only when the target is on another page". The second was chosen.
 Measured afterwards, it oscillated at a page edge (moved from SCAR-008 on
 2026-10-22; the layout side of it is SCAR-021).

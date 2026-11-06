@@ -643,7 +643,7 @@ Every note name is unique in the vault (SCAR-012). Start note:
 | `1.2 Dueling.md` | first heading `# Brawling` differs from the title (US-6.3 AC-6) |
 | `1.3 Leaf Craft.md` | preamble note embedding two spells (US-6.4) |
 | `Spells/Rootbinder.md` | frontmatter, then text (US-5.2) |
-| `Spells/Fog Lantern.md` | frontmatter in front of a heading (US-5.2, SCAR-027) |
+| `Spells/Fog Lantern.md` | frontmatter in front of a heading (US-5.2, SCAR-034) |
 | `2 Charms.md` | pass-through wrapper of `Seasonal Charms` (US-6.5) |
 | `Seasonal Charms.md` | flat-top map: long labels, `Polish&Transplant`, linked label `Rootbinder\|Mend a Bone`, green, pink and orange paths (US-4.2, US-4.8, US-4.9) |
 | `Appendix.md` | headingless; `[text](path)` ToC list, a section embed `![[1.1 Moving#Climbing]]` (US-1.2), `![[media.png]]` |
@@ -661,7 +661,7 @@ frontmatter or the pass-through in the fixture fails it).
 ## 6. Manual smoke tests in Obsidian
 
 Vault: `tests/fixtures/basic-vault/` (since 2026-10-30; the former example
-vault held real data and was removed, SCAR-028). `npm run build` deploys the
+vault held real data and was removed, SCAR-035). `npm run build` deploys the
 plugin there; set the output folder to `Export` (ignored by git) so no
 compiled file lands beside the fixture notes, which the fixture integration
 test reads.
@@ -765,7 +765,7 @@ sans-serif as in Obsidian, no notice (so Obsidian lets the compiler read
 Inter's font file); `Georgia, sans` → Georgia, with 10 new PNGs keyed
 `2e33eefc` in the same output folder; no errors.
 
-Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
+Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-035).
 **Rerun** on the fixture vault from `Smoke/Smoke book.md` (two maps, in
 `Smoke/Seasonal Charms.md` and `Smoke/Map key.md`); step 1 expects the version
 just built, and step 4's key is whatever the new PNG names show.
@@ -801,7 +801,7 @@ Text Mapper v1.1.0 enabled.
 
 Result 2026-10-27: all steps passed (reported by the user).
 
-Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-028).
+Run 2026-10-27 on the former example vault (removed 2026-10-30, SCAR-035).
 **Rerun** on the fixture vault from `Smoke/Smoke book.md`; step 1 expects the
 version just built. Text Mapper v1.1.0 enabled, "Map font" empty.
 

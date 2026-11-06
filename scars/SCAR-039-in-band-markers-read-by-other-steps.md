@@ -1,4 +1,4 @@
-# SCAR-032 — Invisible markers written into the text are read by steps they were not meant for
+# SCAR-039 — Invisible markers written into the text are read by steps they were not meant for
 
 **Area:** Design / Verification
 **Severity:** Medium — a working feature broke in the change that added the markers; found only by a mutation run
@@ -20,7 +20,7 @@ only because a mutation run asked for a test of "headings are read without
 markers", and the input written for it happened to put a link inside an
 anchor.
 
-In this project: location markers for warning lines, US-8.4 AC-5 (#97,
+In the Obsidian Vault Compiler: location markers for warning lines, US-8.4 AC-5 (#97,
 v0.18.0); fixed before release by leaving embeds unmarked.
 
 ## Root cause

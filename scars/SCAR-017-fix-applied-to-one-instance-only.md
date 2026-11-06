@@ -53,6 +53,17 @@ step in the fix asked "where else does this exist?".
   date): a text check matches the whole statement, and a drawing a fake can
   carry is drawn; before tickets, the tests are searched for guards that
   forbid a new call.
+- The documents written for the fix (story, tests, tickets) are part of the
+  class and go through the same check. Example (2026-10-27, US-024): the story
+  that removes private words from the published files named two of them, and
+  an example in it quoted a removed heading; the story's own scan found both.
+- When a defect is a value missing from a table that several screens read
+  (built-in values, labels, defaults), every reader of that table is listed
+  at G0 — a search for the table's name and for the values it should hold —
+  not only the screen where the defect was seen. Example (2026-10-31,
+  US-029): the toggles' missing built-ins were found at G0; the details
+  table read the same incomplete table (16 rows showed `—`) and was found
+  only at G3.
 - Applies next to: every defect found in M-checks (stale screens SCAR-016,
   confirmations SCAR-014, Enter key SCAR-013, validation, number formats), and to
   every refactor that copies a block between rows.

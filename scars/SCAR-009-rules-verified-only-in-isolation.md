@@ -14,7 +14,7 @@ the output is really used (the end of a line that is followed by more text,
 where the same `+` is an empty list item). The story, its examples, and the
 first implementation all carried the mistake.
 
-In this project: US-013 AC-3 first said a lone `=`, `-`, `+`, or `12.` needs no
+In Obsidian2Typst: US-013 AC-3 first said a lone `=`, `-`, `+`, or `12.` needs no
 escape. The round-trip test over every printable character, in four positions
 including "before a line break", failed on `+\n+ y`.
 

@@ -1,4 +1,4 @@
-# SCAR-028 — Real user data serves as the development and test data
+# SCAR-035 — Real user data serves as the development and test data
 
 **Area:** Process / Data protection
 **Severity:** High — the whole example vault had to be removed from the working tree; every published document needs a name-replacing step, and the private history still holds the data

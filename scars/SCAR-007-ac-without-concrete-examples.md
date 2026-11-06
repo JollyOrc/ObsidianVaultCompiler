@@ -13,7 +13,7 @@ output. The implementation had to derive the formula from first principles,
 got it wrong on the first attempt, and required a follow-up specification
 document to correct it.
 
-In this project: US-7.3 said a pass-through embed "passes the target heading
+In the Obsidian Vault Compiler: US-7.3 said a pass-through embed "passes the target heading
 through at the right level" but did not define the depth formula for the case
 where the pass-through file itself has no explicit depth annotation. The
 implementation guessed `parentDepth + 1`; the correct answer is `parentDepth`

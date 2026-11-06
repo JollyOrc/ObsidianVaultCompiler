@@ -14,7 +14,7 @@ functions, which the code used. Nobody tested the rules. The tool's import
 brings in definitions only, so no template rule ever applied. It was found
 when a real template with styling rules was tried.
 
-In this project: US-008 AC-9 (Done 2026-10-17); Typst's `#import` does not
+In Obsidian2Typst: US-008 AC-9 (Done 2026-10-17); Typst's `#import` does not
 carry `#set` and `#show` rules; found 2026-10-22 with the preset
 "A5 MU Print", corrected by US-023.
 
@@ -33,11 +33,24 @@ test; the rest was taken from expectation, not from the tool.
   ("not measured: …"), not as a fact, and stays an open item.
 - When a story builds on another story's statement about a tool, the test
   that backs it is named; without one, it is measured first.
+- An explanation of an observed failure is marked unverified until a test
+  shows it; a change that makes the symptom go away does not prove the
+  explanation. Example (2026-10-27, TICKET-072): a ligature was named as the
+  cause of a failing PDF text search and withdrawn; the same search had passed
+  in an earlier run, and the cause is not established.
 - When the tool can produce the thing in question itself (an editor's link
   autocomplete, an export, a "copy" command), take its own output as the
   first measurement instead of guessing candidate forms and trying each
-  (added 2026-11-01: three rounds of guessed link forms left headings with
-  `#` and `:` unreachable; the fourth, Obsidian's own autocomplete, showed
-  the rule at once — SCAR-033).
+  (added 2026-11-01, Vault Compiler: three rounds of guessed link forms left
+  headings with `#` and `:` unreachable; the fourth, Obsidian's own
+  autocomplete, showed the rule at once — SCAR-040).
+- A statement about where a dependency fails names the code path the run
+  actually takes, checked against the configuration. Example (2026-10-30,
+  webpage-export US-001 G0): the review cited the timeouts of the fallback renderer for an
+  export that uses the main renderer (`useFallbackRenderer: false`);
+  corrected while writing the diagnostic build.
+- An outcome that varies between runs is reported with every measured
+  count, not the first or the best one. Example (2026-10-30, webpage-export US-001 AC-14):
+  3/3 in one run, 2/3 in the next; both recorded.
 - Applies next to: compiler and renderer behaviour, Obsidian API timing and
   events, file formats, library defaults.

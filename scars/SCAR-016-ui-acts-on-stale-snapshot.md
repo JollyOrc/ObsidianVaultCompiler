@@ -63,6 +63,12 @@ tab that has been open for a while, which is how a user really works.
   US-021): the preset store announced changes but not its load; the style
   panel that Obsidian restores at startup kept an empty preset dropdown until
   a later change (a gap since US-012, found by M11 step 3).
+- Each draw/change/use example names how the change can arrive while that
+  screen is shown: a modal blocks the workspace, so a change behind it comes
+  from outside the window (a sync, a second window, another app), never from
+  a menu or a panel of the same window. Example (2026-10-31, US-029 AC-5):
+  the draft let the user choose a preset in the ribbon menu while a settings
+  modal was open; corrected to a preset note changed on disk.
 - Applies next to: every settings row, button, menu and list item that is built
   once and clicked later (use, duplicate, rename, delete, a future cover picker
   or font picker).
