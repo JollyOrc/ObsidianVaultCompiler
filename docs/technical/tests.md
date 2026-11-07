@@ -595,6 +595,55 @@ Source lines in warnings (US-8.4 AC-5, #95; `tests/integration/warning-lines.tes
   the pattern without its end anchor); the second first survived for want of
   that input, test added, both caught.
 
+### Epic 9 — Entry data from note properties (#108, G2 2026-11-07)
+
+Written before the code; 175 tests, 144 red until the code exists, 31 green
+guards of today's behaviour (the suite before them: 973, all green). **All green
+with #109 to #114 (2026-11-07): 1173 tests.**
+
+- `tests/integration/entry-block.test.ts` — US-9.1 AC-1 to AC-11, AC-13
+  (all green with #111, 58 tests; #111's mutation check: 7 mutants of the
+  link rule, all caught after a test of a link inside a map value was added;
+  mutation check 2026-11-07: 9 mutants, all caught after two checks were
+  added — no placeholder in any output, no property text where no block is
+  written):
+  which notes, the place in every title path at both toggle values, content
+  and exclusions, key case, the fixed YAML form (exact text **and** parsed
+  with `yaml` 2.9.1, SCAR-028), fence length, link flattening, invalid YAML,
+  other steps leaving the block alone, no metadata cache (text check).
+- `tests/integration/entry-assets.test.ts` — US-9.2: every link form, size
+  aliases, dedupe with body embeds, missing images, invalid values, the image
+  extensions, ambiguity, `entryAssetKeys`; guard: US-2.6 AC-2 body rule. All 44
+  green with #112; mutation check 2026-11-07: 10 mutants (size parts, the
+  three link forms, the four invalid reasons, ambiguity, the credit, the
+  missing-image report), all caught.
+- `tests/integration/entry-repeats.test.ts` — US-9.3; all 16 green with
+  #113. Mutation check 2026-11-07: 8 mutants, all caught after tests of a
+  real pass-through and of frontmatter line offsets were added (the first ran with "Normalise
+  headings" off, where a one-embed wrapper is not a pass-through).
+- `tests/integration/entry-not-compiled.test.ts` — US-9.4 AC-1 to AC-4,
+  with the folder-value table (SCAR-033). Green with #114, with the Notice tests in
+  `entry-settings.test.ts` (27 tests). Mutation check 2026-11-07: 12 mutants;
+  one survivor showed a dead check (`..` and drive letters, which the
+  existence check already rejects), which was removed.
+- `tests/integration/output-folder.test.ts` and `tests/unit/output-folders.test.ts`
+  — US-3.1 "Output folder"; green with #109 (17 tests). The unit tests
+  moved out of `entry-settings.test.ts` so they run before `entries.ts`
+  exists. Mutation check 2026-11-07: 6 mutants, all caught after the test of
+  Obsidian's lookup gained a check of the copied source (both candidates
+  were named `hare.png`, so the output text could not tell them apart).
+- `tests/integration/control-fences.test.ts` — US-5.1 AC-F, every language
+  in every fence form; green with #116 (38 tests). Mutation check
+  2026-11-07: 5 mutants (unclosed blocks, the empty line outside quotes,
+  the language match, a block ended by its quote), all caught after one
+  test was added for the quote end.
+- `tests/unit/entry-settings.test.ts` — `parseListSetting`,
+  `completionNotice` (US-9.4 AC-5), and text checks that
+  `main.ts` decides nothing about entries (SCAR-031).
+
+Not covered automatically: Obsidian2Typst reading a compiled book, and the
+settings rows in Obsidian (a manual check, filed with the tickets).
+
 ## 4. Property-based and fuzz tests
 
 - (Slug fuzzing removed with `slugify` in v0.19.0, #99; anchors are tested
@@ -936,6 +985,14 @@ compile writes below `Export/`, which git ignores.
    to `Export`.
 10. Is anything missing, odd or ugly that this list did not ask about? Report
     it even if it seems unrelated.
+
+### M21 — Entry data from note properties (Epic 9, #108, #115)
+
+Result 2026-11-07 with `0.22.0-m21.1` and Obsidian2Typst 0.12.0: passed
+(reported by the user).
+
+In a file of its own (SCAR-029): `tests/manual/M21-entry-data.md`. Its
+automated twin is `tests/integration/entry-fixture.test.ts`.
 
 ### M20 — Quoted notes and code in quotes (US-1.5, US-1.4 AC-7, #105, #106)
 

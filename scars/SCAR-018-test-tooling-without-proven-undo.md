@@ -8,7 +8,7 @@
 ## What went wrong
 
 Tooling that edits files for a test (mutation runs, scripted edits, probe
-setups) assumed its own effect instead of checking it. Four times in two
+setups) assumed its own effect instead of checking it. Five times in three
 stories:
 
 1. A scripted text replace matched nothing (the formatter had already changed
@@ -23,6 +23,13 @@ stories:
    over the other, and the remaining mutants ran against a broken tree. Only
    `shasum -c` at the end showed it; the file was rebuilt to its recorded
    checksum and the whole run repeated (US-017, TICKET-047).
+5. A mutation loop restored each mutant with `git checkout -- <file>`. The
+   file also held the ticket's own change, not yet committed, so the
+   "restore" returned it to the last commit and threw that change away; the
+   next mutants ran against the old code. Nothing was checked after the
+   restore; the loss showed only because `git diff --stat` no longer listed
+   the file. The change was applied again and the mutation run repeated from
+   a backup copy (2026-11-07, Vault Compiler #116).
 
 ## Root cause
 
@@ -36,6 +43,12 @@ the restore is wrong, every later mutant tests something else, and the report
 - Back up every file a run may change by its full relative path (mirror the
   tree: `mkdir -p "$S/$(dirname "$f")"; cp "$f" "$S/$f"`), never by its base
   name, and write a checksum list of the originals before the first change.
+- Restore from the run's own backup, never with `git checkout`, `git restore`
+  or `git stash`: git returns a file to a commit, not to the state the run
+  started from, and the uncommitted work under test is lost with the mutant.
+  Git is a valid undo only for a file proven unchanged since the last commit
+  (`git diff --quiet -- <file>` before the run). Example (2026-11-07, Vault
+  Compiler #116): see item 5 above.
 - After every restore, check the whole list (`shasum -a 256 -c`). A failed
   check stops the run at once; the results of the run are void and the run is
   repeated after the sources are proven equal to the checksums.

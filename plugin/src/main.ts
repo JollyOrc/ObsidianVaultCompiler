@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import { InMemoryVaultCompiler } from './compiler.ts';
+import { completionNotice, parseListSetting } from './entries.ts';
 import { ObsidianLinkResolver } from './resolver.ts';
 import { ObsidianAssetManager } from './assets.ts';
 import { computeContentHash } from './utils.ts';
@@ -10,6 +11,7 @@ import {
   resolveOutputLocation,
   vaultRelativeFromAbsolute,
   type OutputLocationResult,
+  foldersToIgnore,
 } from './output-location.ts';
 import { OutputWriter, type WriterFs } from './output-writer.ts';
 import { DelayedSave } from './delayed-save.ts';
@@ -39,6 +41,11 @@ interface VaultCompilerSettings {
   mapFont: string;
   /** US-4.9 | AC-7: no hex numbers, centred and wrapped labels in compiled maps. */
   tidyMapLabels: boolean;
+  /** Epic 9 | Settings: comma-separated lists, read with `parseListSetting`. */
+  entryMarkerKeys: string;
+  entryExcludeKeys: string;
+  entryAssetKeys: string;
+  expectCompiledFolders: string;
 }
 
 /**
@@ -62,6 +69,10 @@ const DEFAULT_SETTINGS: VaultCompilerSettings = {
   normaliseHeadings: false,
   mapFont: '',
   tidyMapLabels: true,
+  entryMarkerKeys: '',
+  entryExcludeKeys: 'aliases, cssclasses, publish',
+  entryAssetKeys: 'illustration',
+  expectCompiledFolders: '',
 };
 
 export default class VaultCompilerPlugin extends Plugin {
@@ -219,6 +230,13 @@ export default class VaultCompilerPlugin extends Plugin {
         mapFontKey: mapImageKey(mapFont.key, this.settings.tidyMapLabels),
         assetFolder: 'assets',
         resolve: (raw: string, currentFile: string) => resolver.resolve(raw, currentFile),
+        // US-3.1 "Output folder": the settings' folder and this run's.
+        ignoredFolders: foldersToIgnore([this.resolveOutputLocation(), resolved]),
+        // Epic 9 | Settings (#108).
+        entryMarkerKeys: parseListSetting(this.settings.entryMarkerKeys, { lowerCase: true }),
+        entryExcludeKeys: parseListSetting(this.settings.entryExcludeKeys, { lowerCase: true }),
+        entryAssetKeys: parseListSetting(this.settings.entryAssetKeys, { lowerCase: true }),
+        expectCompiledFolders: parseListSetting(this.settings.expectCompiledFolders, { lowerCase: false }),
       });
 
       const result = compiler.compile(run.startingFile);
@@ -304,11 +322,13 @@ export default class VaultCompilerPlugin extends Plugin {
 
       await writer.writeText(outputFile, result.content);
 
+      let warningsName: string | null = null;
       if (result.warningDetails?.length) {
         const now = new Date();
         const pad = (value: number) => String(value).padStart(2, '0');
         const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-        const warningPath = joinOutputPath(outputDir, `warnings_${stamp}.md`);
+        warningsName = `warnings_${stamp}.md`;
+        const warningPath = joinOutputPath(outputDir, warningsName);
         const escapeCell = (value: unknown) =>
           String(value).replace(/\|/g, '\\|').replace(/\n/g, ' ');
         const lines = [
@@ -325,9 +345,8 @@ export default class VaultCompilerPlugin extends Plugin {
 
       await this.verifySourceVaultUnchanged(sourceSnapshot, writer);
 
-      new Notice(
-        `Compilation complete: ${result.stats.filesProcessed} files, ${result.stats.assetsCopied} assets, ${result.stats.assetsDeduplicated} deduplicated.`
-      );
+      // US-9.4 | AC-5: the wording lives in entries.ts.
+      new Notice(completionNotice(result, warningsName));
     } catch (error) {
       new Notice(`Compilation failed: ${(error as Error).message}`);
     }
@@ -605,5 +624,24 @@ class VaultCompilerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // Epic 9 (#108): entry data from note properties.
+    const listSetting = (name: string, desc: string, key: 'entryMarkerKeys' | 'entryExcludeKeys' | 'entryAssetKeys' | 'expectCompiledFolders') =>
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addText(text =>
+          text
+            .setPlaceholder('')
+            .setValue(this.plugin.settings[key])
+            .onChange(value => {
+              this.plugin.settings[key] = value;
+              this.plugin.settingsSaver.request();
+            })
+        );
+    listSetting('Entry marker keys', 'A note with one of these properties (comma-separated) keeps its properties as an entry block. Empty: off.', 'entryMarkerKeys');
+    listSetting('Entry exclude keys', 'Properties never written into an entry block (comma-separated).', 'entryExcludeKeys');
+    listSetting('Entry image keys', 'Entry properties that name an image to copy (comma-separated).', 'entryAssetKeys');
+    listSetting('Expect compiled folders', 'Notes in these folders that are never compiled are listed in the warnings file (comma-separated). Empty: off.', 'expectCompiledFolders');
   }
 }

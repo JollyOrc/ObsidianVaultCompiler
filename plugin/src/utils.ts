@@ -46,19 +46,21 @@ export function headingLevel(filename: string): number {
  *      including the first such closing line and its line break (`\n` or
  *      `\r\n`);
  *   2. returns in `lines` how many source lines were removed (0 when there is
- *      no frontmatter).
+ *      no frontmatter);
+ *   3. US-9.1 | AC-10: returns in `yaml` the text between the two `---`
+ *      lines as written (`\r\n` kept), or null when there is no frontmatter.
  * Nothing else changes: blank lines after the frontmatter and later `---`
  * rules are kept, and a first-line `---` without a closing line is not
  * frontmatter.
  */
-export function splitFrontmatter(text: string): { body: string; lines: number } {
-  const match = text.match(/^---[ \t]*\r?\n(?:[^\n]*\n)*?---[ \t]*(?:\r?\n|$)/);
+export function splitFrontmatter(text: string): { body: string; lines: number; yaml: string | null } {
+  const match = text.match(/^---[ \t]*\r?\n((?:[^\n]*\n)*?)---[ \t]*(?:\r?\n|$)/);
   if (!match) {
-    return { body: text, lines: 0 };
+    return { body: text, lines: 0, yaml: null };
   }
   const block = match[0];
   const lines = block.split('\n').length - (block.endsWith('\n') ? 1 : 0);
-  return { body: text.slice(block.length), lines };
+  return { body: text.slice(block.length), lines, yaml: match[1] };
 }
 
 /**
@@ -79,10 +81,25 @@ const FENCE = /^\s*(```|~~~)/;
  * KD-3 (US-6.6); US-1.4 | AC-1: the fence a line opens or closes with — its
  * character and how many of them — or null.
  */
-function fenceOf(line: string): { char: string; length: number } | null {
+function fenceOf(line: string): { char: string; length: number; info: string } | null {
   if (!FENCE.test(line)) return null;
-  const run = line.trimStart().match(/^(`+|~+)/)![1];
-  return { char: run[0], length: run.length };
+  const text = line.trimStart();
+  const run = text.match(/^(`+|~+)/)![1];
+  return { char: run[0], length: run.length, info: text.slice(run.length).trim() };
+}
+
+/**
+ * US-5.1 | AC-F; US-1.4 | AC-1, AC-7: one fenced block of a note — its
+ * opening line, its last line (the closing fence, the last line of its quote,
+ * or the note's last line), the info string after the opening fence, the
+ * quote depth it was opened at, and whether a fence or its quote closed it.
+ */
+export interface FencedBlock {
+  start: number;
+  end: number;
+  info: string;
+  depth: number;
+  closed: boolean;
 }
 
 /** US-1.5 | Definitions: one quote marker — at most three spaces, `>`, one optional space or tab. */
@@ -116,25 +133,48 @@ export function splitQuote(line: string, max = Infinity): { prefix: string; dept
 function walkFences(
   lines: string[],
   onLine: (inside: boolean) => void,
+  blocks: FencedBlock[] = [],
 ): { line: number; char: string; length: number; depth: number } | null {
   let open: { line: number; char: string; length: number; depth: number } | null = null;
+  let block: FencedBlock | null = null;
   lines.forEach((line, index) => {
-    if (open !== null) {
+    if (open !== null && block !== null) {
       const quote = splitQuote(line, open.depth);
       if (quote.depth === open.depth) {
         onLine(true);
         const fence = fenceOf(quote.body);
-        if (fence !== null && fence.char === open.char && fence.length >= open.length) open = null;
+        if (fence !== null && fence.char === open.char && fence.length >= open.length) {
+          open = null;
+          block.end = index;
+          block.closed = true;
+        }
         return;
       }
+      // The quote ended, and the block with it.
       open = null;
+      block.end = index - 1;
+      block.closed = true;
     }
     onLine(false);
     const quote = splitQuote(line);
     const fence = fenceOf(quote.body);
     open = fence === null ? null : { line: index, ...fence, depth: quote.depth };
+    if (fence !== null) {
+      block = { start: index, end: lines.length - 1, info: fence.info, depth: quote.depth, closed: false };
+      blocks.push(block);
+    }
   });
   return open;
+}
+
+/**
+ * US-5.1 | AC-F: every fenced block of `lines`, in order, by the rule of
+ * `codeBlockMask`. A fence inside a block is code, so blocks never nest.
+ */
+export function fencedBlocks(lines: string[]): FencedBlock[] {
+  const blocks: FencedBlock[] = [];
+  walkFences(lines, () => undefined, blocks);
+  return blocks;
 }
 
 /**

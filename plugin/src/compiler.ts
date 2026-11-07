@@ -9,6 +9,7 @@ import {
   titleFromBasename,
   tidyBlankLines,
   codeBlockMask,
+  fencedBlocks,
   matchHeading,
   headingLevel,
   startsWithHeading,
@@ -21,6 +22,7 @@ import {
 } from './utils.ts';
 import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
+import { entryBlock, imageLink } from './entries.ts';
 import type { Heading } from './anchors.ts';
 
 /**
@@ -124,6 +126,53 @@ function replaceKeepingLines(
   return { content: pieces.join(''), lineMap: map };
 }
 
+/** US-5.1 | AC-F: the only table of the languages whose blocks are removed. */
+const CONTROL_LANGUAGES = new Set([
+  'meta-bind-embed',
+  'leaflet',
+  'calendarium',
+  'compressed-json',
+  'dataview',
+  'dataviewjs',
+]);
+
+/**
+ * US-5.1 | AC-F; US-8.4 | AC-5: removes every closed fenced block whose
+ * language (the first word of its info string) is in `CONTROL_LANGUAGES`,
+ * found by the one fence parser (`fencedBlocks`): backtick and tilde fences,
+ * a closing fence at least as long as the opening one, blocks in quotes.
+ * A block outside a quote leaves one empty line, so the text around it stays
+ * apart; a block in a quote leaves nothing, so no empty `>` line is left.
+ * An unclosed block is kept and reported by US-1.4 AC-6. A control block
+ * shown inside another code block is code, never a block of its own.
+ */
+function removeControlBlocks(content: string, lineMap: number[]): { content: string; lineMap: number[] } {
+  const lines = content.split('\n');
+  const removed = fencedBlocks(lines).filter(
+    block => block.closed && CONTROL_LANGUAGES.has(block.info.split(/\s/)[0].toLowerCase()),
+  );
+  if (removed.length === 0) return { content, lineMap };
+  const out: string[] = [];
+  const map: number[] = [];
+  let at = 0;
+  for (const block of removed) {
+    for (; at < block.start; at++) {
+      out.push(lines[at]);
+      map.push(lineMap[at]);
+    }
+    if (block.depth === 0) {
+      out.push('');
+      map.push(lineMap[block.start]);
+    }
+    at = block.end + 1;
+  }
+  for (; at < lines.length; at++) {
+    out.push(lines[at]);
+    map.push(lineMap[at]);
+  }
+  return { content: out.join('\n'), lineMap: map };
+}
+
 /** US-2.6 | AC-1, AC-2: true for `http://` and `https://` addresses, in any case. */
 export function isWebAddress(target: string): boolean {
   return /^https?:\/\//i.test(target.trim());
@@ -153,6 +202,43 @@ export interface CompilerOptions {
   normaliseHeadings?: boolean;
   /** US-4.8 | AC-6: font key for map PNG names; absent → the default key of `mapAssetName`. */
   mapFontKey?: string;
+  /**
+   * US-3.1 "Output folder", US-0.4: vault-relative folders whose files don't
+   * exist for link resolution (`foldersToIgnore`); absent or `[]` → none.
+   */
+  ignoredFolders?: string[];
+  /** US-9.1 | AC-1, AC-2: keys that make a note an entry (lower case); absent or `[]` → off. */
+  entryMarkerKeys?: string[];
+  /** US-9.1 | AC-4: keys left out of the block (lower case); absent → `ENTRY_EXCLUDE_DEFAULT`. */
+  entryExcludeKeys?: string[];
+  /** US-9.2: keys whose value is an image (lower case); absent → `['illustration']`. Used by #112. */
+  entryAssetKeys?: string[];
+  /** US-9.4: folders whose notes must be compiled, as typed; absent or `[]` → off. Used by #114. */
+  expectCompiledFolders?: string[];
+}
+
+/** US-2.1; US-9.2 | AC-5: the only list of the file types copied as images. */
+const IMAGE_FILE = /\.(png|jpg|jpeg|gif|svg|webp|bmp|ico)$/i;
+
+/** Epic 9 | Settings: the default of `entryExcludeKeys`. */
+export const ENTRY_EXCLUDE_DEFAULT = ['aliases', 'cssclasses', 'publish'];
+
+/** Epic 9 | Settings: the default of `entryAssetKeys`. */
+export const ENTRY_ASSET_DEFAULT = ['illustration'];
+
+/**
+ * US-9.1 | AC-3, AC-11: the line that holds an entry block's place while the
+ * note is assembled. No step reads it as Markdown (an HTML comment of its own
+ * kind, not a sentinel); `insertEntryBlocks` replaces it last.
+ */
+const ENTRY_PLACEHOLDER = /^<!-- __ventry__:(\d+) -->\n(?:[ \t]*\n)*/gm;
+
+/**
+ * US-3.1 "Output folder": true when `path` lies in one of `folders` or below
+ * it, compared by whole path segments (`Outline/x` is not in `Out`).
+ */
+export function inIgnoredFolder(path: string, folders: readonly string[]): boolean {
+  return folders.some(folder => path === folder || path.startsWith(`${folder}/`));
 }
 
 /** US-6.3 | AC-4: what an embed needs to know about the line it sits on. */
@@ -235,12 +321,18 @@ export class InMemoryVaultCompiler {
   };
 
   constructor(files: Record<string, string>, options?: Partial<CompilerOptions>) {
-    Object.entries(files).forEach(([path, content]) => this.files.set(this.norm(path), content));
     this.options = {
       enableTextMapper: true,
       assetFolder: 'assets',
       ...options,
     };
+    // US-3.1 "Output folder": a file in an output folder is never read, found
+    // or counted, so every lookup below skips it.
+    const ignored = (this.options.ignoredFolders ?? []).map(folder => this.norm(folder).replace(/^\/+|\/+$/g, ''));
+    Object.entries(files).forEach(([path, content]) => {
+      const key = this.norm(path);
+      if (!inIgnoredFolder(key, ignored)) this.files.set(key, content);
+    });
   }
 
   compile(startFile: string): CompileResult {
@@ -248,10 +340,12 @@ export class InMemoryVaultCompiler {
     if (!this.files.has(root)) {
       throw new Error(`Starting file not found: ${startFile}`);
     }
+    this.root = root;
     const assembled = this.processMarkdown(root, false);
     const converted = this.sanitizeOutput(this.convertLinks(assembled));
+    this.reportNotCompiled();
     return {
-      content: tidyBlankLines(this.stripSentinels(converted)),
+      content: this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(converted))),
       warnings: this.warnings,
       warningDetails: [...this.warningDetails],
       stats: { ...this.stats },
@@ -270,6 +364,7 @@ export class InMemoryVaultCompiler {
       throw new Error(`Starting file not found: ${startFile}`);
     }
 
+    this.root = root;
     const assembled = this.processMarkdown(root, false);
     const linked = this.convertLinks(assembled);
 
@@ -324,7 +419,9 @@ export class InMemoryVaultCompiler {
       }
     });
 
-    const sanitized = tidyBlankLines(this.stripSentinels(this.sanitizeOutput(processed)));
+    const sanitized = this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(this.sanitizeOutput(processed))));
+    // US-9.4 | AC-4: after every other row, as in `compile`.
+    this.reportNotCompiled();
     return {
       content: sanitized,
       warnings: this.warnings,
@@ -414,7 +511,9 @@ export class InMemoryVaultCompiler {
   private resolve(raw: string, currentFile: string): ResolvedTarget {
     if (this.options.resolve) {
       const resolvedPath = this.options.resolve(raw.trim(), currentFile);
-      if (resolvedPath) {
+      // US-3.1 "Output folder": Obsidian's answer counts only for a file the
+      // compiler knows; one in an output folder falls through to the search.
+      if (resolvedPath && this.files.has(this.norm(resolvedPath))) {
         let anchor: string | null = null;
         let link = raw.trim();
         if (link.includes('#')) {
@@ -533,8 +632,126 @@ export class InMemoryVaultCompiler {
    * (a text check in the frontmatter tests keeps it so). `lines` is the
    * number of source lines removed, for warning line numbers (AC-12).
    */
-  private readNote(path: string): { body: string; lines: number } {
+  private readNote(path: string): { body: string; lines: number; yaml: string | null } {
     return splitFrontmatter(this.files.get(path)!);
+  }
+
+  /** US-9.1 | AC-3: the entry blocks of this compile, by placeholder number. */
+  private entryBlocks: string[] = [];
+
+  /** US-9.4 | AC-3: the starting file, and the notes seen whole, as a section or quoted. */
+  private root = '';
+  private seenWhole = new Set<string>();
+  private seenSection = new Set<string>();
+  private seenQuoted = new Set<string>();
+
+  /**
+   * US-9.4 | AC-1 to AC-4: after compiling, one row per note in
+   * `expectCompiledFolders` that no whole-note embed brought in, sorted by
+   * vault path, after every other row; a folder value that is not a vault
+   * folder gives `Folder not found in the vault: <value>` instead. Values:
+   * `\` read as `/`; leading and trailing `/` dropped (`/` alone is the whole
+   * vault); a value naming no vault folder (`..`, a drive letter, a typo) is
+   * not found; folders match by whole path
+   * segments, case as stored. The starting file, files under the output
+   * folders (never in `files`) and `*.excalidraw.md` are left out.
+   */
+  private reportNotCompiled(): void {
+    const folders: string[] = [];
+    for (const value of this.options.expectCompiledFolders ?? []) {
+      const folder = value.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      // `..` and drive letters are never vault folders, so they are not found.
+      const exists = folder === '' || [...this.files.keys()].some(key => key.startsWith(`${folder}/`));
+      if (exists) folders.push(folder);
+      else this.report(`Folder not found in the vault: ${value}`, value, '', 0);
+    }
+    if (folders.length === 0) return;
+    const notes = [...this.files.keys()]
+      .filter(key => /\.md$/i.test(key) && !/\.excalidraw\.md$/i.test(key))
+      .filter(key => key !== this.root && !this.seenWhole.has(key))
+      .filter(key => folders.some(folder => folder === '' || key.startsWith(`${folder}/`)))
+      .sort();
+    for (const note of notes) {
+      const how = this.seenSection.has(note)
+        ? 'Not compiled (section embed only)'
+        : this.seenQuoted.has(note) ? 'Not compiled (quoted only)' : 'Not compiled';
+      this.report(how, note, note, 0);
+    }
+  }
+
+  /** US-9.3 | AC-2: the entry notes a whole-note embed has compiled, by vault path. */
+  private compiledEntries = new Set<string>();
+
+  /**
+   * US-9.3 | AC-1 to AC-5: for a whole-note embed of `path` written in
+   * `file` on `line`: when `path` is an entry note already compiled, reports
+   * `Duplicate entry omitted` and returns the comment line that replaces
+   * the embed; else null. Only the set of compiled entries is read, so a
+   * note seen first in a quote or as a section never counts (AC-3), and the
+   * circular check, which runs before the note is compiled, comes first
+   * (AC-4).
+   */
+  private repeatOf(path: string, file: string, line: number): string | null {
+    if (!this.compiledEntries.has(path)) return null;
+    // Read through readNote (US-5.2 AC-1); `line` counts the frontmatter too.
+    const note = this.files.has(file) ? this.readNote(file) : { body: '', lines: 0 };
+    const source = note.body.split('\n')[line - 1 - note.lines] ?? '';
+    const written = source.trim().replace(/^(?:[-*+]|\d+\.)\s+/, '');
+    this.report('Duplicate entry omitted', written, file, line);
+    let name = this.basename(path).replace(/\.md$/i, '');
+    while (name.includes('--')) name = name.replace(/--/g, '- -');
+    return `\n<!-- repeat of "${name}" omitted -->\n`;
+  }
+
+  /** US-9.3 | AC-5: the 1-based line of `file` (as stored) that holds `text` first; 0 if none. */
+  private sourceLineOf(file: string, text: string): number {
+    if (!this.files.has(file)) return 0;
+    const note = this.readNote(file);
+    const index = note.body.split('\n').findIndex(line => line.includes(text));
+    return index === -1 ? 0 : index + 1 + note.lines;
+  }
+
+  /**
+   * US-9.1 | AC-2, AC-9, AC-12: the entry block of a note brought in by a
+   * whole-note embed, or null; its warnings name the note and the line.
+   */
+  private entryOf(path: string, yaml: string | null): string | null {
+    const markerKeys = this.options.entryMarkerKeys ?? [];
+    if (yaml === null || markerKeys.length === 0) return null;
+    const result = entryBlock(yaml, {
+      markerKeys,
+      excludeKeys: this.options.entryExcludeKeys ?? ENTRY_EXCLUDE_DEFAULT,
+      assetKeys: this.options.entryAssetKeys ?? ENTRY_ASSET_DEFAULT,
+      asset: (value, line) => this.entryImage(value, path, line),
+    });
+    for (const warning of result.warnings) {
+      this.warnings.push(`Warning: ${warning.message}`);
+      this.warningDetails.push({ message: warning.message, link: warning.link, file: path, line: warning.line });
+    }
+    return result.block;
+  }
+
+  /**
+   * US-9.1 | AC-3: puts the placeholder of `block` on the line after the
+   * note's title heading — the first non-empty line in every title path.
+   */
+  private placeEntryBlock(content: string, block: string): string {
+    const lines = content.split('\n');
+    const title = lines.findIndex(line => line.trim() !== '');
+    if (title === -1) return content;
+    this.entryBlocks.push(block);
+    lines.splice(title + 1, 0, `<!-- __ventry__:${this.entryBlocks.length - 1} -->`);
+    return lines.join('\n');
+  }
+
+  /**
+   * US-9.1 | AC-3, AC-11: the last step of a compile — each placeholder
+   * becomes its block, and the empty lines after it go, so the body follows
+   * the block directly. Nothing reads the output after this.
+   */
+  private insertEntryBlocks(content: string): string {
+    if (this.entryBlocks.length === 0) return content;
+    return content.replace(ENTRY_PLACEHOLDER, (_m, index: string) => `${this.entryBlocks[Number(index)]}\n`);
   }
 
   private isMarkdownPath(path: string): boolean {
@@ -542,10 +759,19 @@ export class InMemoryVaultCompiler {
   }
 
   private assetTag(sourcePath: string, alt: string): string {
+    return this.formatAsset(encodeAssetPath(this.assetPath(sourcePath)), alt, sourcePath);
+  }
+
+  /**
+   * US-2.1, US-2.2, US-2.5; US-9.2 | AC-3 (SCAR-001): the asset path of a
+   * vault file — `assets/<normalised name>`, made unique — registered once
+   * for copying; a file met again gets its first path and counts as
+   * deduplicated. Returns the path only (not encoded, no Markdown).
+   */
+  private assetPath(sourcePath: string): string {
     if (this.sourceToAsset.has(sourcePath)) {
-      const existing = this.sourceToAsset.get(sourcePath)!;
       this.stats.assetsDeduplicated += 1;
-      return this.formatAsset(encodeAssetPath(existing), alt, sourcePath);
+      return this.sourceToAsset.get(sourcePath)!;
     }
 
     const base = this.basename(sourcePath);
@@ -563,12 +789,44 @@ export class InMemoryVaultCompiler {
     const assetRef = `${this.options.assetFolder}/${unique}`;
     this.sourceToAsset.set(sourcePath, assetRef);
     this.stats.assetsCopied += 1;
-    return this.formatAsset(encodeAssetPath(assetRef), alt, sourcePath);
+    return assetRef;
+  }
+
+  /**
+   * US-9.2 | AC-1 to AC-6: the block value of an image key of `notePath`
+   * (its line: `line`), or `undefined` to leave the key out. A list, a web
+   * address, a note or a file that is not an image is reported as
+   * `Entry image is not a local image (<reason>)`; a missing file as
+   * `Missing asset`; an ambiguous name as for body embeds. Otherwise the
+   * image is registered like a body embed and written `![credit](assets/x)`,
+   * or the bare path without a credit.
+   */
+  private entryImage(value: unknown, notePath: string, line: number): unknown {
+    if (value === null) return value;
+    const written = Array.isArray(value) ? JSON.stringify(value) : String(value);
+    const invalid = (reason: string) => {
+      this.report(`Entry image is not a local image (${reason})`, written, notePath, line);
+      return undefined;
+    };
+    if (Array.isArray(value)) return invalid('list');
+    const { path, credit } = imageLink(String(value), raw => parseEmbedDestination(raw).path);
+    if (isWebAddress(path)) return invalid('web address');
+    const resolved = this.resolve(path, notePath);
+    if (resolved.missing) {
+      this.stats.missingReferences += 1;
+      this.report('Missing asset', path, notePath, line);
+      return undefined;
+    }
+    if (this.isMarkdownPath(resolved.path)) return invalid('note');
+    if (!IMAGE_FILE.test(resolved.path)) return invalid('not an image');
+    if (resolved.ambiguity !== null) this.report(resolved.ambiguity, path, notePath, line);
+    const ref = encodeAssetPath(this.assetPath(resolved.path));
+    return credit === '' ? ref : `![${credit}](${ref})`;
   }
 
   private formatAsset(assetRef: string, alt: string, sourcePath: string): string {
     const lower = sourcePath.toLowerCase();
-    if (/\.(png|jpg|jpeg|gif|svg|webp|bmp|ico)$/.test(lower)) {
+    if (IMAGE_FILE.test(lower)) {
       return `![${alt}](${assetRef})`;
     }
     if (/\.(mp4|avi|mov|mkv|webm)$/.test(lower)) {
@@ -604,6 +862,10 @@ export class InMemoryVaultCompiler {
     }
 
     this.processedStack.push(path);
+    // US-9.4 | AC-3: how the note appeared — whole, as a section, or quoted.
+    if (quoted) this.seenQuoted.add(path);
+    else if (autoHeading) this.seenWhole.add(path);
+    else if (path !== this.root) this.seenSection.add(path);
     this.stats.filesProcessed += 1;
 
     const note = this.readNote(path);
@@ -653,19 +915,8 @@ export class InMemoryVaultCompiler {
       lineMap = fenced.from.map(index => lineMap[index]);
     }
 
-    // Remove Obsidian control command fences.
-    const controlLanguages = [
-      'meta-bind-embed',
-      'leaflet',
-      'calendarium',
-      'compressed-json',
-      'dataview',
-      'dataviewjs',
-    ];
-    for (const lang of controlLanguages) {
-      const fence = new RegExp('```' + lang.replace(/-/g, '\\-') + '[\\s\\S]*?```', 'g');
-      ({ content, lineMap } = replaceKeepingLines(content, lineMap, fence));
-    }
+    // US-5.1 | AC-F: remove Obsidian control command fences, every form.
+    ({ content, lineMap } = removeControlBlocks(content, lineMap));
 
     // Remove SerializedQuery comment delimiters while preserving their listed
     // embeds for expansion.
@@ -857,6 +1108,17 @@ export class InMemoryVaultCompiler {
       content = `${heading}\n\n${body.replace(/^(?:[ \t]*\n)+/, '').trimEnd()}\n`;
     } else if (!this.headingMap.has(path)) {
       this.headingMap.set(path, titleFromBasename(this.basename(path)));
+    }
+
+    // US-9.1 | AC-2, AC-3: a whole-note embed of an entry note keeps its
+    // properties as a block under its title. Placed last, so every rule above
+    // read the note without it (SCAR-034); quoted notes never get one.
+    if (autoHeading && !quoted) {
+      const block = this.entryOf(path, note.yaml);
+      if (block !== null) {
+        content = this.placeEntryBlock(content, block);
+        this.compiledEntries.add(path);
+      }
     }
 
     if (unclosed !== null) {
@@ -1398,7 +1660,9 @@ export class InMemoryVaultCompiler {
   private expandPassThrough(pt: PassThrough, path: string, depth: number): string {
     const base = this.basename(path);
     if (pt.anchor === null) {
-      const inner = this.processMarkdown(pt.target, true, depth - 1, 0, depth);
+      // US-9.3 | AC-3: the wrapper keeps what it writes; a repeated target is the comment.
+      const inner = this.repeatOf(pt.target, path, this.sourceLineOf(path, pt.rawPath))
+        ?? this.processMarkdown(pt.target, true, depth - 1, 0, depth);
       this.headingMap.set(path, this.headingMap.get(pt.target) ?? titleFromBasename(this.basename(pt.target)));
       return inner;
     }
@@ -1511,7 +1775,9 @@ export class InMemoryVaultCompiler {
           // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
           return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
-        return this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
+        // US-9.3 | AC-2: an entry note compiled before becomes a comment.
+        return this.repeatOf(resolved.path, currentFile, context.line)
+          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
       }
       const alt = display ? display.trim() : '';
       return this.assetTag(resolved.path, alt);
@@ -1614,7 +1880,9 @@ export class InMemoryVaultCompiler {
           // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
           return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
-        return this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
+        // US-9.3 | AC-2: an entry note compiled before becomes a comment.
+        return this.repeatOf(resolved.path, currentFile, context.line)
+          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
       }
       const tag = this.assetTag(resolved.path, alt);
       // US-2.6 | AC-3: an image keeps its title after the new path.

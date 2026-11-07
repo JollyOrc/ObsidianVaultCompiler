@@ -184,6 +184,8 @@ same way they do in Obsidian.
   warning.
 - Link targets that Obsidian reports as unresolved are reported as missing in
   the compiled output.
+- A target in the output folder counts as not found, even when Obsidian
+  returns it (US-3.1, "Output folder", 2026-11-07).
 
 ## Epic 1 — Core compilation
 
@@ -302,7 +304,8 @@ Definitions:
   today (e.g. spells of two schools). Notes that only want to point at other
   notes write the links in a sentence, not as a list (the user rewrites the
   glossary entries `Talentweb Strand` and `Swift Talents`, decided
-  2026-10-27).
+  2026-10-27). *Exception (2026-11-07):* an **entry note** (US-9.1) is
+  compiled once; later embeds become a comment (US-9.3).
 
 ### US-1.4 Code is copied as written
 *(Written 2026-11-01 from [#84](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/84),
@@ -960,6 +963,26 @@ filenames
   `[[Note#50% off]]` finds `## 50% off`; `[x](50%%20off.md)` (a lone `%`
   before an escape) finds `50% off.md`; `![x](50%.png)` finds `50%.png`
   and becomes `![x](assets/50.png)` (the name rule of US-2.5).
+- **Output folder** *(added 2026-11-07 for
+  [#108](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/108);
+  measured: compiled output inside a vault made every exported image name
+  ambiguous)*. The output folder is output only. Files in the vault folder
+  named by the `outputFolder` setting, and in its subfolders, don't exist for
+  link resolution: all files, not only images. The same holds for the folder
+  the export prompt sets for one run (US-7.3 AC-3). A link that finds its
+  file only there is reported as missing; when Obsidian's lookup (US-0.4)
+  returns a file there, the compiler resolves again among the other files.
+  An empty `outputFolder` (the vault root) excludes nothing, and neither does
+  a folder outside the vault. The folder comes from the setting, never from
+  its name. Examples (`outputFolder: Out`):
+  - `images/hare.png` and `Out/assets/hare.png` → `![[hare.png]]` gives
+    `![](assets/hare.png)` from `images/hare.png`, with no ambiguity warning.
+  - only `Out/assets/hare.png` → `Missing include`.
+  - `[[compiledtext]]` with only `Out/compiledtext.md` → missing.
+  - `Out/Run/assets/x.png` → ignored too.
+  - the prompt sets `Drafts` for one run → `Drafts/` and `Out/` are both
+    ignored in that run.
+  - `outputFolder` empty → nothing is ignored; output unchanged.
 
 ## Epic 4 — TextMapper diagrams
 
@@ -1436,6 +1459,29 @@ compiled output
 - Dataview Serializer plugin commands and generated markers are removed from
   the compiled output rather than emitted as content.
 - No plugin-specific markup remains in visible output.
+- **AC-F Every fence form** *(added 2026-11-07, G0-B8; measured with v0.21.0
+  in the #108 step-0 review)*. The removed languages are one table:
+  `dataview`, `dataviewjs`, `meta-bind-embed`, `leaflet`, `calendarium`,
+  `compressed-json`. One fence parser (CommonMark) finds each of them, and the
+  code copy of US-1.4 uses the same parser:
+  - a `~~~dataviewjs` fence → removed (v0.21.0: kept as code);
+  - a four-backtick fence holding a three-backtick line → removed whole,
+    closed only by a fence of at least four (v0.21.0: a stray ```` `` ````
+    line was left);
+  - a fence inside a quote, `> ```dataviewjs` … `> ```` → removed with its
+    `> ` prefixes, and no empty `>` line is left (v0.21.0: one was);
+  - Lede, blank, ```` ```dataviewjs ```` block, blank, `### Signs` → lede,
+    one blank line, `### Signs`;
+  - with US-9.1 on: title heading, `o2t-entry` block, first body line, in that
+    order, wherever the removed block stood.
+  - the language is the first word after the fence, compared exactly (in
+    lower case): ```` ```dataviewish ```` is kept (v0.21.0 removed it, as a
+    prefix match);
+  - a block outside a quote leaves one empty line, so `Text.` / block /
+    `More.` stay two paragraphs; a block in a quote leaves nothing, and one
+    closed by the end of its quote is removed up to that end;
+  - an unclosed control block is kept and reported as unclosed (AC-6 of
+    US-1.4), so a missing fence never deletes the rest of a note.
 
 ### US-5.2 Remove YAML frontmatter
 *(Added 2026-10-27, v0.13.0.)*
@@ -1454,6 +1500,9 @@ compiled rulebook with either toggle value, adding 186 `---` lines.
 
 **Decision (user, 2026-10-27, measured before it was offered, SCAR-020):** all
 frontmatter is dropped; no field (not even `tags`) is carried into the output.
+*Amended 2026-11-07:* an **entry note** (US-9.1) keeps its properties,
+`tags` included, as an `o2t-entry` block under its title. Every other note is
+unchanged, and the frontmatter text itself is never output.
 Two other options were measured and declined: a `#LeafCraft #LifeMagic` tag line
 under the title, and an italic `*Tags: LeafCraft, LifeMagic*` line.
 
@@ -2288,3 +2337,319 @@ compilation
 - Unreadable files produce `<!-- Warning: Unreadable file: filename.md -->`.
 - Compilation continues after these warnings.
 - The final report lists all missing and unreadable references.
+
+## Epic 9 — Entry data from note properties
+
+*(Written 2026-11-07 for [#108](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/108).
+Decisions G0-A1 to A9 and B1 to B8 taken 2026-11-05; spikes 2026-11-06 and
+2026-11-07; step-0 review: `development/drafts/entry-data-scar-review.md`.)*
+
+A book can lay out some notes as **entries**: a creature, a spell or an item
+with a statblock and an illustration. Their data lives in the note's
+properties, which US-5.2 removes. This epic keeps the properties of such notes
+as a data block for the typesetter, copies the images named in them, lists
+each entry once and reports entry notes that never reached the book.
+
+**The block's reader owns its format (SCAR-040).** The `o2t-entry` block is
+specified by its reader, Obsidian2Typst:
+[`docs/technical/entry-block.md`](https://github.com/JollyOrc/Obsidian2Typst/blob/main/docs/technical/entry-block.md)
+(release 0.12.0). These stories say what this compiler writes and do not
+restate the reader's rules. Readers of the compiled file: Obsidian2Typst (PDF
+and its statblock preview in Obsidian) and Obsidian itself, which shows the
+block as that preview when Obsidian2Typst is installed and as a code block
+otherwise.
+
+**Definitions**
+
+- **Whole-note embed:** a note brought in whole, without a heading anchor:
+  `![[Fen Hare]]`, `![x](Fen%20Hare.md)`, a ToC list item `- [[Fen Hare]]`
+  (US-1.3), and the target of a pass-through wrapper (US-6.5), which is
+  processed as if embedded directly. **Not** whole-note embeds: the starting
+  file, a section embed `![[Fen Hare#Signs]]`, a pass-through wrapper itself,
+  and an embed inside a quote or callout (US-1.5).
+- **Entry note:** a note brought in by a whole-note embed whose frontmatter
+  has at least one **top-level** key named in `entryMarkerKeys` (compared
+  without case).
+- **The note's title heading:** the heading the compiler writes for the note:
+  the injected or replacing title (US-6.1, US-6.3 to US-6.5).
+
+**Settings** (all text fields, comma-separated; read when a compile starts;
+written through `settingsSaver`, US-7.1 AC-S1). Items are trimmed and empty
+items dropped; key lists are compared without case.
+
+| Setting | Default | Story |
+|---|---|---|
+| `entryMarkerKeys` | *(empty: off)* | US-9.1 |
+| `entryExcludeKeys` | `aliases, cssclasses, publish` | US-9.1 |
+| `entryAssetKeys` | `illustration` | US-9.2 |
+| `expectCompiledFolders` | *(empty: off)* | US-9.4 |
+
+Examples (SCAR-019): `entryMarkerKeys` `""` → off; `might` → one key;
+` Might , attacks,,` → `might`, `attacks`. `entryExcludeKeys` `""` → nothing
+excluded (an `aliases` key is written); `aliases, tags` → `tags` is left out
+too. `entryAssetKeys` `""` → no key is treated as an image (an
+`illustration` value is written as text, links flattened by US-9.1 AC-9);
+`illustration, portrait` → both. With `entryMarkerKeys` empty the other three
+entry settings have no effect; `expectCompiledFolders` works on its own.
+
+**Decisions live in tested modules (SCAR-031).** `main.ts` passes the settings
+and writes the report; a text check over `main.ts` fails if it decides
+anything about entries.
+
+**Two invariants for every story of this epic:**
+1. `entryMarkerKeys` and `expectCompiledFolders` empty → the compiled text of
+   `basic-vault`, the smoke book and every existing test is byte-identical to
+   v0.21.0.
+2. `entryMarkerKeys` set, but no note has any of its keys → the same.
+
+**Not measured here (SCAR-024):** how Obsidian2Typst lays the entries out
+(its US-030 to US-036).
+
+### US-9.1 Keep an entry note's properties as an `o2t-entry` block
+**As a** book author
+**I want** the properties of my entry notes carried into the compiled file
+**So that** the typesetter can print each entry's statblock.
+
+**Acceptance criteria**
+
+- **AC-1 Off by default.** With `entryMarkerKeys` empty every frontmatter is
+  removed as in US-5.2 (invariant 1).
+- **AC-2 Which notes.** `entryMarkerKeys: might`; `Fen Hare.md` =
+  `---` / `might: 3` / `---` / `Fen hares are shy.`
+
+  | Root holds | Block? |
+  |---|---|
+  | `![[Fen Hare]]` | yes |
+  | `![x](Fen%20Hare.md)` | yes |
+  | `- [[Fen Hare]]` (ToC list) | yes |
+  | `![[W]]`, `W.md` = `![[Fen Hare]]` (pass-through) | yes, under `Fen Hare`'s heading; none for `W` |
+  | `![[Fen Hare#Signs]]` | no |
+  | `> ![[Fen Hare]]`, `> [!note]` / `> ![[Fen Hare]]` | no |
+  | `Fen Hare.md` is the starting file | no |
+  | a note with `stats:` / `  might: 3` (nested key) | no |
+  | a note with `# might: 3` (YAML comment) / `tags: [a]` | no |
+  | a note with `text: \|` / `  might: 3` (inside a multi-line string) | no |
+
+  A note without a block has its frontmatter removed as in US-5.2.
+- **AC-3 Place: directly under the note's title heading**, with no blank
+  line between, in every title path, and before the note's first body line
+  (SCAR-034: heading-first, preamble and pass-through classification read the
+  note as if there were no block). Measured title placement with v0.21.0 at
+  `5b8e166`; `Fen Hare.md` = `---` / `might: 3` / `attacks:` /
+  `  - "Kick: 2d6"` / `---` / *body*:
+  - Root `# Book` / `## Beasts` / `![[Fen Hare]]`, body `Fen hares are shy.`:
+    - on → `### Fen Hare` / ```` ```o2t-entry ```` / `might: 3` / `attacks:` /
+      `  - "Kick: 2d6"` / ```` ``` ```` / `Fen hares are shy.`
+    - off → the same with `## Fen Hare`.
+  - Heading-first body `# Fen Hare` / `Fen hares are shy.` / `## Signs` /
+    `Tracks.`: on → `### Fen Hare`, the block, `Fen hares are shy.`,
+    `#### Signs`, `Tracks.`; off → `## Fen Hare`, the block, …, `## Signs`.
+  - Pass-through `![[W]]`, `W.md` = `![[Fen Hare]]`, body `# Fen Hare` /
+    `Shy.`: on → `### Fen Hare`, the block, `Shy.`; off → `## W`, *(blank)*,
+    `## Fen Hare`, the block, `Shy.` (no block under `## W`).
+  - Nested: `Section.md` = `Intro.` / `![[Fen Hare]]` embedded from the root
+    → the block follows `Fen Hare`'s own heading at whatever depth it has.
+  - A body that starts with a list, a table, a fence, an indented code line,
+    a quote or a `dataviewjs` block (removed, US-5.1): the block is followed
+    by that line, unchanged (SCAR-009). A body that starts with a heading is
+    heading-first (above): the title takes that heading's place.
+- **AC-4 Content.** Every top-level property of the note except the keys in
+  `entryExcludeKeys`, **`tags` included**, in the note's order, keys in lower
+  case. `entryExcludeKeys` default: `Fen Hare.md` with `aliases: [Hare]`,
+  `might: 3`, `tags: [beast]` → block `might: 3` / `tags:` / `  - beast`.
+  This amends US-5.2 for entry notes only.
+- **AC-5 Key case.** Two keys that differ only in case: the first one is
+  written, in lower case (as the reader does), and the warnings file gets
+  `Entry keys differ only in case: Might / might` with the second key as the
+  link, the note and the line of the second key. Example: `Might: 3` / `might: 4` → `might: 3`. *(Only YAML
+  typed in source mode can do this; the Properties panel refuses it.)*
+- **AC-6 Fixed YAML form (G0-A4).** The block is the note's mapping
+  serialised by `yaml` 2.9.1 `stringify(value, {nullStr: ''})`, which equals
+  what the Properties panel writes (spike 2026-11-06). The library is bundled
+  (ISC licence; SCAR-036 licence check; SCAR-042 `main.js` compared before and
+  after). Examples (note → block):
+
+  | In the note | In the block |
+  |---|---|
+  | `might: 3` | `might: 3` |
+  | `vigour: "11"` | `vigour: "11"` |
+  | `flag: yes` | `flag: yes` (a string, YAML 1.2) |
+  | `empty:` | `empty:` |
+  | `attacks: ['A: 1d6']` | `attacks:` / `  - "A: 1d6"` |
+  | `motto: "Run first: ask later"` | `motto: "Run first: ask later"` |
+  | `note: Bite 1d6 #fire` (quoted in the note) | `note: "Bite 1d6 #fire"` |
+  | `born: 2026-11-07` | `born: 2026-11-07` |
+  | `- B: 2d6` in a list (unquoted, a map) | `  - B: 2d6`, written as is, **no warning** |
+
+  Two notes that hold the same values in different quoting or list style give
+  the same block. A value that is a map is written as it is and not reported:
+  this compiler doesn't know which keys are printed, and Obsidian2Typst warns
+  for the keys it uses (decided 2026-11-07).
+- **AC-7 Fence (G0-A5).** The fence is backticks, one more than the longest
+  backtick run in the block, at least three: a value holding
+  ```` ``` ```` → a four-backtick fence; ``Uses `code` here`` → three.
+- **AC-8 Links flattened (G0-A7), by the reader's rule.** In every string of
+  every non-asset key (lists included), link markup becomes its display text,
+  exactly as Obsidian2Typst's reader shows it: a wikilink or embed its alias,
+  else its target as written; with a heading anchor `File > Heading`, or
+  `Heading` for `[[#Heading]]`; a Markdown link its text; an image its alt
+  text. Bold and italic stay.
+
+  | Value | Written |
+  |---|---|
+  | `"[[Quick Step]]"` | `Quick Step` |
+  | `"[[Skills/Keen Nose\|Keen Nose]]"` | `Keen Nose` |
+  | `"[[Skills/Keen Nose]]"` | `Skills/Keen Nose` |
+  | `"[[Rules#Grappling]]"` | `Rules > Grappling` |
+  | `"[x](https://example.com)"` | `x` |
+  | `"**Bite** [[Teeth]]: 1d6"` | `"**Bite** Teeth: 1d6"` |
+
+  An asset key (US-9.2) is not flattened.
+- **AC-9 Frontmatter that isn't valid YAML.** With `entryMarkerKeys` set, a
+  note whose frontmatter does not parse gets no block, its frontmatter is
+  removed as in US-5.2, and the warnings file gets
+  `Frontmatter is not valid YAML` with the note and the line `yaml` reports.
+  Example: `---` / `might: [3` / `---`.
+- **AC-10 Read from the note text (SCAR-022).** Properties are parsed from
+  the text the compiler already read (US-5.2's frontmatter), never from
+  Obsidian's metadata cache, which can lag behind a save.
+- **AC-11 Other steps leave the block alone (SCAR-039).** No other step
+  changes the block's text or reads it: ToC expansion, embeds of either
+  syntax, link conversion (US-2.3), TextMapper, control-fence removal, code
+  ranges (US-1.4), section extraction, quoting (US-1.5), blank-line tidying
+  (US-6.6), sentinel and marker stripping, output link checks (US-8.3). Test
+  for each: a block holding `illustration: "![c](assets/hare.png)"`, a
+  value `"- [[A]]"` that looks like a ToC item, `"%20"`, `"<!-- x -->"` and
+  `"# Not a heading"` is in the output byte for byte, and no warning names it.
+- **AC-12 Warnings name the note.** Every warning of this epic names the
+  note's vault path and the line of the key in the note as stored, frontmatter
+  included (US-8.4 AC-5).
+- **AC-13 The reader reads it back (SCAR-028).** Every block in the tests is
+  compared as exact text **and** parsed with `yaml` 2.9.1 to the expected
+  values.
+
+### US-9.2 Copy images named in entry properties
+**As a** book author
+**I want** an image named in a property such as `illustration` to be copied
+like an embedded image
+**So that** an entry's illustration doesn't have to be an embed in its text.
+
+Measured with v0.21.0 (spike 2026-11-07): the compiler's link resolution and
+asset naming already handle every form below when they are reached; the
+property route needs its own rules for the alias, invalid values and the
+warning.
+
+**Acceptance criteria**
+
+- **AC-1 Forms.** For each key in `entryAssetKeys`, the value is one image
+  link. All of these give the same file, `images/hare.png`, copied once with
+  US-2.2 deduplication and US-2.5 names:
+  `"[[hare.png|Drawn by A. Nobody]]"` (the form a vault should write: Obsidian
+  updates it when the image moves, and it shows as a backlink),
+  `"[[images/hare.png]]"`, `"[Drawn by A. Nobody](images/hare.png)"`,
+  `images/hare.png`, `hare.png`, `"![[hare.png|Drawn by A. Nobody]]"`,
+  `"![Drawn by A. Nobody](images/hare.png)"`, `"![](<images/hare.png>)"`.
+  Embed forms are read without a warning, though Obsidian doesn't track them
+  in properties (decided 2026-11-07). The path is taken out of the value with
+  the patterns the embed steps use (`parseEmbedDestination`) and resolved by
+  the same `resolve()` (US-0.4, US-3.1), with spaces, `%20`, `<…>`, `../`,
+  case and anchors as for body embeds.
+- **AC-2 Written as an image with its credit.** In the block the value is
+  `"![Drawn by A. Nobody](assets/hare.png)"`, or `assets/hare.png` when there
+  is no credit. The credit is the alias or link text. An alias of digits
+  only, or digits `x` digits, is not a credit in any form: `[[hare.png|300]]`,
+  `![[hare.png|300x200]]` → `assets/hare.png`; `[[hare.png|A. Nobody|300]]`
+  and `![A. Nobody|300](images/hare.png)` → `"![A. Nobody](assets/hare.png)"`.
+  A link with no alias and no link text has no credit. *Unlike a body embed:*
+  `![[pic.png|200]]` in the text still gives `![200](assets/pic.png)`
+  (US-2.6 AC-2; guard test).
+- **AC-3 Shared with body embeds.** The same image as a body embed and as a
+  property gives one file in `assets/` (measured: 1 copied, 1 deduplicated).
+  Two different `owl.png` (one in the body, one in a property) give
+  `assets/owl.png` and `assets/owl_1.png`.
+- **AC-4 Missing image.** The key is left out of the block, nothing else is
+  written in its place, and the warnings file gets `Missing asset` with the
+  value, the note and the key's line, whatever the form (a body wiki embed
+  says `Missing include`).
+- **AC-5 Not one local image (G0-B7).** The key is left out and the warnings
+  file gets `Entry image is not a local image (<reason>)` with the value:
+
+  | Value | Reason |
+  |---|---|
+  | a list `["[[a.png]]", "[[b.png]]"]` | `list` |
+  | `https://example.com/x.png`, `[[https://example.com/x.png]]` | `web address` |
+  | `[[Quick Step]]` (a note) | `note` |
+  | `[[sheet.pdf]]` | `not an image` |
+
+  Images are the extensions US-2.1 copies as images. (Measured: without
+  these checks a note link put the note's text into the block, a PDF became
+  a link and a web address became a local path.)
+- **AC-6 Ambiguous name.** Reported as for body embeds (US-8.5), with the
+  note and the key's line; the file chosen is the one US-3.1 chooses.
+
+### US-9.3 List each entry once
+**As a** book author
+**I want** an entry note that two lists bring in to be compiled only once
+**So that** the book has no duplicate entries.
+
+**Acceptance criteria**
+
+- **AC-1 Scope.** Only entry notes are deduplicated (`entryMarkerKeys` set).
+  Any other note listed twice is compiled twice, as US-1.3 AC-6 says
+  (spells of two schools).
+- **AC-2 The repeat becomes a comment.** The second and every later
+  whole-note embed of the same entry note (same resolved vault path) writes
+  one line `<!-- repeat of "Fen Hare" omitted -->` instead of the note,
+  where the embed or list item was. The name is the note's file name without
+  `.md`; a `--` in it is written `- -`. Root `## Beasts` / `- [[Fen Hare]]` /
+  `## Marsh` / `- [[Fen Hare]]` → under `## Marsh` only the comment.
+  Obsidian2Typst drops HTML comments (its US-001 AC-15).
+- **AC-3 What doesn't count.** Section embeds never count, before or after
+  the whole note. Embeds in quotes and callouts neither count nor are
+  replaced. A pass-through wrapper whose target was already compiled keeps
+  what the wrapper itself writes (toggle off: `## W`), and the target becomes
+  the comment.
+- **AC-4 Circular embeds come first.** A note that embeds itself (directly
+  or through others) is reported as circular (US-1.2) as today, not as a
+  repeat.
+- **AC-5 Report.** Each repeat adds `Duplicate entry omitted` to the warnings
+  file, with the embed as written, the file and the line it is written on.
+- **AC-6 Nested repeat.** A repeat inside a note that is itself embedded is
+  found the same way, and its line names the note it is written in.
+
+### US-9.4 Report entry notes that were never compiled
+**As a** book author
+**I want** a list of the notes in my entry folders that didn't reach the
+book
+**So that** a note with a missing tag doesn't drop out unnoticed.
+
+**Acceptance criteria**
+
+- **AC-1 Folders.** `expectCompiledFolders` names vault folders; every `.md`
+  note in them and their subfolders is expected. Values (SCAR-033):
+
+  | Value | Means |
+  |---|---|
+  | *(empty)* | off |
+  | `Creatures` | `Creatures/` and below |
+  | `Creatures/`, `/Creatures` | the same |
+  | `Lore\Creatures` | `Lore/Creatures` |
+  | `Creature` (and `Creatures` exists) | only `Creature/`: whole path segments |
+  | `creatures` (the folder is `Creatures`) | not found: names are compared with case, as Obsidian does |
+  | `/` | the whole vault |
+  | `../x`, `C:\x`, a folder that doesn't exist | ignored, with `Folder not found in the vault: <value>` in the warnings file (link: the value; no file; line 0) |
+
+- **AC-2 What is left out.** The starting file, every file under the output
+  folder (US-3.1 AC "output folder"), and `*.excalidraw.md`.
+- **AC-3 What counts as compiled (G0-B5).** Only a whole-note embed. A note
+  that was brought in only as a section, or only inside a quote or callout,
+  is listed with how: `Not compiled (section embed only)`,
+  `Not compiled (quoted only)`. Otherwise `Not compiled`.
+- **AC-4 Report.** One row per note in the warnings file, sorted by vault
+  path, after all other warnings: the message, the note's vault path as the
+  link and as the file, line 0.
+- **AC-5 Notice (G0-B6).** When any repeat (US-9.3) or uncompiled note was
+  found, the completion Notice adds the counts and the warnings file, e.g.
+  `Compilation complete: 12 files, 3 assets, 0 deduplicated. 1 duplicate
+  entry omitted, 2 notes not compiled: see warnings_20261107_1530.md.`
+  A count of zero is not shown; with both zero the Notice is unchanged.

@@ -180,3 +180,19 @@ export function resolveOutputLocation(request: OutputLocationRequest): OutputLoc
     },
   };
 }
+
+/**
+ * US-3.1 "Output folder", US-0.4: the vault folders whose files link
+ * resolution ignores — the folder of each location that lies in the vault
+ * (the settings' and this run's), each once, in order. The vault root and
+ * folders outside the vault give nothing; a refused location gives nothing.
+ */
+export function foldersToIgnore(locations: readonly OutputLocationResult[]): string[] {
+  const folders: string[] = [];
+  for (const result of locations) {
+    if (!result.ok || result.location.kind !== 'vault') continue;
+    const folder = result.location.folder.replace(/^\/+|\/+$/g, '');
+    if (folder !== '' && !folders.includes(folder)) folders.push(folder);
+  }
+  return folders;
+}

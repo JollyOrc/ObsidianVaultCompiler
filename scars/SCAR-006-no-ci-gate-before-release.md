@@ -12,6 +12,14 @@ caught before tagging because there was no automated enforcement of "tests
 green before release". At the start of the next work session 44 tests were
 failing — covering features that were considered delivered.
 
+The same gap, at the size of one commit (2026-11-07, Vault Compiler #113): on
+a branch whose tests were written before the code, a test run and the commit
+were chained in one command. The run's output went through `grep`, so its
+exit code was lost, and the commit ran whatever the result. The output showed
+one failure: a guard (only `readNote` may read note text) that the new code
+broke. It was seen only after the commit; the code was fixed and the
+unpushed commit amended.
+
 ## Root cause
 
 - Tests existed but were not all run (or all passing) at release time.
@@ -22,6 +30,16 @@ failing — covering features that were considered delivered.
 
 ## Prevention
 
+- On a branch where tests come before the code, the full suite is red by
+  design, so "the suite is green" cannot gate anything. Name the set that
+  must be green at each step (every test outside the tickets still to do)
+  and keep it in a file; the gate is that set's exit code. Example
+  (2026-11-07, Vault Compiler #113): the list of test files outside Epic 9's
+  open tickets, run before each commit.
+- A commit depends on the gate's exit code (`gate && git commit`), never on
+  reading its output, and the gate's output is not piped through a filter
+  (`grep`, `tail`) that replaces its exit code. Run the gate and the commit as
+  two steps when the result has to be read first.
 - The build/release command must run the full test suite and **block on any
   failure**. A release that skips this step is not a release; it is a gamble.
   (Obsidian2Typst: fixed in v0.10.0, `npm run build` now runs tests first.

@@ -1,6 +1,6 @@
 # Draft tickets — Entry data from note properties (epic #108)
 
-**Status:** Draft, 2026-11-05. **Not filed yet.** Amended 2026-11-05 with the answers to the step-0 questions (A1 to A9 for the shared block contract, B1 to B8 for this plugin). Each amended draft cites its answer as G0-xx. The behaviour spec is "Bestiary Layout User Stories" in the private spec repository (BL-B1 to BL-B5); the stories written at step 1 restate it in generic terms.
+**Status:** filed 2026-11-07 as #109 to #116 (see each ticket). Drafted 2026-11-05. Amended 2026-11-05 with the answers to the step-0 questions (A1 to A9 for the shared block contract, B1 to B8 for this plugin). Each amended draft cites its answer as G0-xx. The behaviour spec is "Bestiary Layout User Stories" in the private spec repository (BL-B1 to BL-B5); the stories written at step 1 restate it in generic terms.
 
 These drafts are filed as GitHub issues (template "Ticket (maintainers)") only after:
 1. the step-0 SCAR review (done: `entry-data-scar-review.md`, 30 gaps; questions answered)
@@ -19,7 +19,7 @@ The **block format** is owned by its reader, Obsidian2Typst (its story "Entry da
 - **Key case (G0-A8):** keys are matched case-insensitively and written in lowercase.
 - **YAML form (G0-A4):** re-serialised in a fixed form. Tentative until the YAML spike.
 - **Fence (G0-A5):** one backtick longer than the longest backtick run in the block (CommonMark).
-- **Credit (G0-A6):** no credit key; the credit is the alt text of the `illustration` image and is kept.
+- **Credit (G0-A6, amended 2026-11-07):** no credit key; the credit is the alias (or link text) of the `illustration` link and is kept. Vaults are expected to write `[[hare.png|Credit]]`, the form Obsidian tracks in properties; embed forms are read too, without a warning.
 - **Links (G0-A7):** links in property values are flattened to their display text; bold and italic are kept.
 - **Repeats (G0-B3, B4):** only entry notes are deduplicated; a repeat becomes an HTML comment; section embeds never count as repeats.
 - **Not compiled (G0-B5):** only whole embeds count as compiled.
@@ -29,130 +29,112 @@ The **block format** is owned by its reader, Obsidian2Typst (its story "Entry da
 
 ## Open points for step 1
 
-- **Key order in the fixed form:** the trigger setting no longer lists every key, so the order can't follow it. Proposed: the note's property order (what the author sees in the Properties panel). Alternative: sorted. Decide at step 1, after the YAML spike.
-- **In-band markers (SCAR-039):** the block is an in-band marker read by a later program. The class search must list every step that reads fenced blocks (US-1.4 code copy, US-5.1 removal, link rewriting, the TextMapper step) and decide for each that it leaves `o2t-entry` alone.
+- ~~**Key order in the fixed form**~~: the note's property order (US-9.1 AC-4, 2026-11-07).
+- ~~**In-band markers (SCAR-039)**~~: listed in US-9.1 AC-11 (2026-11-07).
 
 ## Spikes before step 1
 
 - the YAML form Obsidian's Properties panel writes
-- how property links resolve in the user's Obsidian
+- ~~how property links resolve in the user's Obsidian~~ (done 2026-11-07: only link forms without `!` are indexed; the compiler's `resolve()` and `assetTag()` handle every form; see T-9.2-A)
 - how Obsidian2Typst's `yaml` 2.9.1 parses this compiler's output
 
 ---
 
-## T-9.1-A — Write entry data blocks from note properties
+## Tickets (step 3, rewritten 2026-11-07 from the stories)
 
-- **Source:** US-9.1 (to be written) AC-1 to AC-4; epic #108; amends US-5.2
-- **Defect / Why:** US-5.2 removes all frontmatter, so per-note layout data never reaches the typesetter. Example: `Fen Hare.md` with `might: 3`, `attacks: ["Kick: 2d6"]`, `tags: [beast]` compiles today to `### Fen Hare`, then the body. The data is lost.
-- **Change:** in the frontmatter step (where US-5.2 removes the block), a **whole-note embed** whose frontmatter has at least one key of `entryMarkerKeys` keeps every property except those in `entryExcludeKeys` (G0-A2) and emits them directly under the note's heading, at whatever level that heading has:
+Order of work: T-5.1-A and T-3.1-A first (both stand alone and change existing behaviour), then T-9.1-A, T-9.1-B, T-9.2-A, T-9.3-A, T-9.4-A, and T-9.1-C last (fixture and manual check). All on the branch `108-entry-data`; the epic merges to `main` once every test is green (SCAR-006). Red counts measured on the branch at `21cf0f4`.
 
-  ````
-  ### Fen Hare
-  ```o2t-entry
-  might: 3
-  attacks:
-    - "Kick: 2d6"
-  tags:
-    - beast
-  ```
-  ````
+### T-5.1-A (#116) — Control blocks of every fence form are removed
 
-  Keys are written in lowercase. Two keys that differ only in case give `ENTRY_KEY_CASE "<note>": Might / might` (G0-A8). Add both settings to the settings tab: `entryMarkerKeys` default empty, `entryExcludeKeys` default `aliases, cssclasses, publish`.
-- **Class search (SCAR-017):** every place that places a note's heading (embed, nested ToC expansion US-1.3, quote embed US-1.5, section embed, pass-through wrapper, preamble files from US-5.2, the root file). Each is decided: whole-note embeds get the block, all others don't (G0-B2).
-- **Guard search (SCAR-023):** the US-5.2 tests that assert "no frontmatter text in the output" must still hold when the setting is empty, and must allow the block when it is set.
-- **Tests:**
-  - setting empty → output byte-identical to today
-  - one trigger key set → block with all properties except the excluded ones, `tags` included
-  - an excluded key (`aliases`) → not in the block
-  - `Might` and `might` in one note → one key `might` and `ENTRY_KEY_CASE`
-  - a section embed, a quoted embed, a callout embed and the root file → no block
-  - a note at depth 3 → block under its own heading
-  - a note without any trigger key → no block
-  - two notes → two blocks, each under its own heading
-- **Not measured here (SCAR-024):** what Obsidian2Typst does with the block.
-- **Status:** Draft
+- **Source:** US-5.1 AC-F (G0-B8); epic #108
+- **Defect / Why:** the removal regex `'```'+lang+'[\s\S]*?```'` only matches a fence of exactly three backticks. Measured with v0.21.0: `~~~dataviewjs` stays as code; a four-backtick `dataviewjs` fence leaves a stray two-backtick line; a `dataviewjs` block inside a quote leaves an empty `> ` line.
+- **Change:** `compiler.ts` — one table of removed languages (`dataview`, `dataviewjs`, `meta-bind-embed`, `leaflet`, `calendarium`, `compressed-json`) and one CommonMark fence parser for removal: backtick and tilde fences, a closing fence at least as long as the opening one, fences inside quotes with their prefix. The code copy of US-1.4 uses the same parser.
+- **Class search (SCAR-017):** every reader of fences: control removal, TextMapper fences (US-4.1), the SerializedQuery scan, `codeRanges` / `codeLines` / `codeBlockMask`, `unclosedFence`. Each moves to the shared parser or is listed here with why it stays.
+- **Guard search (SCAR-023):** `control-commands.test.ts`, `code-blocks.test.ts`, `code-as-written.test.ts:211` (pins today's code output); the text check that `dataviewjs` is named once.
+- **Tests:** `tests/integration/control-fences.test.ts`: 34 tests, 25 red, 9 guards green (three-backtick fences, other languages kept, one table).
+- **Not measured here (SCAR-024):** —
+- **Status:** filed
 
-## T-9.1-B — Fixed YAML form, fence length and flattened links
+### T-3.1-A (#109) — The output folder is not searched when links resolve
 
-- **Source:** US-9.1 AC (determinism, fence, links)
-- **Defect / Why:** the same properties written with a different quoting in two notes must give the same block text. Otherwise the output isn't deterministic, and downstream diffs are noisy. A value with backticks would close a three-backtick fence early. A link in a value would reach the statblock, which is always link-free (G0-A7).
+- **Source:** US-3.1 "Output folder", US-0.4 (2026-11-07); epic #108
+- **Defect / Why:** a compile into a vault folder copies images to `<output folder>/assets/`; the next compile finds those copies too. Measured in a real vault: every image name that had been exported was ambiguous between the source and its copies.
+- **Change:** `output-location.ts` — `foldersToIgnore(locations)`: the vault folders of the settings location and this run's location, without the vault root and without folders outside the vault. `compiler.ts` — option `ignoredFolders`; `directMatch`, `basenameMatches` and the result of `options.resolve` skip every file under those folders (whole path segments). `main.ts` passes `ignoredFolders: foldersToIgnore([...])`.
+- **Class search (SCAR-017):** every caller of `resolve()`: wiki and Markdown embeds, links (US-2.3), pass-through wrappers, quoted embeds, ToC items, TextMapper assets, and the entry images of T-9.2-A.
+- **Guard search (SCAR-023):** the US-0.3 output-location tests; `vault-safety.test.ts` (US-8.1); `link-resolution.test.ts`.
+- **Tests:** `tests/integration/output-folder.test.ts`: 10 tests, 8 red, 2 guards green; `tests/unit/entry-settings.test.ts`, "foldersToIgnore": 5 tests.
+- **Not measured here (SCAR-024):** Obsidian's own lookup returning a file in the output folder (tested with a stand-in resolver; checked by hand in T-9.1-C).
+- **Status:** filed
+
+### T-9.1-A (#110) — Write an entry note's properties as an `o2t-entry` block
+
+- **Source:** US-9.1 AC-1 to AC-7, AC-9 to AC-13; the settings table of Epic 9; amends US-5.2; the format is Obsidian2Typst's `docs/technical/entry-block.md` (SCAR-040)
+- **Defect / Why:** US-5.2 removes all frontmatter, so an entry's data never reaches the typesetter. Example: `Fen Hare.md` with `might: 3`, `attacks: ["Kick: 2d6"]` compiles to `## Fen Hare` / `Fen hares are shy.`
 - **Change:**
-  - serialise in a fixed form: one key per line, lists in block style, two-space indent, strings quoted only when YAML needs it (G0-A4; tentative until the YAML spike). Key order: see the open point.
-  - the fence is one backtick longer than the longest backtick run in the content, three at least (G0-A5)
-  - links in values are flattened to their display text: `[[Quick Step]]` → `Quick Step`, `[[Skills/Keen Nose|Keen Nose]]` → `Keen Nose`, `[text](url)` → `text`. Bold and italic stay. The `illustration` value is not flattened (T-9.2-A).
-- **Class search (SCAR-017):** any other place that writes YAML (none known; to confirm). The link flattening reuses the display-text rules of the link rewriter (US-2.3), not a second parser.
-- **Guard search (SCAR-023):** *(at step 3)*
-- **Tests:**
-  - `attacks: ['A: 1d6']` and `attacks:\n  - "A: 1d6"` give the same block
-  - a value holding three backticks → a four-backtick fence
-  - a wikilink, an aliased wikilink and a Markdown link in values → their display text; `**bold**` kept
-  - Obsidian2Typst's `yaml` parser reads every test block back to the same values
-- **Not measured here (SCAR-024):** —
-- **Status:** Draft
+  - bundle `yaml` 2.9.1 (ISC): licence check (SCAR-036), `main.js` compared before and after (SCAR-042)
+  - `entries.ts` (new): `parseListSetting`; the block writer: top-level keys only, exclusions, keys in lower case, the note's order, first of two case-twins wins with a warning, `stringify(value, {nullStr: ''})`, the fence one backtick longer than the longest run
+  - `compiler.ts`: `splitFrontmatter` returns the YAML text too (SCAR-001); a whole-note embed of an entry note writes the block directly under its title heading in each title path (US-6.1, US-6.3 to US-6.5; four places, listed in the step-0 review); heading-first and pass-through classification read the note without the block (SCAR-034); no other step reads or changes the block (SCAR-039)
+  - `main.ts`: four settings rows and defaults, passed with `parseListSetting`; no decision in `main.ts` (SCAR-031)
+- **Class search (SCAR-017):** title placement: `applyHeadingNormalisation`, the `${heading}\n\n${body}` branch, `expandPassThrough`, the quoted title (no block). Fence and text readers that must leave the block alone: the list in US-9.1 AC-11.
+- **Guard search (SCAR-023):** `frontmatter.test.ts:45/118/206/235` (the text check that frontmatter is discarded must allow the block only when the setting is set); `settings-writes.test.ts` (its count of settings writes changes with the new rows: this ticket updates it, SCAR-044); `compile-basic.test.ts:234-275`; `obsidian-anchors.test.ts:239/350`; `warnings-once.test.ts:155`.
+- **Tests:** `tests/integration/entry-block.test.ts` except AC-8: 49 tests, 36 red, 13 guards green; `tests/unit/entry-settings.test.ts`, "parseListSetting" and the `main.ts` text checks: 9 tests.
+- **Not measured here (SCAR-024):** what Obsidian2Typst does with the block (T-9.1-C).
+- **Status:** filed
 
-## T-9.2-A — Images named in properties are copied as assets
+### T-9.1-B (#111) — Links in entry values become their display text
 
-- **Source:** US-9.2 (to be written) AC-1 to AC-4
-- **Defect / Why:** an image only in `illustration:` is never copied, because only body embeds are (US-2.1).
-- **Change:** for keys named in a new setting `entryAssetKeys` (default `illustration`), resolve `[[images/hare.png]]`, `images/hare.png`, `![[hare.png|Credit]]` and `![Credit](images/hare.png)` through the link resolution of US-0.4 / US-3.1. Copy the image with deduplication (US-2.2) and name normalisation (US-2.5), and write it into the block with its **alt text kept as the credit** (G0-A6): `"![Credit](assets/hare.png)"`, or `assets/hare.png` when there is none. A numeric alias (`![[hare.png|300]]`) is a size in Obsidian, not a credit, and is dropped.
-  - An image that can't be found gives the missing-file warning, and the key is left out.
-  - A list, a web URL or a link to a note gives `ENTRY_ILLUSTRATION_INVALID "<note>": <list|url|note>`, and the key is left out (G0-B7).
-- **Class search (SCAR-017):** all asset paths (embeds, web images from US-2.6, TextMapper renders from US-4.7). The new caller must use the same dedupe map.
-- **Guard search (SCAR-023):** the dedupe tests from US-2.2. The same image used as a body embed and as a property gives one asset.
-- **Tests:**
-  - four link forms → same asset path; the two with alt text keep it
-  - a numeric alias → no credit
-  - a missing image → warning and no key
-  - a list, a URL and a note link → each warning and no key
-  - the same image in a body and a property → one file in `assets/`
-- **Not measured here (SCAR-024):** how large the image prints.
-- **Status:** Draft
-
-## T-9.3-A — A repeated entry note becomes a comment
-
-- **Source:** US-9.3 (to be written) AC-1 to AC-4
-- **Defect / Why:** an entry note listed in two lists is compiled twice, for example a creature tagged into two categories.
-- **Change:** keep a set of entry notes (notes that got a block, T-9.1-A) already embedded in this compilation. A second or later **whole-note** embed of one of them emits `<!-- repeat of "Fen Hare" omitted -->` instead of the content, and adds `Duplicate entry omitted: Fen Hare` to the warnings file (G0-B3, B6). Other notes are never deduplicated, so US-1.3 AC-6 (spells listed under two schools) holds. Section embeds never count: not a section after its whole note, and not the whole note after one of its sections (G0-B4). No setting: the rule only acts when `entryMarkerKeys` is set.
-- **Class search (SCAR-017):** circular-dependency prevention (spec 6.3) already tracks a stack. Decide whether that stack and the new set interact (a cycle versus a repeat).
-- **Guard search (SCAR-023):** tests that rely on a note appearing twice (for example the US-1.3 nested ToC tests). They must stay green, because only entry notes are affected.
-- **Tests:**
-  - an entry note embedded twice → the second is the comment, and the warnings file lists it
-  - a non-entry note embedded twice → two copies as today
-  - a section embed of an entry note before or after its whole embed → both kept
-  - a repeat inside a nested embed
-  - `entryMarkerKeys` empty → output byte-identical to today
-- **Not measured here (SCAR-024):** that Obsidian2Typst drops the comment (its US-001 AC-15).
-- **Status:** Draft
-
-## T-9.4-A — Report notes that were expected but never compiled
-
-- **Source:** US-9.4 (to be written) AC-1 to AC-3
-- **Defect / Why:** a note whose tags put it in no generated list silently drops out of the book.
-- **Change:** add the setting `expectCompiledFolders` (list of folders, default empty). After compiling, the warnings file lists `Not compiled: <note>` for every Markdown note in those folders, at any depth, that never appeared as a **whole-note embed** (G0-B5). A note that appeared only quoted or only as a section embed is listed with how it appeared: `Not compiled (section embed only): <note>`. The Notice gives only the count (G0-B6).
-- **Class search (SCAR-017):** the warnings file is the only output place; the statistics report (spec 7.4) gains no lines.
+- **Source:** US-9.1 AC-8 (G0-A7)
+- **Defect / Why:** a link in a value would reach the statblock, which is always link-free. `skills: ["[[Skills/Keen Nose|Keen Nose]]"]` must be written `Keen Nose`.
+- **Change:** `entries.ts` — flatten every string of every non-asset key, lists included, by the reader's rule (Obsidian2Typst `flattenLinks`): a wikilink or embed its alias, else its target as written; `File > Heading` with an anchor, `Heading` for `[[#Heading]]`; a Markdown link its text; an image its alt text; bold and italic stay. Uses the link patterns of US-2.3, not a parser of its own.
+- **Class search (SCAR-017):** the link patterns in `compiler.ts` (`LINK`, the embed patterns); the flattening uses them.
 - **Guard search (SCAR-023):** —
-- **Tests:**
-  - folder with 3 notes, 2 embedded → one line
-  - a note only section-embedded, a note only quoted → listed with how they appeared
-  - setting empty → no line
-  - subfolders count
+- **Tests:** `tests/integration/entry-block.test.ts`, "AC-8": 9 tests, 9 red.
 - **Not measured here (SCAR-024):** —
-- **Status:** Draft
+- **Status:** filed
 
-## T-5.1-A — Control blocks of every fence form are removed
+### T-9.2-A (#112) — Images named in entry properties are copied as assets
 
-- **Source:** US-5.1 (amendment) AC "Dataview … fenced code blocks are stripped"; G0-B8
-- **Defect / Why:** US-5.1 names `dataview` blocks only. A `dataviewjs` block (used for a preview in the note) must not reach the output, and the entry data block (T-9.1-A) must stay directly under the heading even when such a block comes first in the body. The step-0 review measured that the removal fails for `~~~` fences, fences of four or more backticks and fences inside quotes.
-- **Change:** one fence parser for all removed block languages, handling `~~~` fences, fences of four or more backticks (closed only by a fence at least as long) and fences inside quotes (with the quote prefix). Add `dataviewjs` to the list if it isn't there. T-9.1-B's fence length relies on the same parser.
-- **Class search (SCAR-017):** all removed block languages (`dataview`, `dataviewjs`, `meta-bind-embed`, `leaflet`, `calendarium`, `compressed-json`). Confirm the list is one table, and that the code copy of US-1.4 uses the same parser.
-- **Guard search (SCAR-023):** *(at step 3)*
-- **Tests:**
-  - `dataviewjs` block → removed, with no extra blank lines left
-  - each language in a `~~~` fence, a four-backtick fence and inside a quote → removed
-  - a four-backtick block holding a three-backtick line → removed whole
-  - with T-9.1-A on: heading, `o2t-entry` block, first paragraph, in that order
+- **Source:** US-9.2 AC-1 to AC-6; the link spike of 2026-11-07
+- **Defect / Why:** an image only in `illustration:` is never copied. Measured with v0.21.0: the forms resolve when they reach `resolve()`, but a size alias was kept as alt text, a note link put the note's text in, a PDF became a link and a web address became a local path.
+- **Change:** `entries.ts` / `compiler.ts` — for keys in `entryAssetKeys`: reject a list, a web address, a note and a non-image (`png jpg jpeg gif svg webp bmp ico`) with `Entry image is not a local image (<reason>)`; take the path out with `parseEmbedDestination` and the wikilink pattern; `resolve()`, then a path-only split of `assetTag` (it returns Markdown and encodes the path, SCAR-001); credit = alias or link text unless it is a size (`300`, `300x200`, a `|300` suffix); a missing image → `Missing asset` and the key left out.
+- **Class search (SCAR-017):** all asset paths: body embeds, web images (US-2.6), TextMapper renders (US-4.7); the new caller uses the same dedupe map.
+- **Guard search (SCAR-023):** US-2.2 dedupe tests; `web-images.test.ts` (US-2.6 AC-2 keeps a body size as alt text: guard in the new file).
+- **Tests:** `tests/integration/entry-assets.test.ts`: 44 tests, 43 red, 1 guard green.
+- **Not measured here (SCAR-024):** how large the image prints (Obsidian2Typst).
+- **Status:** filed
+
+### T-9.3-A (#113) — A repeated entry note becomes a comment
+
+- **Source:** US-9.3 AC-1 to AC-6; amends US-1.3 AC-6 for entry notes
+- **Defect / Why:** an entry note listed in two lists is compiled twice, so the book has the entry twice.
+- **Change:** `compiler.ts` — a set of the resolved paths of entry notes already compiled by a whole-note embed; a later whole-note embed writes `<!-- repeat of "<name>" omitted -->` (`--` written `- -`) and a `Duplicate entry omitted` row. Section embeds and quoted embeds neither count nor are replaced; the circular check runs first.
+- **Class search (SCAR-017):** every whole-note embed path: wiki and Markdown embeds, ToC items, pass-through targets. The "embedded" set of US-1.3 AC-5 is filled only where a note is really embedded (SCAR-038).
+- **Guard search (SCAR-023):** the US-1.3 nested ToC tests (`toc-lists.test.ts`) that rely on a note appearing twice; they stay green, only entry notes are affected.
+- **Tests:** `tests/integration/entry-repeats.test.ts`: 13 tests, 8 red, 5 guards green.
+- **Not measured here (SCAR-024):** that Obsidian2Typst drops the comment (its US-001 AC-15).
+- **Status:** filed
+
+### T-9.4-A (#114) — Report notes that were expected but never compiled
+
+- **Source:** US-9.4 AC-1 to AC-5
+- **Defect / Why:** a note whose tags put it in no generated list drops out of the book without a word.
+- **Change:** `compiler.ts` — option `expectCompiledFolders`: normalise each value (slashes, `\`), refuse `..`, absolute paths and folders not in the vault with `Folder not found in the vault: <value>`; after compiling, one row per `.md` note in those folders (whole segments, case as stored) that no whole-note embed brought in, sorted by path, after all other rows; the starting file, the output folder and `*.excalidraw.md` left out. `entries.ts` — `completionNotice`; `main.ts` shows it.
+- **Class search (SCAR-017):** the warnings file is the only place for the list; the Notice gives only counts.
+- **Guard search (SCAR-023):** the Notice text check in `entry-settings.test.ts` (the wording moves out of `main.ts`).
+- **Tests:** `tests/integration/entry-not-compiled.test.ts`: 15 tests, 14 red, 1 guard green; `tests/unit/entry-settings.test.ts`, "completion Notice": 4 tests.
 - **Not measured here (SCAR-024):** —
-- **Status:** Draft
+- **Status:** filed
+
+### T-9.1-C (#115) — A synthetic entry chapter, and the manual check in Obsidian
+
+- **Source:** Epic 9; SCAR-012, SCAR-029, SCAR-035, SCAR-045
+- **Why:** the epic's output is read by another plugin and by Obsidian's own link index; only a run in Obsidian shows both.
+- **Change:** `tests/fixtures/basic-vault/Entries/` (invented notes: two entries in two lists, one repeat, one note in no list, an image in a property, a size alias, a note link as `illustration`); its section in `index2compile.md`; manual check M21 in a file of its own (`tests/manual/M21-entry-data.md`): settings rows, the output folder ignored with Obsidian's lookup, the compiled book opened in Obsidian with Obsidian2Typst 0.12.0 (the statblock preview), a PDF export of the chapter. Both build versions named.
+- **Class search (SCAR-017):** —
+- **Guard search (SCAR-023):** `fixture-vault.test.ts` and the smoke-book tests pin the compiled fixture; they gain the chapter here.
+- **Tests:** the fixture tests, updated; M21.
+- **Not measured here (SCAR-024):** —
+- **Status:** filed
 
 ---
 
@@ -161,5 +143,8 @@ The **block format** is owned by its reader, Obsidian2Typst (its story "Entry da
 1. Step 0 is done: see `entry-data-scar-review.md` (30 gaps). The drafts' real-data examples were replaced, and so was the example in public #108.
 2. The answers to the step-0 questions are in ("Bestiary G0 Questions" in the private spec repository), and these drafts now follow them.
 3. Measure first: the three spikes above.
-4. Step 1: write Epic 9 (US-9.1 to US-9.4) and the US-5.1 and US-5.2 amendments in `userstories.md`, closing every gap in the review. US-9.1 waits for Obsidian2Typst's `entry-block.md`.
+4. ~~Step 1~~: done 2026-11-07. Epic 9 (US-9.1 to US-9.4) and the amendments to US-0.4, US-1.3 AC-6, US-3.1 (output folder), US-5.1 (AC-F) and US-5.2 are in `userstories.md`. Decided on the way: a map value is written as is, with no warning (Obsidian2Typst warns for the keys it prints); link flattening follows the reader's rule; `ENTRY_*` codes became plain warning messages in this compiler's warnings table.
+6. ~~Step 2~~: done 2026-11-07, seven test files (175 tests, 144 red, 31 guards green; listed in `docs/technical/tests.md`). The options the tests pass: `entryMarkerKeys`, `entryExcludeKeys`, `entryAssetKeys`, `expectCompiledFolders`, `ignoredFolders`; new functions `parseListSetting`, `completionNotice` (`entries.ts`) and `foldersToIgnore` (`output-location.ts`).
+7. ~~Step 3~~: done 2026-11-07. Eight tickets filed as #109 to #116 and listed on #108 in the order of work: #116, #109, #110, #111, #112, #113, #114, #115.
+8. Next: the code, ticket by ticket on `108-entry-data`, starting with #116 (T-5.1-A).
 5. Committed in `3e705c0` on `main`, not pushed: the `scars` submodule, the renumbered references, the publish script (`--exclude .git`) and the first version of these drafts. The 2026-11-05 amendment of this file is committed separately, also not pushed. Run the full gate and a publish dry run before pushing. Commit and push only on the user's go.

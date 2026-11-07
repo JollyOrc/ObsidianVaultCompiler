@@ -50,6 +50,18 @@ into `main.js`. It should avoid external runtime dependencies where possible.
 | Node `path` (via Electron) | Path normalization for asset filenames | Recommended on desktop |
 | Web `URL` / `fetch` | Reserved for external links (left untouched) | No |
 
+### Bundled runtime package (since #110, 2026-11-07)
+
+| Package | Purpose | Licence | How it ships |
+|---|---|---|---|
+| `yaml` 2.9.1, exact (`npm install --save-exact`), YAML 1.2 | Reads a note's frontmatter and writes the `o2t-entry` block in the fixed form `stringify(value, {nullStr: ''})` (US-9.1 AC-6). The block's reader, Obsidian2Typst, uses the same package and version, so writer and reader cannot disagree. | ISC (copyright Eemeli Aro) | Bundled into `main.js`. Its copyright and permission notice is the `banner` of `esbuild.config.mjs`, read from `node_modules/yaml/LICENSE`, so it heads every `main.js`, minified or not (SCAR-036). |
+
+Measured on 2026-11-07 (SCAR-042): the production `main.js` grew from
+60,747 to 162,730 bytes with this package. The ISC licence permits use under
+the plugin's Unlicense as long as the notice travels with the code. The
+notice holds the author's e-mail address; it is inside `main.js`, which is
+not tracked and ships only inside the release zip.
+
 ## 4. TextMapper diagram support (core feature)
 
 ### How maps are drawn (v0.14.0, decided 2026-10-27)

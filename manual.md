@@ -21,6 +21,7 @@ does not look right. You do not need any technical knowledge to follow it.
 11. [Warnings and messages](#11-warnings-and-messages)
 12. [Your notes are safe](#12-your-notes-are-safe)
 13. [Tips and frequently asked questions](#13-tips-and-frequently-asked-questions)
+14. [Entries: creatures, spells and items with data](#14-entries-creatures-spells-and-items-with-data)
 
 ---
 
@@ -307,7 +308,9 @@ own text and headings stay as you wrote them.
 **Step 2 — Remove note properties.** The properties block at the very top of
 each note (the part between two `---` lines, also called "frontmatter", with
 things like `tags:` or `aliases:`) is left out of the document. A `---` line
-anywhere else in a note is a horizontal divider and is kept.
+anywhere else in a note is a horizontal divider and is kept. The one
+exception is an **entry** note: its properties become a data block for the
+typesetter (see [section 14](#14-entries-creatures-spells-and-items-with-data)).
 
 **Step 3 — Remove Obsidian-only blocks.** Blocks that only work inside Obsidian
 are removed:
@@ -315,7 +318,12 @@ are removed:
 - Dataview and DataviewJS queries (`dataview`, `dataviewjs`) — they can't run
   outside Obsidian, so they are left out completely;
 - Meta Bind, Leaflet, Calendarium and compressed-JSON blocks
-  (`meta-bind-embed`, `leaflet`, `calendarium`, `compressed-json`);
+  (`meta-bind-embed`, `leaflet`, `calendarium`, `compressed-json`).
+  This holds for every way of writing the block: between ` ``` ` or `~~~`
+  lines, with four or more backticks, and inside a quote. The language must
+  be exactly one of these words: a block marked `dataviewish` is kept. A
+  block whose closing line is missing is kept and reported, so a missing
+  line never deletes the rest of your note;
 - the hidden markers of the **Dataview Serializer** plugin. The lists that
   Dataview Serializer wrote into your note are **kept**, and if they are lists
   of note links, they are expanded like any other table of contents. This is a
@@ -326,7 +334,8 @@ every embed is replaced by the content of the note (or section) it points to,
 in order. Then the same happens inside *that* note, and so on, as deep as your
 notes go.
 
-- If a note is listed twice in different places, it appears twice.
+- If a note is listed twice in different places, it appears twice — except an
+  entry note, which appears once (see [section 14](#14-entries-creatures-spells-and-items-with-data)).
 - If notes embed each other in a circle (A embeds B, B embeds A), the plugin
   stops the circle and leaves a hidden note
   `<!-- Circular dependency avoided: … -->` instead of looping forever.
@@ -579,6 +588,10 @@ Open **Settings → Obsidian Vault Compiler**.
 | **Map font** | Font for text on compiled maps, e.g. `Georgia, serif`. Leave empty to use the same font Obsidian shows your notes in. | empty |
 | **Tidy map labels** | On: compiled maps have no hex numbers and their names are centred and wrapped. | On |
 | **Normalise headings** | On: all headings are re-levelled so they nest correctly (see [section 8](#8-headings)). Off: simple levels from file-name numbers. | Off |
+| **Entry marker keys** | Property names, separated by commas. A note with one of them becomes an entry: its properties go into the document as a data block (see [section 14](#14-entries-creatures-spells-and-items-with-data)). Empty: no entries. | empty |
+| **Entry exclude keys** | Properties never written into an entry's data block. | `aliases, cssclasses, publish` |
+| **Entry image keys** | Entry properties that name a picture, which is copied like an embedded one. | `illustration` |
+| **Expect compiled folders** | Folders, separated by commas. Every note in them (and in their subfolders) that doesn't end up in the document is listed in the warnings file. Empty: no list. | empty |
 
 ### Output folder rules
 
@@ -598,6 +611,14 @@ start, nothing is written, and a message explains why:
 | The same path as the starting note | it would overwrite your starting note | Choose a different name or folder |
 
 A folder **inside** the vault that doesn't exist yet is created for you.
+
+**The output folder is never read.** Files in the output folder (and its
+subfolders) are left out when the plugin looks for linked notes and pictures:
+they are earlier results, not sources. So a picture copied to
+`Exports/assets/` by an earlier run is never mistaken for the original, and
+never makes a picture name ambiguous. This holds for the folder in the
+settings and for a folder you type for one run. When the output folder is
+the top level of your vault (empty), nothing is left out.
 
 ---
 
@@ -642,13 +663,19 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | **TextMapper …** | A map couldn't be drawn. | See [section 9](#9-hex-maps-text-mapper). |
 | **Code block not closed; closed at the end of the note** | A note opens a code block (` ``` `) and never closes it. | Add the closing ` ``` ` line in the note. |
 | **Map directive "…" is unknown and was ignored** | A word in a `# vault-compiler:` line is misspelt. | Use `no-outlines` or `no-glow` (see [section 9](#9-hex-maps-text-mapper)). |
+| **Duplicate entry omitted** | An entry note is listed a second time; the second place holds a hidden note instead. | Usually fine; remove the second listing if you don't want the warning. |
+| **Not compiled** (also *section embed only*, *quoted only*) | A note in an *Expect compiled folders* folder isn't in the document as a whole note. | List or embed it, or check the tags that should bring it into a list. |
+| **Folder not found in the vault: …** | A folder in *Expect compiled folders* doesn't exist (names are case-sensitive). | Check the spelling, and use `/` between folders. |
+| **Entry image is not a local image (…)** | An entry's picture property holds a list, a web address, a note or a file that isn't a picture. | Write one picture link, e.g. `[[picture.png\|Credit]]`. |
+| **Entry keys differ only in case: … / …** | An entry note has two properties such as `Might` and `might`. | Keep one of them; the first one is used. |
+| **Frontmatter is not valid YAML** | A note's properties block can't be read, so it can't be an entry. | Open the note's properties in source mode and fix the line named. |
 
 ### Messages in the corner of the screen
 
 | Message | Meaning |
 |---|---|
 | *Vault compilation started.* | The run has begun. |
-| *Compilation complete: …* | Finished successfully, with a short summary. |
+| *Compilation complete: …* | Finished successfully, with a short summary. When entries were left out as repeats or expected notes were missing, it adds how many, e.g. *1 duplicate entry omitted, 2 notes not compiled: see warnings_….md.* |
 | *Starting file not found.* | The starting note in the settings doesn't exist. Check the path. |
 | *Compilation not started: …* | The output folder or file name was refused; the message says why (see [section 10](#output-folder-rules)). |
 | *Compilation cancelled.* | You chose not to overwrite an existing document. |
@@ -721,3 +748,92 @@ Yes. The only limit is that the document must be saved inside the vault.
 **Can I compile into a folder that's synced (Dropbox, iCloud, OneDrive)?**
 Yes, in the desktop app. Pick the folder with **Browse**. The folder must
 already exist.
+
+---
+
+## 14. Entries: creatures, spells and items with data
+
+Some books describe many things of one kind — creatures, spells, items — each
+with numbers: a creature's strength, its attacks, its picture. You keep these
+numbers as the note's **properties**, and the typesetting plugin
+**Obsidian2Typst** (0.12.0 or later) prints them as a statblock. This plugin
+carries the properties into the document for it.
+
+### Turning it on
+
+In the settings, put the property names that mark an entry into **Entry
+marker keys**, e.g. `vigour, attacks, illustration, layout`. A note that has
+at least one of them is an entry. With the setting empty (the default),
+nothing changes: all properties are left out, as before.
+
+### What an entry looks like in the document
+
+A note `Fen Hare.md` with these properties:
+
+```yaml
+vigour: 11
+might: 4
+attacks:
+  - "Kick: 2d6"
+skills:
+  - "[[Quick Step]]"
+tags:
+  - beast
+illustration: "[[hare.png|Drawn by A. Nobody]]"
+aliases:
+  - Hare
+```
+
+becomes, right under its heading:
+
+````markdown
+### Fen Hare
+```o2t-entry
+vigour: 11
+might: 4
+attacks:
+  - "Kick: 2d6"
+skills:
+  - Quick Step
+tags:
+  - beast
+illustration: "![Drawn by A. Nobody](assets/hare.png)"
+```
+Fen hares are quick and shy. …
+````
+
+- **Every property is kept**, `tags` included, except those in **Entry exclude
+  keys** (`aliases` above). Names are written in lower case, in your order.
+- **Links become plain text** (`[[Quick Step]]` → `Quick Step`): the
+  statblock never has links. Bold and italic stay.
+- **The picture** named in an **Entry image key** (`illustration`) is copied
+  into `assets/` like an embedded picture, and its credit is kept. Write it
+  as `[[picture.png|Credit]]`: Obsidian then updates the property when you
+  rename or move the picture. Other forms (`![[…]]`, `![Credit](path)`, a
+  plain path) work too, but Obsidian doesn't update them. A number such as
+  `|300` is a size, never a credit.
+- Only notes brought in **whole** (listed or embedded) get the block; a
+  section embed (`![[Fen Hare#Signs]]`), a quote and the starting note
+  don't.
+- Turn **Normalise headings** on (or give the entry notes headings deeper
+  than their chapter), so the entries sit inside their chapter's heading.
+
+In Obsidian, the block shows as a statblock when Obsidian2Typst is installed,
+and as a code block otherwise.
+
+### Each entry once
+
+When two lists bring in the same entry note (a creature tagged into two
+groups), it appears only the first time. The second place holds a hidden
+note, `<!-- repeat of "Fen Hare" omitted -->`, and the warnings file lists
+*Duplicate entry omitted*. Notes that aren't entries still appear as often
+as they are listed.
+
+### Notes that never made it into the book
+
+Put the folders that hold your entries into **Expect compiled folders**, e.g.
+`Notes/Creatures`. After each compilation, every note in them that isn't
+in the document as a whole note is listed in the warnings file — *Not
+compiled*, or *Not compiled (section embed only)* / *(quoted only)* when it
+appears only that way. The message in the corner says how many.
+
