@@ -46,6 +46,7 @@ interface VaultCompilerSettings {
   entryExcludeKeys: string;
   entryAssetKeys: string;
   expectCompiledFolders: string;
+  detailMarkerKeys: string;
 }
 
 /**
@@ -73,6 +74,7 @@ const DEFAULT_SETTINGS: VaultCompilerSettings = {
   entryExcludeKeys: 'aliases, cssclasses, publish',
   entryAssetKeys: 'illustration',
   expectCompiledFolders: '',
+  detailMarkerKeys: '',
 };
 
 export default class VaultCompilerPlugin extends Plugin {
@@ -237,6 +239,7 @@ export default class VaultCompilerPlugin extends Plugin {
         entryExcludeKeys: parseListSetting(this.settings.entryExcludeKeys, { lowerCase: true }),
         entryAssetKeys: parseListSetting(this.settings.entryAssetKeys, { lowerCase: true }),
         expectCompiledFolders: parseListSetting(this.settings.expectCompiledFolders, { lowerCase: false }),
+        detailMarkerKeys: parseListSetting(this.settings.detailMarkerKeys, { lowerCase: true }),
       });
 
       const result = compiler.compile(run.startingFile);
@@ -626,7 +629,7 @@ class VaultCompilerSettingTab extends PluginSettingTab {
       );
 
     // Epic 9 (#108): entry data from note properties.
-    const listSetting = (name: string, desc: string, key: 'entryMarkerKeys' | 'entryExcludeKeys' | 'entryAssetKeys' | 'expectCompiledFolders') =>
+    const listSetting = (name: string, desc: string, key: 'entryMarkerKeys' | 'entryExcludeKeys' | 'entryAssetKeys' | 'expectCompiledFolders' | 'detailMarkerKeys') =>
       new Setting(containerEl)
         .setName(name)
         .setDesc(desc)
@@ -643,5 +646,7 @@ class VaultCompilerSettingTab extends PluginSettingTab {
     listSetting('Entry exclude keys', 'Properties never written into an entry block (comma-separated).', 'entryExcludeKeys');
     listSetting('Entry image keys', 'Entry properties that name an image to copy (comma-separated).', 'entryAssetKeys');
     listSetting('Expect compiled folders', 'Notes in these folders that are never compiled are listed in the warnings file (comma-separated). Empty: off.', 'expectCompiledFolders');
+    // US-9.5 (#118): detail data from note properties.
+    listSetting('Detail marker keys', 'A note with one of these properties (comma-separated) gets a details block with only these properties, in this order. Empty: off.', 'detailMarkerKeys');
   }
 }

@@ -22,7 +22,8 @@ import {
 } from './utils.ts';
 import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
-import { entryBlock, imageLink } from './entries.ts';
+import { detailBlockText, detailPlan, entryBlock, flattenLinks, headingForm, imageLink } from './entries.ts';
+import type { DetailItem } from './entries.ts';
 import type { Heading } from './anchors.ts';
 
 /**
@@ -50,6 +51,8 @@ interface LinkPlace {
   headingLines: boolean;
   offset: number;
   source: string;
+  /** US-9.5 | AC-8, AC-13: the place to report, where the text has no marker (a detail value: the key's line). */
+  location?: { file: string; line: number };
 }
 
 /**
@@ -213,6 +216,12 @@ export interface CompilerOptions {
   entryExcludeKeys?: string[];
   /** US-9.2: keys whose value is an image (lower case); absent → `['illustration']`. Used by #112. */
   entryAssetKeys?: string[];
+  /**
+   * US-9.5 | AC-1, AC-2, AC-4: keys that make a note a detail note and are the
+   * only ones its `o2t-details` block holds, in this order (lower case);
+   * absent or `[]` → off.
+   */
+  detailMarkerKeys?: string[];
   /** US-9.4: folders whose notes must be compiled, as typed; absent or `[]` → off. Used by #114. */
   expectCompiledFolders?: string[];
 }
@@ -225,6 +234,12 @@ export const ENTRY_EXCLUDE_DEFAULT = ['aliases', 'cssclasses', 'publish'];
 
 /** Epic 9 | Settings: the default of `entryAssetKeys`. */
 export const ENTRY_ASSET_DEFAULT = ['illustration'];
+
+/** US-9.5 | AC-8: a detail block waiting for the link step: its note and its values. */
+interface PendingDetails {
+  path: string;
+  items: DetailItem[];
+}
 
 /**
  * US-9.1 | AC-3, AC-11: the line that holds an entry block's place while the
@@ -636,8 +651,12 @@ export class InMemoryVaultCompiler {
     return splitFrontmatter(this.files.get(path)!);
   }
 
-  /** US-9.1 | AC-3: the entry blocks of this compile, by placeholder number. */
-  private entryBlocks: string[] = [];
+  /**
+   * US-9.1 | AC-3: the blocks of this compile, by placeholder number. A
+   * detail block (US-9.5) is a `PendingDetails` until the link step has
+   * converted the links of its values (AC-8); then it is its text.
+   */
+  private entryBlocks: Array<string | PendingDetails> = [];
 
   /** US-9.4 | AC-3: the starting file, and the notes seen whole, as a section or quoted. */
   private root = '';
@@ -732,10 +751,31 @@ export class InMemoryVaultCompiler {
   }
 
   /**
+   * US-9.5 | AC-2 to AC-6, AC-9, AC-10, AC-13: the `o2t-details` block of a
+   * note brought in by a whole-note embed whose entry rules gave no block, or
+   * null; its warnings name the note and the key's line. A note that has
+   * entry keys is never a detail note: `entryWritten` is true then, and the
+   * only thing reported is that the note has detail keys too (AC-9).
+   */
+  private detailsOf(path: string, yaml: string | null, entryWritten: boolean): PendingDetails | null {
+    const keys = this.options.detailMarkerKeys ?? [];
+    if (yaml === null || keys.length === 0) return null;
+    const plan = detailPlan(yaml, { keys, reportInvalid: (this.options.entryMarkerKeys ?? []).length === 0 });
+    if (entryWritten) {
+      if (plan.first !== null) {
+        this.reportOnce('Entry keys and detail keys in one note: only the entry block is written', plan.first.key, path, plan.first.line);
+      }
+      return null;
+    }
+    for (const warning of plan.warnings) this.reportOnce(warning.message, warning.link, path, warning.line);
+    return plan.items === null ? null : { path, items: plan.items };
+  }
+
+  /**
    * US-9.1 | AC-3: puts the placeholder of `block` on the line after the
    * note's title heading — the first non-empty line in every title path.
    */
-  private placeEntryBlock(content: string, block: string): string {
+  private placeEntryBlock(content: string, block: string | PendingDetails): string {
     const lines = content.split('\n');
     const title = lines.findIndex(line => line.trim() !== '');
     if (title === -1) return content;
@@ -751,7 +791,7 @@ export class InMemoryVaultCompiler {
    */
   private insertEntryBlocks(content: string): string {
     if (this.entryBlocks.length === 0) return content;
-    return content.replace(ENTRY_PLACEHOLDER, (_m, index: string) => `${this.entryBlocks[Number(index)]}\n`);
+    return content.replace(ENTRY_PLACEHOLDER, (_m, index: string) => `${this.entryBlocks[Number(index)] as string}\n`);
   }
 
   private isMarkdownPath(path: string): boolean {
@@ -1119,6 +1159,9 @@ export class InMemoryVaultCompiler {
         content = this.placeEntryBlock(content, block);
         this.compiledEntries.add(path);
       }
+      // US-9.5 | AC-2, AC-9: a detail block only where no entry block was written.
+      const details = this.detailsOf(path, note.yaml, block !== null);
+      if (details !== null) content = this.placeEntryBlock(content, details);
     }
 
     if (unclosed !== null) {
@@ -1932,7 +1975,80 @@ export class InMemoryVaultCompiler {
     // before any link in a heading is converted (`## See [[Pools]]`).
     const sourceTexts = this.outlineOf(content).headings.map(h => h.text);
     const headingsDone = this.convertLinkPhase(content, true, sourceTexts);
-    return this.convertLinkPhase(headingsDone, false, sourceTexts);
+    const done = this.convertLinkPhase(headingsDone, false, sourceTexts);
+    this.finishDetails(done, sourceTexts);
+    return done;
+  }
+
+  /**
+   * US-9.5 | AC-8, AC-13: turns each pending detail block into its text; the
+   * placeholder stays where it is. The links of its string values are
+   * converted at the placeholder's place,
+   * when every heading's final text is known, by the body rules; a link that
+   * becomes an in-book link is written in Obsidian's heading form; one that
+   * gets no target keeps its text (the warning stays). Warnings name the
+   * note and the key's line.
+   */
+  private finishDetails(content: string, sourceTexts: string[]): void {
+    if (!this.entryBlocks.some(block => typeof block !== 'string')) return;
+    const doc = this.outlineOf(content);
+    for (const found of content.matchAll(/^<!-- __ventry__:(\d+) -->$/gm)) {
+      const index = Number(found[1]);
+      const block = this.entryBlocks[index];
+      if (typeof block === 'string') continue;
+      const items = block.items.map(item => {
+        if (typeof item.value !== 'string') return item;
+        const at: LinkPlace = {
+          doc, sourceTexts, headingLines: false, offset: found.index, source: content,
+          location: { file: block.path, line: item.line },
+        };
+        return { ...item, value: this.reportDetailLinksOnce(() => this.convertDetailValue(item.value as string, at)) };
+      });
+      this.entryBlocks[index] = detailBlockText(items);
+    }
+  }
+
+  /**
+   * US-9.5 | AC-8, AC-13: runs `convert` and keeps only the warnings it adds
+   * that were not reported before for the same message, note and line — a
+   * note embedded twice has two blocks and one problem (US-1.4 AC-6 rule, as
+   * `reportOnce`).
+   */
+  private reportDetailLinksOnce<T>(convert: () => T): T {
+    const startWarnings = this.warnings.length;
+    const startDetails = this.warningDetails.length;
+    const result = convert();
+    const added = this.warningDetails.splice(startDetails);
+    const addedText = this.warnings.splice(startWarnings);
+    added.forEach((detail, i) => {
+      const key = `${detail.message}\u0000${detail.file}\u0000${detail.line}`;
+      if (this.reported.has(key)) return;
+      this.reported.add(key);
+      this.warningDetails.push(detail);
+      if (addedText[i] !== undefined) this.warnings.push(addedText[i]);
+    });
+    return result;
+  }
+
+  /**
+   * US-9.5 | AC-8: the links of one detail value, converted as in body text
+   * and written in the heading form `[[#anchor|text]]` (`headingForm`); a
+   * result that is a warning comment becomes the link's own text
+   * (`flattenLinks`); an external link, an asset link and an embed (not read
+   * by `LINK`) stay as converted.
+   */
+  private convertDetailValue(text: string, at: LinkPlace): string {
+    return text.replace(LINK, (m, rawLink?: string, display?: string, label?: string, rawPath?: string) => {
+      const converted = rawLink !== undefined
+        ? this.convertWikiLink(rawLink, display, at)
+        : this.convertMarkdownLink(m, label ?? '', rawPath ?? '', at);
+      return converted.startsWith('<!--') ? flattenLinks(m) : headingForm(converted);
+    });
+  }
+
+  /** US-8.4 | AC-5; US-9.5 | AC-13: the note and line a link of this place is reported at. */
+  private locate(at: LinkPlace): { file: string; line: number } {
+    return at.location ?? this.findSourceLocation(at.source, at.offset);
   }
 
   /**
@@ -1967,14 +2083,14 @@ export class InMemoryVaultCompiler {
     }
     const resolved = this.resolve(raw, '');
     if (resolved.missing) {
-      const loc = this.findSourceLocation(at.source, at.offset);
+      const loc = this.locate(at);
       const message = `Missing wiki link`;
       this.stats.missingReferences += 1;
       this.report(message, raw, loc.file, loc.line);
       return `<!-- Warning: ${message} -->`;
     }
     if (resolved.ambiguity !== null) {
-      const loc = this.findSourceLocation(at.source, at.offset);
+      const loc = this.locate(at);
       this.report(resolved.ambiguity, raw, loc.file, loc.line);
     }
     if (!this.isMarkdownPath(resolved.path)) {
@@ -1983,7 +2099,7 @@ export class InMemoryVaultCompiler {
     // US-8.3: if the target file exists in the vault but was never embedded in
     // the compiled output, replace with a warning comment instead of a broken anchor.
     if (!this.headingMap.has(resolved.path)) {
-      const loc = this.findSourceLocation(at.source, at.offset);
+      const loc = this.locate(at);
       const message = `link target '${raw}' not embedded in compiled output`;
       this.warnings.push(`Warning: ${message}`);
       this.warningDetails.push({ message, link: raw, file: loc.file, line: loc.line });
@@ -2011,7 +2127,7 @@ export class InMemoryVaultCompiler {
     const resolved = this.resolve(rawPath, '');
     if (resolved.missing) {
       if (this.isMarkdownPath(rawPath)) {
-        const loc = this.findSourceLocation(at.source, at.offset);
+        const loc = this.locate(at);
         const message = `Missing markdown link`;
         this.stats.missingReferences += 1;
         this.report(message, rawPath, loc.file, loc.line);
@@ -2027,14 +2143,14 @@ export class InMemoryVaultCompiler {
       if (asset) {
         return `[${text || this.basename(resolved.path)}](${asset})`;
       }
-      const loc = this.findSourceLocation(at.source, at.offset);
+      const loc = this.locate(at);
       const message = `Missing asset link`;
       this.stats.missingReferences += 1;
       this.report(message, rawPath, loc.file, loc.line);
       return `<!-- Warning: ${message} -->`;
     }
     if (resolved.ambiguity !== null) {
-      const loc = this.findSourceLocation(at.source, at.offset);
+      const loc = this.locate(at);
       this.report(resolved.ambiguity, rawPath, loc.file, loc.line);
     }
     if (this.isMarkdownPath(resolved.path)) {
@@ -2068,7 +2184,7 @@ export class InMemoryVaultCompiler {
    * link's note is not known (the caller keeps its own handling).
    */
   private sameNoteLink(headingPart: string, label: string | null, raw: string, asWritten: string | null, at: LinkPlace): string | null {
-    const file = this.findSourceLocation(at.source, at.offset).file;
+    const file = this.locate(at).file;
     if (!this.files.has(file)) return null;
     const region = at.doc.regionAt(at.offset, file);
     return this.headingLink(file, headingPart, label, raw, at, { region, asWritten });
@@ -2094,7 +2210,7 @@ export class InMemoryVaultCompiler {
     const parts = headingPart.split('#').filter(part => part.trim() !== '');
     const source = this.sourceHeadings(path);
     const index = new Outline(source).find(parts.map(linkKey));
-    const loc = () => this.findSourceLocation(at.source, at.offset);
+    const loc = () => this.locate(at);
     if (index === -1) {
       const where = loc();
       this.report(`Missing heading anchor: ${raw}`, raw, where.file, where.line);
@@ -2142,7 +2258,7 @@ export class InMemoryVaultCompiler {
     const outline = new Outline(at.doc.headings.map((h, i) => ({ level: h.level, text: texts[i] })));
     const { anchor, duplicates } = outline.anchorFor(index);
     if (duplicates > 0) {
-      const where = this.findSourceLocation(at.source, at.offset);
+      const where = this.locate(at);
       this.report(
         `Heading "${texts[index]}" occurs ${duplicates} times and no heading path tells them apart; the link goes to the first`,
         raw, where.file, where.line,

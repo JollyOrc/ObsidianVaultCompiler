@@ -94,6 +94,27 @@ the restore is wrong, every later mutant tests something else, and the report
   the overwrite was seen from the tool's "updated" message, the file restored
   from git and proven equal to the commit, and the new tests moved to
   `code-as-written.test.ts` before anything was committed.
+- A script that runs an outward step in a loop (closing issues with a
+  comment, posting, uploading, publishing) first builds every input it will
+  send, checks each one (the file exists, is not empty, holds the value it
+  should), and only then makes the first outward call; the outward command
+  itself does not stop on an empty input. Word splitting differs between
+  shells (zsh does not split an unquoted variable, bash does), so a loop
+  over pairs uses an explicit separator or an array, never `set -- $x`.
+  Example (2026-11-09, Obsidian2Typst release 0.13.0): a loop meant to write
+  six comment files and close six issues with them wrote the files under
+  wrong names in zsh; `gh issue close --comment "$(cat missing-file)"` then
+  closed all six with an empty comment. The comments were added afterwards
+  from corrected files, checked first.
+- A scripted edit that places text by a slice (from one phrase to another)
+  asserts the match count of both ends and that the slice is not empty, not
+  only the count of the text it replaces; and a file that no git history
+  protects (a state file, a ledger) is copied away before the edit. Example
+  (2026-11-09, Obsidian2Typst #152): a script found its end phrase in an
+  earlier entry too, the slice was empty, and `replace('', text)` put the
+  text between every character of the ledger (648 MB). The size check of the
+  next gate found it; the file was rebuilt by removing every copy of the
+  inserted text, which was possible only because that text was known.
 - Applies next to: every mutation run, every scripted refactor, probe setups
   that write into the project, install scripts, manual-check fixtures,
   commits and publishes after a manual check, new files written by a tool.

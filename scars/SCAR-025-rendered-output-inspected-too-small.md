@@ -34,5 +34,20 @@ parts without looking at how they meet.
 - When a visual defect is found, a check by program that tells the defect
   from the fix is added where one exists (here: the number of shading
   objects, opaque against blending strips).
+- A layout drawn into a container whose width varies (a pane, a window, a
+  column) is checked at several widths, from the widest it reaches down to
+  the narrowest it is meant to work at, and its edges are compared by
+  program (each part's outer edge against its frame's inner edge), not only
+  judged by eye at the one width at hand: an overrun a fraction of a box
+  wide looks like part of the frame line. The narrowest width at which the
+  layout still holds is measured and stated. Example (2026-11-08,
+  Obsidian2Typst US-035, #138): the on-screen statblock passed its manual
+  check, looked at in one pane; a full row of tick boxes ended 0.7 em past
+  the frame at every width (grid columns `1fr`, whose minimum is the
+  content, plus margins between the groups of boxes). A browser harness
+  measured the edges at page widths of 100 to 900 px: 11.4 px past the
+  content edge before the fix; at the edge from 190 px up after it
+  (`minmax(0, 1fr)` columns, gap columns instead of margins).
 - Applies next to: backgrounds, frames and ornaments, cover pages, image
-  crops, the preview's canvas.
+  crops, the preview's canvas, on-screen views drawn into panes of any
+  width.

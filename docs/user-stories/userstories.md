@@ -1501,7 +1501,9 @@ compiled rulebook with either toggle value, adding 186 `---` lines.
 **Decision (user, 2026-10-27, measured before it was offered, SCAR-020):** all
 frontmatter is dropped; no field (not even `tags`) is carried into the output.
 *Amended 2026-11-07:* an **entry note** (US-9.1) keeps its properties,
-`tags` included, as an `o2t-entry` block under its title. Every other note is
+`tags` included, as an `o2t-entry` block under its title. *Amended 2026-11-09:*
+a **detail note** (US-9.5) keeps the properties named in `detailMarkerKeys`, and
+only those, as an `o2t-details` block. Every other note is
 unchanged, and the frontmatter text itself is never output.
 Two other options were measured and declined: a `#LeafCraft #LifeMagic` tag line
 under the title, and an italic `*Tags: LeafCraft, LifeMagic*` line.
@@ -2349,6 +2351,8 @@ with a statblock and an illustration. Their data lives in the note's
 properties, which US-5.2 removes. This epic keeps the properties of such notes
 as a data block for the typesetter, copies the images named in them, lists
 each entry once and reports entry notes that never reached the book.
+US-9.5 (2026-11-09) adds a second, smaller block, `o2t-details`, for notes
+that only keep a few facts.
 
 **The block's reader owns its format (SCAR-040).** The `o2t-entry` block is
 specified by its reader, Obsidian2Typst:
@@ -2383,6 +2387,7 @@ items dropped; key lists are compared without case.
 | `entryExcludeKeys` | `aliases, cssclasses, publish` | US-9.1 |
 | `entryAssetKeys` | `illustration` | US-9.2 |
 | `expectCompiledFolders` | *(empty: off)* | US-9.4 |
+| `detailMarkerKeys` | *(empty: off)* | US-9.5 |
 
 Examples (SCAR-019): `entryMarkerKeys` `""` → off; `might` → one key;
 ` Might , attacks,,` → `might`, `attacks`. `entryExcludeKeys` `""` → nothing
@@ -2401,6 +2406,10 @@ anything about entries.
    `basic-vault`, the smoke book and every existing test is byte-identical to
    v0.21.0.
 2. `entryMarkerKeys` set, but no note has any of its keys → the same.
+3. *(2026-11-09, US-9.5)* `detailMarkerKeys` empty → the compiled text of
+   `basic-vault`, the smoke book and every existing test is byte-identical to
+   v0.22.0.
+4. `detailMarkerKeys` set, but no note has any of its keys → the same.
 
 **Not measured here (SCAR-024):** how Obsidian2Typst lays the entries out
 (its US-030 to US-036).
@@ -2504,7 +2513,8 @@ anything about entries.
   | `"[x](https://example.com)"` | `x` |
   | `"**Bite** [[Teeth]]: 1d6"` | `"**Bite** Teeth: 1d6"` |
 
-  An asset key (US-9.2) is not flattened.
+  An asset key (US-9.2) is not flattened. The `o2t-details` block of US-9.5
+  is exempt: it keeps links as in-book links (US-9.5 AC-8).
 - **AC-9 Frontmatter that isn't valid YAML.** With `entryMarkerKeys` set, a
   note whose frontmatter does not parse gets no block, its frontmatter is
   removed as in US-5.2, and the warnings file gets
@@ -2653,3 +2663,192 @@ book
   `Compilation complete: 12 files, 3 assets, 0 deduplicated. 1 duplicate
   entry omitted, 2 notes not compiled: see warnings_20261107_1530.md.`
   A count of zero is not shown; with both zero the Notice is unchanged.
+
+### US-9.5 Keep a note's detail properties as an `o2t-details` block
+*(Written 2026-11-09 for [#118](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/118);
+step-0 review: `development/drafts/detail-data-scar-review.md`; decisions
+taken 2026-11-09. Reader: Obsidian2Typst 0.14.0.)*
+
+**As a** book author
+**I want** a few facts of a note (a duration, a kind, a requirement, a flag)
+carried into the compiled file as data
+**So that** the typesetter can print them as one row under the note's heading,
+without the note becoming an entry.
+
+**The block's reader owns its format (SCAR-040).** The `o2t-details` block is
+specified by its reader, Obsidian2Typst:
+[`docs/technical/details-block.md`](https://github.com/JollyOrc/Obsidian2Typst/blob/main/docs/technical/details-block.md)
+(release 0.14.0). This story says what this compiler writes and does not
+restate the reader's rules. Readers of the compiled file: Obsidian2Typst (PDF
+and its preview in Obsidian) and Obsidian itself, which shows the block as that
+preview when Obsidian2Typst is installed and as a code block otherwise.
+
+**Why not `o2t-entry`.** Measured with v0.22.0 (`InMemoryVaultCompiler`,
+synthetic notes, `entryMarkerKeys` = the four keys of the example below): the
+entry block holds **every** property, `tags` included, and flattens a link
+(`[[Quick Step]]` → `Quick Step`); the reader treats the note as an entry (a
+page of its own, or `ENTRY_OUTSIDE_CHAPTER`). In the body, a link in a table
+cell reaches the book as an in-book link, `[Quick Step](#Quick%20Step)`.
+
+**Setting** (text field, comma-separated; read when a compile starts; written
+through `settingsSaver`, US-7.1 AC-S1; items trimmed, empty items dropped, keys
+compared without case): `detailMarkerKeys`, default *(empty: off)*. It does two
+things: **a note with at least one of these top-level keys is a detail note**,
+and **only these keys are written, in this order**.
+
+Examples (SCAR-019): `""` → off; `pace` → one key; ` Pace , kind,,` → `pace`,
+`kind`; `kind, pace` → `kind` is written before `pace` whatever the note's
+order; `pace, Pace` → `pace` once.
+
+**Measured for the view line.** A `dataviewjs` fence holding
+`dv.view("Templates/views/craft-details")` is removed by US-5.1 (all fence
+forms, #116) without leaving a blank line, with the note's title directly
+followed by the next body line or, with US-9.1 or this story on, by the block
+(`# R` / fence / `Text.` → `## R` / `Text.`; a note that is only the fence →
+the title alone; a block followed by nothing but the next note's heading is
+followed by it directly, as US-9.1 AC-3 says: the empty lines after a block go).
+Nothing new is specified for it: AC-11 pins it. The same
+text in single backticks is inline code (US-1.4) and stays.
+
+**Definitions.** *Whole-note embed* and *the note's title heading*: as in the
+Epic 9 introduction. A **detail note** is a note brought in by a whole-note
+embed that has at least one top-level key of `detailMarkerKeys` and no key of
+`entryMarkerKeys`.
+
+**Acceptance criteria**
+
+- **AC-1 Off by default.** `detailMarkerKeys` empty → no `o2t-details` block
+  and the compiled text of every existing test, `basic-vault` and the smoke book
+  is byte-identical to v0.22.0 (invariant 3). Keys set but no note has any of
+  them → the same (invariant 4).
+- **AC-2 Which notes.** `detailMarkerKeys: pace, kind`; `Reed Weaving.md` =
+  `---` / `pace: Brisk` / `---` / `You weave reeds.`
+
+  | Root holds | Block? |
+  |---|---|
+  | `![[Reed Weaving]]` | yes |
+  | `![x](Reed%20Weaving.md)` | yes |
+  | `- [[Reed Weaving]]` (ToC list) | yes |
+  | `![[W]]`, `W.md` = `![[Reed Weaving]]` (pass-through) | yes, under `Reed Weaving`'s heading; none for `W` |
+  | `![[Reed Weaving#Knots]]` | no |
+  | `> ![[Reed Weaving]]`, `> [!note]` / `> ![[Reed Weaving]]` | no |
+  | `Reed Weaving.md` is the starting file | no |
+  | a note with `stats:` / `  pace: Brisk` (nested key) | no |
+  | a note with `# pace: Brisk` (YAML comment) / `tags: [a]` / `other: 1` | no |
+  | a note with `text: \|` / `  pace: Brisk` (inside a multi-line string) | no |
+  | a note with `pace:` (empty) | yes: `pace:` |
+  | a note embedded twice | a block each time (no repeat rule: that is US-9.3 for entries only) |
+
+  A note without a block has its frontmatter removed as in US-5.2.
+- **AC-3 Place: directly under the note's title heading**, with no blank line
+  between, in every title path, before the note's first body line, exactly as
+  US-9.1 AC-3 (the same placement code serves both blocks; SCAR-034: heading
+  first, preamble and pass-through classification read the note without the
+  block). Examples with `Reed Weaving.md` = `---` / `pace: Brisk` / `---` /
+  *body*: root `# Book` / `## Crafts` / `![[Reed Weaving]]`, body `You weave
+  reeds.`: on → `### Reed Weaving` / ```` ```o2t-details ```` / `pace: Brisk` /
+  ```` ``` ```` / `You weave reeds.`; off → `## Reed Weaving` / `You weave
+  reeds.`. Heading-first body `# Reed Weaving` / `Text.` / `## Knots` /
+  `Tight.`: on → `### Reed Weaving`, the block, `Text.`, `#### Knots`. A body
+  that starts with a list, table, fence, indented code line, quote, callout or
+  a `dataviewjs` block (removed): the block is followed by that line,
+  unchanged (SCAR-009). With this story on, the block follows the title also
+  when the first body line is the `dataviewjs` view line (AC-11).
+- **AC-4 Content: the listed keys only.** Exactly the keys of
+  `detailMarkerKeys` that the note has set, **in the setting's order**, keys in
+  lower case; every other property is left out, `tags` too unless listed. A
+  listed key the note does not have is left out. Example: setting
+  `kind, pace`; note `pace: Brisk` / `kind: craft` / `tags: [x]` / `other: 1`
+  → `kind: craft` / `pace: Brisk`. Two keys of one note that differ only in
+  case: the first is written and the warnings file gets `Detail keys differ
+  only in case: Pace / pace` (second key as the link, its line). *(Only YAML
+  typed in source mode can do this.)*
+- **AC-5 Values: text, number, flag, empty.** Text and numbers as they are; a
+  Checkbox property as `true` or `false` (written as it is); an empty property
+  as `key:`. **A list or a map is left out** (the reader would drop it with
+  `DETAIL_VALUE_NOT_TEXT`) and the warnings file gets `Detail value is not
+  text: <key>` with the key as the link, the note and the key's line. When
+  nothing is left to write, the note gets no block (the warning stays).
+  Example: `pace: Brisk` / `needs:` / `  - A` / `  - B` → block `pace: Brisk`
+  and one warning for `needs`. Obsidian writes `tags` as a list, so listing
+  `tags` in the setting gives only that warning; a `tags` value that is one
+  text is written.
+- **AC-6 Fixed YAML form.** As US-9.1 AC-6: `yaml` 2.9.1
+  `stringify(value, {nullStr: ''})`, one key per line:
+
+  | In the note | In the block |
+  |---|---|
+  | `pace: Brisk` | `pace: Brisk` |
+  | `cost: 3` | `cost: 3` |
+  | `cost: "3"` | `cost: "3"` |
+  | `starter: true` | `starter: true` |
+  | `starter: false` | `starter: false` |
+  | `pace:` | `pace:` |
+  | `motto: "Run first: ask later"` | `motto: "Run first: ask later"` |
+  | `note: Bite #fire` (quoted in the note) | `note: "Bite #fire"` |
+  | `when: 2026-11-07` | `when: 2026-11-07` |
+
+- **AC-7 Fence.** Backticks, one more than the longest backtick run in the
+  block, at least three: a value holding ```` ``` ```` → four.
+- **AC-8 Links stay links (G0 answer 4a; exempt from US-9.1 AC-8).** A link
+  in a value is converted to the same in-book link as in body text (US-2.3,
+  same targets, same warnings), written in Obsidian's heading form, which the
+  reader prints as a link: `[[#<heading anchor>|<text>]]`. The text is the
+  link's alias or text, else the one body text shows. Measured with v0.22.0, a
+  body link `[[Basket Knots]]` gives `[Basket Knots](#Basket%20Knots)`, the
+  form this rule converts. `Basket Knots.md` has a section `## Tight` and is
+  in the book:
+
+  | Value | Written |
+  |---|---|
+  | `"[[Basket Knots]]"` | `"[[#Basket Knots\|Basket Knots]]"` |
+  | `"[[Basket Knots\|Knots]]"` | `"[[#Basket Knots\|Knots]]"` |
+  | `"[[Basket Knots#Tight]]"` | `"[[#Tight\|Tight]]"` |
+  | `"[[Basket Knots#Tight\|tight ones]]"` | `"[[#Tight\|tight ones]]"` |
+  | `"[Knots](Basket%20Knots.md)"` | `"[[#Basket Knots\|Knots]]"` |
+  | `"[[#Tight]]"` (written in `Basket Knots.md` itself) | `"[[#Tight\|Tight]]"` |
+  | `"**Needs** [[Basket Knots]]"` | `"**Needs** [[#Basket Knots\|Basket Knots]]"` |
+  | `"[x](https://example.com)"` | `"[x](https://example.com)"` (an external link as written) |
+  | `"![x](a.png)"`, `"![[a.png]]"` (image or embed) | as written, not copied as an asset (the reader prints the alt text or the name) |
+  | `"[[Missing Note]]"` | `Missing Note`, plus the body warning `Missing wiki link` |
+  | `"[[Unused Note]]"` (exists, not in the book) | `Unused Note`, plus `link target 'Unused Note' not embedded in compiled output` |
+
+  A converted link whose heading anchor needs a path (the same heading text
+  twice) is written `[[#Parent#Heading\|text]]` and gives the body warning.
+  Warnings name the note and the line of the key (AC-13). Link conversion
+  happens in the link step (US-2.3), when every heading's final text is known;
+  the block itself stays out of every other step (AC-12).
+- **AC-9 Entry keys and detail keys (G0 answer 2).** A note that has a key of
+  `entryMarkerKeys` and a key of `detailMarkerKeys` gets **only the entry
+  block**, and the warnings file gets one `Entry keys and detail keys in one
+  note: only the entry block is written` with the first detail key as the link
+  and its line. Example: `entryMarkerKeys: might`, `detailMarkerKeys: pace`;
+  `might: 3` / `pace: Brisk` → `o2t-entry` with `might`, `pace` per US-9.1
+  (the entry block's own rules), no `o2t-details`.
+- **AC-10 Frontmatter that isn't valid YAML.** With only `detailMarkerKeys`
+  set: no block, frontmatter removed, `Frontmatter is not valid YAML` with the
+  line `yaml` reports (as US-9.1 AC-9). With both settings set the warning is
+  given once.
+- **AC-11 The view line is removed without a gap (G0 answer 8).** A note that
+  has a `dataviewjs` fence holding `dv.view("Templates/views/craft-details")`
+  before its text, or after the properties, or alone: the fence is gone, no
+  blank line remains, with the setting on and off; a four-backtick or tilde
+  fence of it too (US-5.1 AC-F). No new rule: the tests pin it (SCAR-023).
+- **AC-12 Other steps leave the block alone (SCAR-039).** As US-9.1 AC-11:
+  ToC expansion, embeds, TextMapper, control-fence removal, code ranges,
+  section extraction, quoting, blank-line tidying, sentinel and marker
+  stripping, output link checks (US-8.3). Test: a block with `note: "![c](assets/x.png)"`, `needs: "- [[A]]"`, `x: "%20"`,
+  `y: "<!-- x -->"`, `z: "# Not a heading"` is in the output byte for byte
+  (the one link rule of AC-8 excepted) and no warning names it.
+- **AC-13 Warnings name the note.** Each warning of this story names the
+  note's vault path and the line of the key in the note as stored,
+  frontmatter included (US-8.4 AC-5); a link warning names the line of the
+  key whose value holds the link.
+- **AC-14 The reader reads it back (SCAR-028).** Every block in the tests is
+  compared as exact text and parsed with `yaml` 2.9.1 to the expected values;
+  the example block of the reader's page (`pace: Brisk` / `kind: craft` /
+  `needs: "[[#Basket Knots|Basket Knots]]"` / `starter: true`) is written
+  exactly.
+- **AC-15 A long value reaches the block whole (SCAR-015).** A value of 400
+  words (more than a page holds) is written in full, in order, in one line of
+  the block; nothing is cut and no warning is given.

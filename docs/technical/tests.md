@@ -641,6 +641,60 @@ with #109 to #114 (2026-11-07): 1173 tests.**
   `completionNotice` (US-9.4 AC-5), and text checks that
   `main.ts` decides nothing about entries (SCAR-031).
 
+### Epic 9 — US-9.5 detail data (#118, G2 2026-11-09)
+
+Written before the code; 124 tests (107 integration, 17 unit), 22 integration
+tests green today as guards of existing behaviour (setting off, keys that do
+not trigger), 85 integration red and the unit file red (it imports
+`headingForm`, which does not exist). The suite before them: 365 unit and 814
+integration tests, all green at `6e8f51b`.
+
+- `tests/integration/detail-block.test.ts` — US-9.5 AC-1 to AC-7, AC-9 to
+  AC-15: off and the two invariants, which notes (table, with twice-embedded
+  and empty-value cases), the place in every title path at both toggle values,
+  the listed keys in the setting's order, case twins, list and map values,
+  the fixed YAML form (exact text **and** parsed with `yaml` 2.9.1, SCAR-028),
+  fence length, entry keys and detail keys together, invalid YAML with one
+  and with both settings, the `dataviewjs` view line in three fence forms
+  (a guard of #116 plus the block's place), other steps leaving the block
+  alone (SCAR-039), warning lines, a 400-word value (SCAR-015).
+- `tests/integration/detail-links.test.ts` — US-9.5 AC-8: every link form of
+  the story's table, the same-note link, the heading path of a heading that
+  occurs twice, links without a target (text kept, body warning, no HTML
+  comment in a block), warning lines per key, unlisted keys never read, the
+  entry block still flattening, `compileAsync` equal to `compile`.
+- **Green with #120 (2026-11-09):** `detail-block.test.ts` (82 tests) and
+  `detail-settings.test.ts` (17); the suite without `detail-links.test.ts`:
+  382 unit and 896 integration tests. Two tests that needed link conversion
+  moved to `detail-links.test.ts` (#121). Mutation check 2026-11-09: 21
+  mutants of the writer and its wiring; 18 caught, 3 not (one empty mutant
+  of the shared quote condition, one early return the compiler repeats, one
+  branch yaml never takes for `key:`), none of them behaviour. Added on the
+  way: the key-order test with a numeric key name (an `Object` instead of a
+  `Map` survived) and the once-per-note warning test (`report` instead of
+  `reportOnce` survived).
+- **Green with #121 (2026-11-09):** `detail-links.test.ts` (30 tests; the
+  suite: 382 unit and 926 integration tests). Mutation check 2026-11-09: 17
+  mutants of the link step (conversion skipped, heading form, the comment
+  result, the key's line, the note, Markdown links, non-string values, the
+  placeholder offset, the duplicate filter, `locate`, the first block only,
+  the entry flattening); 15 caught first, two survived and were caught after
+  a test of a same-note link in a note embedded twice (the offset) and a
+  corrected mutant (the first block only, whose first form still finished
+  every block).
+- **Green with #122 (2026-11-09):** `detail-fixture.test.ts` (6 tests: the
+  reviewed book `tests/fixtures/detail-book.expected.md`, the three warnings,
+  every block read back with `yaml` 2.9.1, no view line, setting off, the
+  existing books byte-identical with the chapter present; the suite: 382 unit
+  and 934 integration tests). Mutation check 2026-11-09: 4 mutants; the
+  setting-order mutant survived until a fixture note listed its properties in
+  another order than the setting, then all were caught.
+- `tests/unit/detail-settings.test.ts` — `detailMarkerKeys` as an ordered list
+  (SCAR-019), `headingForm`, and text checks that `main.ts` decides nothing
+  about details (SCAR-031).
+- Guards that change with the code (SCAR-023, SCAR-044): `settings-writes.test.ts`
+  counts the entry list rows (4) and gains the fifth with #120.
+
 Not covered automatically: Obsidian2Typst reading a compiled book, and the
 settings rows in Obsidian (a manual check, filed with the tickets).
 
@@ -985,6 +1039,14 @@ compile writes below `Export/`, which git ignores.
    to `Export`.
 10. Is anything missing, odd or ugly that this list did not ask about? Report
     it even if it seems unrelated.
+
+### M22 — Detail data from note properties (Epic 9, US-9.5, #118, #122)
+
+Result 2026-11-09 with `0.23.0-m22.1` and Obsidian2Typst 0.14.0: passed
+(reported by the user; the four open choices were confirmed).
+
+In a file of its own (SCAR-029): `tests/manual/M22-detail-data.md`. Its
+automated twin is `tests/integration/detail-fixture.test.ts`.
 
 ### M21 — Entry data from note properties (Epic 9, #108, #115)
 

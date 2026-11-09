@@ -49,5 +49,15 @@ gets.
   Example (2026-10-30, webpage-export US-002): a check of each note's first words passed a
   renderer that emptied 4 embeds and dropped 1 457 heading arrows; a
   per-page structure comparison found them.
+- Content placed in a container that cannot break (a grid cell, a box, a
+  fixed-height frame, a non-breaking block) is tested with more than the
+  container can hold, and the test checks that every word of the source
+  reaches the output or that a warning names the loss: a layout engine may
+  cut the overflow at the page foot without any message. Example
+  (2026-11-08, Obsidian2Typst #139): in 0.12.0 the first paragraph beside
+  an entry's statblock sat in a non-breaking grid; a paragraph taller than
+  the page lost its end, silently, in 3 of 400 generated entries. Every
+  example and test had used paragraphs that fit; a letter-by-letter
+  comparison of source and PDF in a spike found it.
 - Applies next to: previews, cover pages, headers and footers, fonts per role,
   anything that is judged by looking at it.

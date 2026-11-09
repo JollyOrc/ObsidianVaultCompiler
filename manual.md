@@ -22,6 +22,7 @@ does not look right. You do not need any technical knowledge to follow it.
 12. [Your notes are safe](#12-your-notes-are-safe)
 13. [Tips and frequently asked questions](#13-tips-and-frequently-asked-questions)
 14. [Entries: creatures, spells and items with data](#14-entries-creatures-spells-and-items-with-data)
+15. [Details: a few facts under a heading](#15-details-a-few-facts-under-a-heading)
 
 ---
 
@@ -308,9 +309,11 @@ own text and headings stay as you wrote them.
 **Step 2 — Remove note properties.** The properties block at the very top of
 each note (the part between two `---` lines, also called "frontmatter", with
 things like `tags:` or `aliases:`) is left out of the document. A `---` line
-anywhere else in a note is a horizontal divider and is kept. The one
-exception is an **entry** note: its properties become a data block for the
-typesetter (see [section 14](#14-entries-creatures-spells-and-items-with-data)).
+anywhere else in a note is a horizontal divider and is kept. The exceptions
+are an **entry** note and a **detail** note: its properties become a data block for the
+typesetter (see [section 14](#14-entries-creatures-spells-and-items-with-data)),
+and a detail note keeps the few properties you name (see
+[section 15](#15-details-a-few-facts-under-a-heading)).
 
 **Step 3 — Remove Obsidian-only blocks.** Blocks that only work inside Obsidian
 are removed:
@@ -591,6 +594,7 @@ Open **Settings → Obsidian Vault Compiler**.
 | **Entry marker keys** | Property names, separated by commas. A note with one of them becomes an entry: its properties go into the document as a data block (see [section 14](#14-entries-creatures-spells-and-items-with-data)). Empty: no entries. | empty |
 | **Entry exclude keys** | Properties never written into an entry's data block. | `aliases, cssclasses, publish` |
 | **Entry image keys** | Entry properties that name a picture, which is copied like an embedded one. | `illustration` |
+| **Detail marker keys** | Property names, separated by commas. A note with one of them gets a small data block with only these properties, in this order (see [section 15](#15-details-a-few-facts-under-a-heading)). Empty: no detail blocks. | empty |
 | **Expect compiled folders** | Folders, separated by commas. Every note in them (and in their subfolders) that doesn't end up in the document is listed in the warnings file. Empty: no list. | empty |
 
 ### Output folder rules
@@ -668,6 +672,9 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | **Folder not found in the vault: …** | A folder in *Expect compiled folders* doesn't exist (names are case-sensitive). | Check the spelling, and use `/` between folders. |
 | **Entry image is not a local image (…)** | An entry's picture property holds a list, a web address, a note or a file that isn't a picture. | Write one picture link, e.g. `[[picture.png\|Credit]]`. |
 | **Entry keys differ only in case: … / …** | An entry note has two properties such as `Might` and `might`. | Keep one of them; the first one is used. |
+| **Detail value is not text: …** | A detail property holds a list or a map, which a detail row can't show. It is left out of the block. | Make it one text, or take it out of *Detail marker keys*. |
+| **Entry keys and detail keys in one note: only the entry block is written** | A note has a property of *Entry marker keys* and one of *Detail marker keys*. | Usually fine; the note is an entry. |
+| **Detail keys differ only in case: … / …** | A detail note has two properties such as `Pace` and `pace`. | Keep one of them; the first one is used. |
 | **Frontmatter is not valid YAML** | A note's properties block can't be read, so it can't be an entry. | Open the note's properties in source mode and fix the line named. |
 
 ### Messages in the corner of the screen
@@ -837,3 +844,65 @@ in the document as a whole note is listed in the warnings file — *Not
 compiled*, or *Not compiled (section embed only)* / *(quoted only)* when it
 appears only that way. The message in the corner says how many.
 
+---
+
+## 15. Details: a few facts under a heading
+
+Some notes carry a few facts that belong in one row under the heading: how
+long a craft takes, what kind it is, what it needs, whether you know it from
+the start. These are not entries (no statblock, no page of their own). You
+keep the facts as properties, and **Obsidian2Typst** (0.14.0 or later) prints
+them as a row of badges under the heading. This plugin carries them into the
+document.
+
+### Turning it on
+
+Put the property names into **Detail marker keys**, e.g.
+`pace, kind, needs, starter`. A note with at least one of them is a **detail
+note**, and **only these properties, in the order you list them,** go into
+the block. With the setting empty (the default), nothing changes.
+
+### What a detail note looks like in the document
+
+A note `Rope Laying.md` with these properties:
+
+```yaml
+kind: craft
+pace: Swift
+needs: "[[Basket Knots]]"
+tags:
+  - craft
+```
+
+and the setting `pace, kind, needs, starter` becomes, right under its heading:
+
+````markdown
+### Rope Laying
+```o2t-details
+pace: Swift
+kind: craft
+needs: "[[#Basket Knots|Basket Knots]]"
+```
+You lay rope. …
+````
+
+- **Only the listed properties** are written, in the setting's order, names
+  in lower case. `tags` and everything else are left out unless you list them.
+- **Text, numbers and checkboxes** are written as they are (`true` or
+  `false` for a checkbox); an empty property is written empty.
+- **A list or a map is left out** and the warnings file says *Detail value is
+  not text*. If nothing is left, the note gets no block.
+- **Links stay links.** Unlike an entry, a link in a detail value points to
+  the heading in the book that the note's own text gets, so the printed row
+  can jump there. A link to a note that is not in the book becomes plain
+  text, with the same warning as in your text.
+- Only notes brought in **whole** (listed or embedded) get the block; a
+  section embed, a quote and the starting note don't. A note embedded twice
+  gets a block each time.
+- A note that has both an entry marker key and a detail key is an entry; it
+  gets only the entry block, and the warnings file says so.
+- A line such as ` ```dataviewjs ` holding `dv.view(...)` is removed as
+  always, and leaves no blank line between the heading and the block.
+
+In Obsidian, the block shows as a row of badges when Obsidian2Typst is
+installed, and as a code block otherwise.

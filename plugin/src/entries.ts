@@ -7,6 +7,7 @@
 
 import { LineCounter, parseDocument, stringify, isMap, isScalar } from 'yaml';
 import type { CompileResult } from './compiler.ts';
+import { decodeLink } from './utils.ts';
 
 /**
  * Epic 9 | Settings: a comma-separated setting as a list. Items are trimmed
@@ -182,10 +183,118 @@ export function entryBlock(yaml: string, options: EntryOptions): EntryResult {
     data[pair.lower] = flattenValue(value);
   }
 
-  const text = stringify(data, { nullStr: '' });
+  return { block: fencedBlock('o2t-entry', stringify(data, { nullStr: '' })), warnings };
+}
+
+/**
+ * US-9.1 | AC-7, US-9.5 | AC-7: `text` in a fence of `language` — backticks,
+ * one more than the longest backtick run in the text, at least three.
+ */
+function fencedBlock(language: string, text: string): string {
   const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map(run => run[0].length));
   const fence = '`'.repeat(Math.max(3, longest + 1));
-  return { block: `${fence}o2t-entry\n${text}${fence}`, warnings };
+  return `${fence}${language}\n${text}${fence}`;
+}
+
+/** US-9.5: one property of a detail block — a text, number, flag or empty value, and its line in the note. */
+export interface DetailItem {
+  key: string;
+  value: string | number | boolean | null;
+  line: number;
+}
+
+/** US-9.5: what a note's frontmatter gives for the detail block. */
+export interface DetailPlan {
+  /** The properties to write, in the setting's order; null when the note gets no block. */
+  items: DetailItem[] | null;
+  /** True when a top-level key of the setting is in the note (the note is a detail note). */
+  hasDetailKeys: boolean;
+  /** The first listed key the note has, as written, with its line (for the both-kinds warning). */
+  first: { key: string; line: number } | null;
+  warnings: EntryWarning[];
+}
+
+/**
+ * US-9.5 | AC-2 to AC-6, AC-10: the properties of a note whose frontmatter is
+ * `yaml` that an `o2t-details` block holds.
+ *
+ * - AC-2: a detail note has a **top-level** key in `keys` (compared without
+ *   case); comments, nested keys and text in strings never count.
+ * - AC-4: only the listed keys the note has, in the setting's order, keys in
+ *   lower case, each once; of two note keys that differ only in case the
+ *   first is used and the second gives `Detail keys differ only in case:
+ *   <first> / <second>`.
+ * - AC-5: a list or a map is left out with `Detail value is not text: <key>`
+ *   (link: the key as written, line: its line); nothing left → `items: null`.
+ * - AC-10: YAML that does not parse gives no block and, when `reportInvalid`,
+ *   `Frontmatter is not valid YAML` (the entry rule reports it already when
+ *   both settings are set).
+ */
+export function detailPlan(yaml: string, options: { keys: readonly string[]; reportInvalid: boolean }): DetailPlan {
+  const none: DetailPlan = { items: null, hasDetailKeys: false, first: null, warnings: [] };
+  if (options.keys.length === 0) return none;
+  const lineCounter = new LineCounter();
+  const doc = parseDocument(yaml, { lineCounter, version: '1.2' });
+  const lineOf = (offset: number) => 1 + lineCounter.linePos(offset).line;
+  if (doc.errors.length > 0) {
+    if (!options.reportInvalid) return none;
+    return { ...none, warnings: [{ message: 'Frontmatter is not valid YAML', link: '', line: lineOf(doc.errors[0].pos[0]) }] };
+  }
+  if (!isMap(doc.contents)) return none;
+
+  const wanted = new Set(options.keys);
+  const found = new Map<string, { key: string; line: number; value: unknown }>();
+  const warnings: EntryWarning[] = [];
+  let first: { key: string; line: number } | null = null;
+  for (const pair of doc.contents.items) {
+    const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+    const lower = key.toLowerCase();
+    if (!wanted.has(lower)) continue;
+    const line = lineOf(isScalar(pair.key) && pair.key.range ? pair.key.range[0] : 0);
+    const earlier = found.get(lower);
+    if (earlier !== undefined) {
+      warnings.push({ message: `Detail keys differ only in case: ${earlier.key} / ${key}`, link: key, line });
+      continue;
+    }
+    first ??= { key, line };
+    const value = pair.value === null || pair.value === undefined ? null : (pair.value as { toJSON: () => unknown }).toJSON();
+    found.set(lower, { key, line, value });
+  }
+  if (found.size === 0) return none;
+
+  const items: DetailItem[] = [];
+  for (const lower of new Set(options.keys)) {
+    const entry = found.get(lower);
+    if (entry === undefined) continue;
+    if (entry.value !== null && typeof entry.value === 'object') {
+      warnings.push({ message: `Detail value is not text: ${lower}`, link: entry.key, line: entry.line });
+      continue;
+    }
+    items.push({ key: lower, value: entry.value as DetailItem['value'], line: entry.line });
+  }
+  return { items: items.length > 0 ? items : null, hasDetailKeys: true, first, warnings };
+}
+
+/**
+ * US-9.5 | AC-4 to AC-7: the `o2t-details` block of `items` — the fixed YAML
+ * form of `yaml` 2.9.1, one key per line in the items' order (a `Map`, so a
+ * key such as `1` keeps its place), in a fence of the right length.
+ */
+export function detailBlockText(items: readonly DetailItem[]): string {
+  return fencedBlock('o2t-details', stringify(new Map(items.map(item => [item.key, item.value])), { nullStr: '' }));
+}
+
+/**
+ * US-9.5 | AC-8: a converted in-book link `[text](#anchor)` in Obsidian's
+ * heading form `[[#anchor|text]]` (the anchor percent-decoded), which the
+ * reader prints as a link; anything else is returned as it is.
+ * `[Tight](#Mat%20Knots#Tight)` → `[[#Mat Knots#Tight|Tight]]`.
+ */
+export function headingForm(link: string): string {
+  const match = link.match(/^\[([^\]]*)\]\(#([^()\s]*)\)$/);
+  if (!match) return link;
+  // US-3.1: the one decode function; a stray `%` stays as written.
+  return `[[#${decodeLink(match[2])}|${match[1]}]]`;
 }
 
 /**

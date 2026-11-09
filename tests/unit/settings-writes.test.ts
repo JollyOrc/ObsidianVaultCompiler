@@ -74,10 +74,10 @@ describe('US-7.1 AC-S1: settings text fields save through the delayed saver', ()
   const tab = () => between('class VaultCompilerSettingTab', '\n}\n');
 
   it('every text field requests a save; switches and Browse save at once', () => {
-    // Four fields of their own, and the four entry lists of #110 through one helper.
+    // Four fields of their own, and the five lists (four entry lists of #110, the detail keys of #120) through one helper.
     assert.equal(count(tab(), /\.addText\(/g), 5);
     assert.equal(count(tab(), /settingsSaver\.request\(\)/g), 5);
-    assert.equal(count(tab(), /\blistSetting\('/g), 4, 'the four entry lists');
+    assert.equal(count(tab(), /\blistSetting\('/g), 5, 'the four entry lists and the detail keys');
     assert.equal(count(tab(), /saveSettings\(\)/g), 4, 'three switches and Browse');
   });
 
