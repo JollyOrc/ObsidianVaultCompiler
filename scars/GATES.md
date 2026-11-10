@@ -15,9 +15,9 @@ found generalises into a SCAR, and assigns a new SCAR's gates here.
 
 The Basis column says where an assignment came from: `both` (the two former
 tables agreed), `Obsidian2Typst` or `webpage-export` (only that table had
-it; the union was taken, as nothing contradicted), or `proposed 2026-11-10`
-(no table had it; derived from the SCAR's Prevention list, to be confirmed
-by the user).
+it; the union was taken, as nothing contradicted), or `confirmed 2026-11-10`
+(no table had it; derived from the SCAR's Prevention list and confirmed by
+the user).
 
 A new SCAR adds its row here in the same commit.
 
@@ -53,15 +53,15 @@ A new SCAR adds its row here in the same commit.
 | SCAR-030 | A test's time limit is left at the default for heavy work | G2, G4 | both |
 | SCAR-031 | Decisions left in the plugin's entry point, where no test reaches them | G2, G4 | Obsidian2Typst |
 | SCAR-032 | A finding is claimed wider than what was measured | G1 | Obsidian2Typst |
-| SCAR-033 | A path from the user is joined as text, and the write lands somewhere nobody chose | G1, G2 | proposed 2026-11-10 |
-| SCAR-034 | A file is classified by its first line before its metadata header is removed | G1, G2 | proposed 2026-11-10 |
-| SCAR-035 | Real user data serves as the development and test data | G1, G2, G4 | proposed 2026-11-10 |
-| SCAR-036 | A licence conflict is fixed in the build, but the artifacts already shipped keep it | G4 | proposed 2026-11-10 |
-| SCAR-037 | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | G1, G2 | proposed 2026-11-10 |
-| SCAR-038 | A lookup also reports, so every caller that only looks fills the report | G2 | proposed 2026-11-10 |
-| SCAR-039 | Invisible markers written into the text are read by steps they were not meant for | G1, G2 | proposed 2026-11-10 |
-| SCAR-040 | An output format is specified without naming the program that reads it | G1, G2 | proposed 2026-11-10 |
-| SCAR-041 | A rule that reads the start of a line does not see past a container's marker | G1, G2 | proposed 2026-11-10 |
+| SCAR-033 | A path from the user is joined as text, and the write lands somewhere nobody chose | G1, G2 | confirmed 2026-11-10 |
+| SCAR-034 | A file is classified by its first line before its metadata header is removed | G1, G2 | confirmed 2026-11-10 |
+| SCAR-035 | Real user data serves as the development and test data | G1, G2, G4 | confirmed 2026-11-10 |
+| SCAR-036 | A licence conflict is fixed in the build, but the artifacts already shipped keep it | G4 | confirmed 2026-11-10 |
+| SCAR-037 | A dependency applies its defaults after the user's input, and the user's settings silently do nothing | G1, G2 | confirmed 2026-11-10 |
+| SCAR-038 | A lookup also reports, so every caller that only looks fills the report | G2 | confirmed 2026-11-10 |
+| SCAR-039 | Invisible markers written into the text are read by steps they were not meant for | G1, G2 | confirmed 2026-11-10 |
+| SCAR-040 | An output format is specified without naming the program that reads it | G1, G2 | confirmed 2026-11-10 |
+| SCAR-041 | A rule that reads the start of a line does not see past a container's marker | G1, G2 | confirmed 2026-11-10 |
 | SCAR-042 | Adding a development tool changes the artefact that ships | G2, G4 | webpage-export |
 | SCAR-043 | A count over a folder includes generated output | G2, G4 | webpage-export |
 | SCAR-044 | A whole-tree check is assigned to a ticket that cannot make it green | G2 | webpage-export |
