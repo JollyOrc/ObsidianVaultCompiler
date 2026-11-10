@@ -631,8 +631,111 @@ and KD-5.
 **Known defect KD-5 (found 2026-11-01): an embed in the middle of a line.**
 `He said ![[Sage]] and left`, `Sage.md` = `Wise words.` → `He said ## Sage` /
 `Wise words.` / ` and left` (toggle off), inside and outside a quote; the
-title lands in the middle of the sentence. Not part of US-1.5; tracked in
-[#107](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/107) (`needs-decision`).
+title lands in the middle of the sentence. Not part of US-1.5; decided
+2026-11-10 as US-1.6
+([#107](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/107)).
+
+### US-1.6 Embed a note in a sentence
+*(Written 2026-11-10 from
+[#107](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/107);
+decisions of the same day: a note goes into the sentence only when it is one
+paragraph once its headings are dropped, its text kept exactly, full stop
+included; any other note keeps the block output of v0.23.0, with a warning.)*
+
+**As an** author
+**I want** an embed written inside a sentence (`He said ![[Sage]] and left.`)
+to put the note's words into that sentence
+**So that** short notes (a phrase, a definition) can be reused in running
+text without a heading or line breaks landing in the middle of it.
+
+Measured with v0.23.0 (2026-11-10), `Sage.md` = `Wise words.`, root
+`# Book` / `` / `He said ![[Sage]] and left.`: toggle on →
+`# Book` / `He said ## Sage` / `Wise words.` / ` and left.`; toggle off the
+same with an empty line after `## Sage`. The same with `![s](Sage.md)`, in a
+quote (`> He said ## Sage` / `Wise words.` / ` and left.` — the rest falls
+out of the quote) and in a list item. A section embed
+`He said ![[Sage#Detail]] and left.` gives `He said ` / `` / `## Detail` /
+`More words.` / `` / ` and left.`
+
+Definitions:
+- An **embed in a sentence** is a note embed (either syntax, whole note or
+  section) on a line that holds other text besides embeds, read after the
+  line's quote prefix and list marker (SCAR-041). `He said ![[Sage]].`,
+  `> He said ![[Sage]] and left.`, `- See ![[Sage]] here`,
+  `![[Sage]] said so.`, `He said: ![[Sage]]`, `## About ![[Sage]]` are
+  embeds in a sentence; `![[Sage]]`, `> ![[Sage]]` (US-1.5), `- ![[Sage]]`
+  (US-1.3), `> - ![[Sage]]` (unchanged, out of scope of US-1.5) and
+  `![[A]] ![[B]]` (only embeds) are not. Images and other
+  files are not note embeds (US-2.1, US-2.6).
+- The **sentence text** of a note is read from the note as stored, after its
+  frontmatter (US-5.2), or from the named section (US-1.2): its heading
+  lines are dropped and the empty lines at both ends. The note **is one
+  paragraph** when what is left has no empty line and no line that starts a
+  block: a list item (`- `, `* `, `+ `, `1. `, `1) `), a quote (`>`), a code
+  fence (` ``` `, `~~~`), indented code on the first line (four spaces or a
+  tab), a table row (a line starting with `|`, or a delimiter row
+  `--- | ---`), a thematic break or setext underline (`---`, `***`, `===`),
+  an HTML block (a line starting with `<`, except one that is a single
+  `<!-- … -->` comment), a line that is only an embed, a math block (`$$`),
+  a footnote or link definition (`[^1]:`, `[x]: `). A note with nothing
+  left is one (empty) paragraph.
+
+Every AC holds with "Normalise headings" on and off (SCAR-019). Root
+`# Book` / `` / `He said ![[Sage]] and left.` unless said otherwise.
+
+**Acceptance criteria**
+
+- **AC-1 One paragraph goes into the sentence.** The embed is replaced by the
+  note's lines, without headings, title and line breaks, joined by single
+  spaces; the text is kept exactly as written, full stop included. No
+  heading, empty line or line break is added before or after.
+  - `Sage.md` = `Wise words.` → `# Book` / `He said Wise words. and left.`
+  - `![s](Sage.md)` → the same.
+  - `Sage.md` = `# Wisdom` / `` / `Wise words.` (heading-first) → the same.
+  - `Sage.md` = `Wise` / `words.` (two lines, one paragraph) → the same.
+  - `He said: ![[Sage]]` → `He said: Wise words.`;
+    `![[Sage]] he said.` → `Wise words. he said.`
+  - Two in one line: `![[Sage]] and ![[Fool]]`, `Fool.md` = `Silly words.`
+    → `Wise words. and Silly words.`
+  - An empty note (or only headings) → `He said  and left.` (the two spaces
+    as written), no warning.
+- **AC-2 Section embed.** `He said ![[Sage#Detail]] and left.`, `Sage.md` =
+  `# Wisdom` / `` / `First.` / `` / `## Detail` / `` / `More words.` →
+  `He said More words. and left.` The section's own heading is dropped. A
+  missing heading gives the US-1.2 comment in the sentence:
+  `He said <!-- Warning: Missing heading anchor: Sage.md#Gone --> and left.`
+  with its warning (US-6.5 AC-12 detail form, the root and line 3).
+- **AC-3 Containers.** The sentence stays in its container (SCAR-041):
+  `> He said ![[Sage]] and left.` → `> He said Wise words. and left.`;
+  `- He said ![[Sage]] and left.` → `- He said Wise words. and left.`;
+  `## About ![[Sage]]` → `## About Wise words.` (a heading of the root,
+  normalised like any). Inside a quoted note (US-1.5) the same: `Q.md` =
+  `He said ![[Sage]] and left.`, root `> ![[Q]]` →
+  `> **Q**` / `>` / `> He said Wise words. and left.`
+- **AC-4 Inside the inlined text.** Links are converted as anywhere else
+  (`Sage.md` = `Read [[Other]] now.`, Other embedded below →
+  `He said Read [Other](#Other) now. and left.`), with their warnings at
+  Sage's lines (US-8.4). An embed in a sentence inside Sage is put in by
+  the same rule (`Sage.md` = `Wise ![[Fool]] words.` →
+  `He said Wise Silly words. words. and left.`). Images are copied and
+  rewritten (US-2.1). A circular embed gives today's comment in the
+  sentence (`<!-- Circular dependency avoided: Sage.md -->`).
+- **AC-5 Not a place in the book.** A note put into a sentence adds no
+  heading, no anchor, no entry or detail block (US-9.1, US-9.5); links to
+  it are treated as to a note not in the book, unless it is embedded
+  elsewhere as a block (as for quotes, US-1.5 AC-8): Sage only in the
+  sentence, `See [[Sage]].` elsewhere →
+  `See <!-- Warning: link target 'Sage' not embedded in compiled output -->.`
+- **AC-6 More than one paragraph: block, with a warning.** A note that is
+  not one paragraph keeps the output of v0.23.0 (title and block in the
+  middle of the line) and adds one warning
+  `{ message: 'Note embedded in a sentence is not one paragraph; embedded as a block', link: 'Sage', file: 'index.md', line: 3 }`
+  (the link as written, the note and line of the embed). `Sage.md` =
+  `# Wisdom` / `` / `First.` / `` / `- a` / `- b` → toggle on
+  `He said ## Sage` / `` / `First.` / `` / `- a` / `- b` / ` and left.`
+  and the warning. The same for `First.` / `` / `Second.` (two
+  paragraphs) and for each block start of the definition. Nothing inside
+  the note is reported twice.
 
 ## Epic 2 — Asset handling and deduplication
 ### US-2.1 Copy embedded media to `assets/`
@@ -999,7 +1102,8 @@ filenames
 - Rendered images are stored under `assets/textmapper/`, named from the
   content hash and the font key (US-4.8 AC-6).
 - The fenced block is replaced by a standard markdown image reference pointing
-  to the rendered file.
+  to the rendered file, with the alt text of US-4.11 (empty unless the map
+  sets a caption).
 - If rendering is disabled in plugin settings, or if the block cannot be
   rendered for any reason, the original fenced block is preserved in the output
   together with a warning comment.
@@ -1346,6 +1450,8 @@ Obsidian:
   - `  # vault-compiler: no-glow` (leading spaces) is not a directive line:
     nothing is switched and nothing is reported.
   - `# vault compiler: no-glow` (no hyphen) is an ordinary comment.
+  - The word `caption` ends the list: the rest of the line is the map's
+    caption, not words (US-4.11, added 2026-11-10).
 - **AC-2 Unknown word.** A word other than `no-outlines` and `no-glow` is
   ignored; the compile warns once per map block and word, in the report
   (US-6.2) as `{ message: 'Map directive "no-outline" is unknown and was ignored',
@@ -1441,6 +1547,80 @@ renames ids (`rough` → `rough-<map id>`) but not `url(#rough)` references.
 **Not measured yet:** all of the above inside Obsidian (SVG structure, the
 directive line in reading view), and SVG filters drawn through Obsidian's
 canvas (US-4.5).
+
+### US-4.11 Map caption: none unless the map sets one
+*(Written 2026-11-10 from
+[#119](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/119);
+decided the same day: no label by default; the caption is set by a
+directive line, `# vault-compiler: caption …`.)*
+
+**As a** vault owner
+**I want** a compiled map to carry no label unless I give it one in the map
+**So that** a typesetter downstream does not print an arbitrary hex label as
+the map's caption.
+
+The reader of the label is Obsidian2Typst (SCAR-040). Its US-003 AC-1 (read
+there, 2026-11-10, not measured here): an image with alt text becomes a
+figure with that caption; an image without alt text gets no caption. Its
+AC-1b: a `|` in the alt text ends the caption (the part after it is a size
+or ignored).
+
+Today (v0.23.0, `altForTextMapper`, specified in no story): the alt text is
+the label of the first labelled hex (`0402 grass "Fog Lantern|Fog Lantern "`
+→ `![Fog Lantern|Fog Lantern ](assets/textmapper/<hash>_0001.png)`, so
+Obsidian2Typst prints `Fog Lantern` under the map); else `<file> Map` from an
+`include <file>.txt` line; else `TextMapper Map`.
+
+What the plugin does with a caption line (Text Mapper v1.1.0): both passes
+of `TextMapperParser.process` in its `main.js` skip every line for which
+`line.startsWith("#")` (read 2026-11-10); measured for
+`# vault-compiler: no-glow` in US-4.10 (the SVG equals the one without the
+line). A caption line has the same first character, so the map in Obsidian
+does not change.
+
+**Acceptance criteria**
+
+- **AC-1 No label by default.** Every map without a caption line is written
+  as `![](assets/textmapper/<hash>_<key>.png)`, whatever its source holds:
+  - `0402 grass "Fog Lantern|Fog Lantern "` → `![](…)` (was
+    `![Fog Lantern|Fog Lantern ](…)`).
+  - `include gnomeyland.txt` / `0101 forest` → `![](…)` (was
+    `![gnomeyland Map](…)`).
+  - `0101 forest` → `![](…)` (was `![TextMapper Map](…)`).
+- **AC-2 Caption line.** In a directive line (US-4.10 AC-1: `#` in the first
+  column, optional spaces, `vault-compiler:` in any case), the word
+  `caption` (any case) ends the list of words; the rest of the line,
+  trimmed, is the caption, written as given:
+  - `# vault-compiler: caption Branches of the fighting skills` /
+    `0101 forest "Moss"` → `![Branches of the fighting skills](…)`.
+  - `#Vault-Compiler: CAPTION Mixed Case Kept` → `![Mixed Case Kept](…)`.
+  - `# vault-compiler: no-glow caption Moss and Stone` → no glow (US-4.10)
+    and `![Moss and Stone](…)`; no unknown-word warning for `Moss`, `and`,
+    `Stone`.
+  - `# vault-compiler: caption` (nothing after it) → `![](…)`, no warning.
+  - `  # vault-compiler: caption X` (leading spaces) is not a directive
+    line → `![](…)`.
+- **AC-3 Characters of the caption.** `\`, `[` and `]` are escaped with a
+  backslash so the image stays one image:
+  `caption Tree [old] \ path` → `![Tree \[old\] \\ path](…)`. A `|` is
+  written as given and reported once per map block, at the opening fence
+  (US-8.4 AC-6):
+  `{ message: 'Map caption contains "|"; Obsidian2Typst ends the caption there', link: 'Moss | Stone', file, line }`
+  for `caption Moss | Stone`.
+- **AC-4 One caption per map.** The first caption line counts; a later one
+  is ignored and reported once per map block, at the opening fence:
+  `{ message: 'Map caption is given more than once; the first is used', link: '<the ignored caption>', file, line }`.
+- **AC-5 Composed.** The caption line is part of the source, so the PNG name
+  (content hash, US-4.1, US-4.10 AC-9) differs from the same map without it;
+  the same map in two notes is drawn once and both places carry the same
+  caption (US-4.7). In a quote (US-1.5 AC-9) the line is
+  `> ![Caption](…)`. With maps off (US-4.1) the fence is kept as written,
+  caption line included. A render failure gives the US-4.1 placeholder,
+  without caption.
+
+**Not measured here (SCAR-024):** how Obsidian2Typst prints `\[`, `\]` and
+`\\` in a caption; that the plugin in Obsidian draws a map with a caption
+line unchanged (manual check).
 
 ## Epic 5 — Obsidian control commands
 
@@ -1828,7 +2008,8 @@ Applies only when US-6.3 is on.
 **Definitions**
 - **Wrapper**: a file whose content, ignoring all whitespace (spaces, tabs,
   newlines), is exactly one markdown embed in either syntax: `![[B.md]]`,
-  `![alt](B.md)`, `![[B.md#Section]]` or `![alt](B.md#Section)`.
+  `![alt](B.md)`, `![[B.md#Section]]` or `![alt](B.md#Section)`, in every
+  form an ordinary embed may take (AC-11).
 - **Effectively heading-first**: a heading-first file, or a wrapper whose
   embed is an anchor embed, or a wrapper whose target is effectively
   heading-first (followed recursively; a circular chain is not).
@@ -1884,6 +2065,49 @@ with its heading text kept (US-6.3 AC-7).
   `NoPrefixPreamble.md` = `Preamble text.` → `# Own Heading`, `## B`,
   `## NoPrefixPreamble` *(B was `# B Heading` before v0.11.0)*.
 - **AC-10 Toggle off.** No pass-through; US-6.1 applies to A and B.
+- **AC-11 The wrapper's embed is read like every embed** *(added 2026-11-10
+  from [#123](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/123))*.
+  Whether a file is a wrapper, and which note and heading its embed names, is
+  read by the same rules as an ordinary embed: percent escapes decoded in the
+  path and the heading (US-1.2, US-3.1 `decodeLink`), a path relative to the
+  wrapper, a `<…>` destination and a title after it (US-2.6 AC-3), a path
+  without `.md` (US-3.1). Each markdown form gives exactly the output of the
+  wiki form `![[Duel Rules#Duel Checks]]`, which v0.23.0 already handles.
+  Root `# Book` / `` / `![[A]]`; `Duel Rules.md` = `# Intro` / `` / `Intro.` /
+  `` / `## Duel Checks` / `` / `Roll both.` / `` / `## Other` / `` / `X.`;
+  "Normalise headings" on. Measured with v0.23.0 (before → after):
+
+  | `A.md` | v0.23.0 | after |
+  |---|---|---|
+  | `![x](Duel%20Rules.md#Duel%20Checks)` | `# Book` only; warning `Missing heading anchor: Duel Rules.md#Duel%20Checks` | `# Book` / `` / `## Duel Checks` / `Roll both.`, no warning |
+  | `Bits/A.md` = `![x](../Duel%20Rules.md#Duel%20Checks)` (root `![[Bits/A]]`) | the same warning | the same as the row above |
+  | `![x](<Duel Rules.md#Duel Checks>)` | `## A` / `` / `### Duel Checks` / `Roll both.` | the same as the first row |
+  | `![x](Duel%20Rules#Duel%20Checks)` | `## A` / `` / `### Duel Checks` / `Roll both.` | the same as the first row |
+  | `![x](Duel%20Rules)` (whole note) | `## A` / `` / `### Duel Rules` / `Intro.` / `` / `#### Duel Checks` / … | `## Duel Rules` / `Intro.` / `` / `### Duel Checks` / `Roll both.` / `` / `### Other` / `X.` |
+
+  Composed cases, with `A.md` = `![x](Duel%20Rules.md#Duel%20Checks)`:
+  - A chain: root `# Book` / `` / `![[W]]`, `W.md` = `![[A]]` → `# Book` /
+    `` / `## Duel Checks` / `Roll both.` (AC-8).
+  - In a quote (US-1.5 AC-6), toggle on **and** off: root `# Book` / `` /
+    `> ![[A]]` → `# Book` / `> ## Duel Checks` / `>` / `> Roll both.`, no
+    warning. v0.23.0 gives `> <!-- Warning: Missing heading anchor: Duel Rules.md#Duel%20Checks -->`
+    with the toggle on and off, because the quote reads every wrapper.
+  - Toggle off: unchanged (`## A` / `` / `## Duel Checks` / `Roll both.`).
+- **AC-12 A missing heading in a pass-through is reported like any missing
+  heading** *(added 2026-11-10 from #123)*. The output gets the US-1.2
+  comment and the warning has the same detail as for an ordinary section
+  embed: the note's link with the heading decoded, the wrapper, and the
+  wrapper's line of the embed in the note as stored (US-8.4 AC-5, US-8.5
+  AC-2). `A.md` = `` / `![[Duel Rules#Gone Now]]` (embed on line 2), or
+  `` / `![x](Duel%20Rules.md#Gone%20Now)`, toggle on → `# Book` /
+  `<!-- Warning: Missing heading anchor: Duel Rules.md#Gone Now -->` (no
+  empty line after a heading, US-6.6) and one
+  detail `{ message: 'Missing heading anchor: Duel Rules.md#Gone Now',
+  link: 'Duel Rules.md#Gone Now', file: 'A.md', line: 2 }`. v0.23.0: no
+  comment, `line: 0`, `link: 'Duel Rules'`. With frontmatter `---` /
+  `tags: [x]` / `---` above the embed, line 5. The wrapper still gets no
+  title (it is a pass-through); with the toggle off nothing changes
+  (`## A` / the comment, line 2).
 
 ### Decisions on US-6.1 and US-6.3 to US-6.5 (2026-10-27)
 
@@ -2226,6 +2450,47 @@ external websites, or anchor targets in the compiled output
   `See [[Gone]], [[Lost]], [x](Away.md).`, embedded → three warnings, each
   with file `Grit.md` and line 3. v0.18.0 gives the second and third a file
   name that contains marker text (`Grit.md -->[[Gone]], <!-- __vl__:3:Grit.md`).
+- **AC-6 Warnings that are not about a link** *(added 2026-11-10 from
+  [#56](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/56);
+  decided the same day)*. They too name a vault note and a line of it as
+  stored (frontmatter included, AC-5); no warning names `compiled-output` or
+  line 0:
+  - **Map warnings** (`TextMapper renderer not available`, `TextMapper render
+    failed: …`, `Map directive "…" is unknown and was ignored`): the note and
+    the line of the map's opening fence. A map drawn once for several places
+    (US-4.7) is reported once, at its first place in the document.
+  - **`Heading depth clamped to h6 in <note>`** for a heading the note
+    writes itself: that note and the line of its first clamped heading.
+  - **The title, a prefix depth and a section embed**: the title (injected,
+    or replacing the first heading), `Heading depth clamped: <note> prefix
+    depth …` and a section shifted past h6 have no heading line of their
+    own; their depth is set by where the note is embedded, so they name the
+    embedding note and the line of the embed. Through a pass-through
+    wrapper (US-6.5), that is the wrapper and its embed's line.
+  - **`Invalid output link`** (`<a href>`): the note and its line, like a
+    markdown link (it carries a location marker as well).
+
+  `Part.md` = `# Part` / `` / `Text.` / `` / ` ```text-mapper ` /
+  `0101 grass "Vale"` / ` ``` ` (fence on line 5), embedded from
+  `index.md` = `# Book` / `` / `![[Part]]`; measured with v0.23.0,
+  `compileAsync` (before → after):
+
+  | Case | v0.23.0 | after |
+  |---|---|---|
+  | 1. maps on, no renderer | `compiled-output`, 0 | `Part.md`, 5 (with `---` / `tags: [x]` / `---` above: 8) |
+  | 2. the renderer throws `boom` | `compiled-output`, 0 | `Part.md`, 5 |
+  | 3. the same map also on line 3 of `index.md`, above the embed | `compiled-output`, 0 (one warning) | `index.md`, 3 (one warning) |
+  | 3b. the same map on line 5 of `index.md`, below the embed on line 3 | `compiled-output`, 0 | `Part.md`, 5 (first in the document, though `index.md`'s own fence is read first) |
+  | 4. `# vault-compiler: no-glw` as the map's first line | `Part.md`, 0 | `Part.md`, 5 |
+  | 5. "Normalise headings" on; `index.md` = `# Book` / `## A` / `### B` / `#### C` / `##### D` / `![[Deep]]` (blank lines between, embed on line 11); `Deep.md` = `Intro.` / `` / `# One` / `` / `## Two` | `Deep.md`, 0 | `Deep.md`, 3 (`# One` would be h7) |
+  | 6. as 5, `Deep.md` = `# Top` / `` / `## Two` | `Deep.md`, 0 | `Deep.md`, 3 |
+  | 7. `index.md` = `# Book` / `` / `###### Deepest` / `` / `![[Deep]]`; `Deep.md` = `Flat text.`, or `# Top` / `` / `Text.` (the title would be h7) | `Deep.md`, 0 | `index.md`, 5 |
+  | 8. `index.md` = `# Book` / `` / `- [[2 Chapter]]`; `2 Chapter.md` = `Chapter text.` / `` / `![[2.1 Sub]]` / `` / `![[3 Wrong]]` | `3 Wrong.md`, 0 | `2 Chapter.md`, 5 |
+  | 9. `index.md` = `# Book` / `` / `###### Deep` / `` / `![[Rules#Combat]]`; `Rules.md` = `# Rules` / `` / `## Combat` / `` / `### Moves` / `` / `x` | `index.md`, 0 | `index.md`, 5; through `W.md` = `` / `![[Rules#Combat]]`: `W.md`, 2 |
+  | 10. `Part.md` = `---` / `tags: [x]` / `---` / `# Part` / `` / `![[Inner]]` / `` / `See <a href="file:///x">x</a>.`, `Inner.md` of five lines | `Part.md`, 14 | `Part.md`, 8 |
+
+  Messages and links are unchanged. With "Normalise headings" off there is
+  no clamp (US-6.1 caps at h6 without a warning).
 
 ### US-8.5 Each problem is reported once, where it was written
 **As a** vault owner  

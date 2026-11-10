@@ -39,5 +39,16 @@ part of the build.
 - A published copy is built by a script that stops on a list of forbidden
   words (names, titles, local user names, e-mail addresses), including inside
   archives. The list is a safety net, not the method.
+- A name that is no person or title can still come from real use: a view, a
+  template, a folder, a property or a preset name. Invent every such name for
+  a story, fixture or test example; do not copy it from a measurement or from
+  the private spec. The forbidden-word list cannot see these names. Before a
+  first publish of a story or fixture, grep the new public text for the
+  names found in the private working copies (file, folder, template and
+  property names), not only for the fixed list. Example (2026-11-09, Vault
+  Compiler #118): a story, four fixture notes and three tests named a view
+  `skill-details` taken from the author's own vault. The publish script
+  passed; a grep against the private folder names found it before the
+  publish, and it was renamed everywhere.
 - Applies next to: any project tested against a user's own documents, mail,
   photos, databases or logs.

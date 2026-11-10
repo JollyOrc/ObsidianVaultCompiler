@@ -80,13 +80,23 @@ describe('US-4.1: text-mapper block replaced by PNG image reference', () => {
     assert.match(match[1], /\.png$/);
   });
 
-  it('uses the correct alt text derived from the block source', async () => {
+  it('US-4.11 AC-1: a hex label is no alt text after rendering', async () => {
     const renderer = new SpyRenderer();
     const result = await new InMemoryVaultCompiler(
       oneBlockFiles('0101 forest "My Map"'),
       { renderer }
     ).compileAsync('index2compile.md');
-    assert.match(result.content, /!\[My Map\]/);
+    assert.match(result.content, /!\[\]\(assets\/textmapper\/[^)]+\.png\)/);
+    assert.doesNotMatch(result.content, /My Map/);
+  });
+
+  it('US-4.11 AC-2: the caption survives rendering', async () => {
+    const renderer = new SpyRenderer();
+    const result = await new InMemoryVaultCompiler(
+      oneBlockFiles('# vault-compiler: caption My Map\n0101 forest'),
+      { renderer }
+    ).compileAsync('index2compile.md');
+    assert.match(result.content, /!\[My Map\]\(assets\/textmapper\/[^)]+\.png\)/);
   });
 
   it('calls the renderer exactly once for a single block', async () => {

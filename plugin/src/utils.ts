@@ -469,3 +469,51 @@ export function decodeLink(text: string): string {
     });
   }
 }
+
+/**
+ * US-1.6 | Definitions: a line that starts a block, besides a quote
+ * (`splitQuote`) and a code fence (`FENCE`), read without the empty-line
+ * and heading cases.
+ */
+const BLOCK_START: RegExp[] = [
+  /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)/, // list item
+  /^ {0,3}\|/, // table row
+  /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/, // table delimiter row
+  /^ {0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|=+[ \t]*)$/, // thematic break, setext underline
+  /^ {0,3}\$\$/, // math block
+  /^ {0,3}\[[^\]]+\]:/, // footnote or link definition
+  /^[ \t]*(?:!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]*\))[ \t]*$/, // a line that is only an embed
+];
+
+/**
+ * US-1.6 | Definitions: whether a note's text (as stored, frontmatter
+ * removed) is one paragraph once its heading lines and the empty lines at
+ * both ends are dropped. It is not when an empty line is left, or a line
+ * starts a block (`BLOCK_START`), an HTML block (a line starting with `<`
+ * that is not a single `<!-- … -->` comment) or, on the first line,
+ * indented code. An empty result is one (empty) paragraph.
+ */
+export function isOneParagraph(text: string): boolean {
+  const lines = text.split('\n').map(line => line.replace(/\r$/, '')).filter(line => matchHeading(line) === null);
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim() === '') start++;
+  while (end > start && lines[end - 1].trim() === '') end--;
+  return lines.slice(start, end).every((line, index) => {
+    if (line.trim() === '') return false;
+    if (index === 0 && /^(?: {4}|\t)/.test(line)) return false;
+    if (/^ {0,3}</.test(line) && !/^[ \t]*<!--.*-->[ \t]*$/.test(line)) return false;
+    if (splitQuote(line, 1).depth > 0 || FENCE.test(line)) return false;
+    return !BLOCK_START.some(rule => rule.test(line));
+  });
+}
+
+/**
+ * US-1.6 | Definitions: whether `line` holds text besides embeds, read after
+ * its quote prefix and list marker (SCAR-041) — an embed on it is then an
+ * embed in a sentence.
+ */
+export function holdsSentence(line: string): boolean {
+  const body = splitQuote(line).body.replace(/^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+/, '');
+  return body.replace(/!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]*\)/g, '').trim() !== '';
+}

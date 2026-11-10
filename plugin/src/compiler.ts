@@ -12,6 +12,8 @@ import {
   fencedBlocks,
   matchHeading,
   headingLevel,
+  holdsSentence,
+  isOneParagraph,
   startsWithHeading,
   stripLeadingHeading,
   splitFrontmatter,
@@ -20,7 +22,7 @@ import {
   encodeAssetPath,
   normalizeAssetFilename,
 } from './utils.ts';
-import { altForTextMapper, buildPlaceholder, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
+import { buildPlaceholder, mapAlt, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
 import { detailBlockText, detailPlan, entryBlock, flattenLinks, headingForm, imageLink } from './entries.ts';
 import type { DetailItem } from './entries.ts';
@@ -266,7 +268,12 @@ interface EmbedContext {
   line: number;
   /** US-1.5: the embed is part of a quote, so the note is a quotation. */
   quoted: boolean;
+  /** US-1.6: the embed's line holds text besides embeds (`holdsSentence`). */
+  inSentence: boolean;
 }
+
+/** US-1.6 | AC-6: the warning for a note in a sentence that is not one paragraph. */
+const NOT_ONE_PARAGRAPH = 'Note embedded in a sentence is not one paragraph; embedded as a block';
 
 /** US-6.5 | Definitions: the single embed of a pass-through wrapper. */
 interface PassThrough {
@@ -275,6 +282,14 @@ interface PassThrough {
   anchor: string | null;
   /** US-8.5 | AC-3: the ambiguity message of the embed, reported by the caller. */
   ambiguity: string | null;
+  /** US-6.5 | AC-12: the embed's line in the wrapper as stored (US-8.4 AC-5). */
+  line: number;
+}
+
+/** US-8.4 | AC-5, AC-6: a note of the vault and a line of it as stored. */
+interface Place {
+  file: string;
+  line: number;
 }
 
 export interface WarningDetail {
@@ -395,7 +410,7 @@ export class InMemoryVaultCompiler {
 
     // Replace each image reference to a textmapper PNG with either the real
     // asset path (after rendering) or a placeholder comment.
-    const processed = await this.replaceTextMapperRefs(linked, async (assetRef, code) => {
+    const processed = await this.replaceTextMapperRefs(linked, async (assetRef, code, offset) => {
       // assetRef is e.g. "assets/textmapper/abc123_2cb44a0b.png" (US-4.8 AC-6).
       const parsed = parseMapAssetRef(assetRef);
       const hash = parsed ? `${parsed.hash}_${parsed.key}` : assetRef;
@@ -406,14 +421,11 @@ export class InMemoryVaultCompiler {
       }
       renderedHashes.add(hash);
 
+      // US-8.4 | AC-6: the first place of the map, read before the first await.
+      const place = this.mapPlace(linked, offset, assetRef);
       if (!renderer || !renderer.isAvailable()) {
         this.warnings.push('Warning: TextMapper renderer not available');
-        this.warningDetails.push({
-          message: 'TextMapper renderer not available',
-          link: assetRef,
-          file: 'compiled-output',
-          line: 0,
-        });
+        this.warningDetails.push({ message: 'TextMapper renderer not available', link: assetRef, ...place });
         return buildPlaceholder(code, 'TextMapper renderer not available');
       }
 
@@ -424,12 +436,7 @@ export class InMemoryVaultCompiler {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.warnings.push(`Warning: TextMapper render failed: ${msg}`);
-        this.warningDetails.push({
-          message: `TextMapper render failed: ${msg}`,
-          link: assetRef,
-          file: 'compiled-output',
-          line: 0,
-        });
+        this.warningDetails.push({ message: `TextMapper render failed: ${msg}`, link: assetRef, ...place });
         return buildPlaceholder(code, msg);
       }
     });
@@ -452,7 +459,7 @@ export class InMemoryVaultCompiler {
    */
   private async replaceTextMapperRefs(
     content: string,
-    replacer: (assetRef: string, code: string) => Promise<string>,
+    replacer: (assetRef: string, code: string, offset: number) => Promise<string>,
   ): Promise<string> {
     // Regex matches image embeds that point at a textmapper asset.
     const pattern = /!\[([^\]]*)\]\((assets\/textmapper\/[^)]+\.png)\)/g;
@@ -464,7 +471,7 @@ export class InMemoryVaultCompiler {
       const alt = m[1];
       const assetRef = m[2];
       const code = this.textMapperSources.get(assetRef) ?? '';
-      const replacement = replacer(assetRef, code).then(r => {
+      const replacement = replacer(assetRef, code, m.index).then(r => {
         // If the replacer returned a plain asset path, re-wrap as an image tag.
         if (r.startsWith('assets/')) {
           return `![${alt}](${r})`;
@@ -481,6 +488,24 @@ export class InMemoryVaultCompiler {
 
   // Maps assetRef → original code block source so compileAsync can invoke the renderer.
   private textMapperSources = new Map<string, string>();
+
+  /**
+   * US-8.4 | AC-6: the opening fence of each map, by `<note>\n<assetRef>`
+   * (first fence in that note) and by `<assetRef>` (first fence read).
+   */
+  private mapPlaces = new Map<string, Place>();
+
+  /**
+   * US-8.4 | AC-6: the note and fence line of the map image at `offset` of
+   * the assembled `content`: the note whose part holds the image, else the
+   * first fence read for that map.
+   */
+  private mapPlace(content: string, offset: number, assetRef: string): Place {
+    const note = this.noteAt(content, offset);
+    return (note !== null ? this.mapPlaces.get(`${note}\n${assetRef}`) : undefined)
+      ?? this.mapPlaces.get(assetRef)
+      ?? { file: this.root, line: 1 };
+  }
 
   private norm(path: string): string {
     return path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\//, '').replace(/\/$/, '');
@@ -890,6 +915,7 @@ export class InMemoryVaultCompiler {
     lastOriginalHeadingLevelInParent = 0,
     forcedDepth: number | null = null,
     quoted = false,
+    site: Place | null = null,
   ): string {
     if (!this.files.has(path)) {
       this.stats.missingReferences += 1;
@@ -929,18 +955,31 @@ export class InMemoryVaultCompiler {
 
     // TextMapper rendering.
     if (this.options.enableTextMapper) {
-      const fenced = this.processTextMapperFences(content, (code) => {
-        const alt = altForTextMapper(code);
+      const fenced = this.processTextMapperFences(content, (code, start) => {
+        const alt = mapAlt(code);
         const hash = computeContentHash(code);
         const filename = mapAssetName(hash, this.options.mapFontKey);
         const assetRef = `${this.options.assetFolder}/textmapper/${filename}`;
         // Record the source so compileAsync can pass it to the renderer.
         this.textMapperSources.set(assetRef, code);
+        // US-8.4 | AC-6: where the map is written, for the render warnings.
+        const fence = { file: path, line: lineMap[start] };
+        if (!this.mapPlaces.has(`${path}\n${assetRef}`)) this.mapPlaces.set(`${path}\n${assetRef}`, fence);
+        if (!this.mapPlaces.has(assetRef)) this.mapPlaces.set(assetRef, fence);
         // US-4.10 | AC-2: one warning per block occurrence and unknown word.
-        for (const word of parseMapDirectives(code).unknown) {
+        const directives = parseMapDirectives(code);
+        for (const word of directives.unknown) {
           const message = `Map directive "${word}" is unknown and was ignored`;
           this.warnings.push(`Warning: ${message}`);
-          this.warningDetails.push({ message, link: word, file: path, line: 0 });
+          this.warningDetails.push({ message, link: word, ...fence });
+        }
+        // US-4.11 | AC-3, AC-4: a caption Obsidian2Typst would cut, a caption given twice.
+        const [caption, repeated] = directives.captions;
+        if (caption?.includes('|')) {
+          this.report('Map caption contains "|"; Obsidian2Typst ends the caption there', caption, fence.file, fence.line);
+        }
+        if (repeated !== undefined) {
+          this.report('Map caption is given more than once; the first is used', repeated, fence.file, fence.line);
         }
         return `![${alt}](${assetRef})`;
       });
@@ -1033,11 +1072,11 @@ export class InMemoryVaultCompiler {
 
     if (quoted && autoHeading) {
       // US-1.5 | AC-6: a pass-through wrapper adds no quote title.
-      const passThrough = this.matchPassThrough(content, path);
+      const passThrough = this.matchPassThrough(content, path, lineMap);
       if (passThrough !== null) {
         const expanded = passThrough.anchor === null
           ? this.processMarkdown(passThrough.target, true, 0, 0, null, true)
-          : this.quotedSection(passThrough.target, passThrough.anchor, passThrough.rawPath, path, lineMap[0]);
+          : this.quotedSection(passThrough.target, passThrough.anchor, passThrough.rawPath, path, passThrough.line);
         this.processedStack.pop();
         return this.wrapWithSentinel(expanded, path);
       }
@@ -1045,15 +1084,16 @@ export class InMemoryVaultCompiler {
 
     if (normalise && autoHeading && !quoted) {
       const base = this.basename(path);
-      const depth = forcedDepth ?? this.fileDepth(base, path, parentDepth, lastOriginalHeadingLevelInParent);
+      // US-8.4 | AC-6: where this note is embedded; its title is reported there.
+      const embeddedAt = site ?? { file: path, line: lineMap[0] };
+      const depth = forcedDepth ?? this.fileDepth(base, parentDepth, lastOriginalHeadingLevelInParent, embeddedAt);
 
       // US-6.5: a wrapper around one embed adds no heading of its own.
-      const passThrough = this.matchPassThrough(content, path);
+      const passThrough = this.matchPassThrough(content, path, lineMap);
       if (passThrough !== null) {
         if (passThrough.ambiguity !== null) {
           // US-8.5 | AC-3: the wrapper's only embed, on its first non-empty line.
-          const line = lineMap[content.split('\n').findIndex(l => l.trim() !== '')];
-          this.report(passThrough.ambiguity, passThrough.rawPath, path, line);
+          this.report(passThrough.ambiguity, passThrough.rawPath, path, passThrough.line);
         }
         const expanded = this.expandPassThrough(passThrough, path, depth);
         this.processedStack.pop();
@@ -1061,6 +1101,7 @@ export class InMemoryVaultCompiler {
       }
 
       const { content: normContent, clamped, title } = this.applyHeadingNormalisation(content, depth, path);
+      const clampedAt = clamped === 'title' ? embeddedAt : clamped === null ? null : { file: path, line: lineMap[clamped] };
       // An injected (not replacing) title adds lines above the source text.
       const added = normContent.split('\n').length - content.split('\n').length;
       if (added > 0) lineMap = [...Array<number>(added).fill(lineMap[0]), ...lineMap];
@@ -1069,10 +1110,10 @@ export class InMemoryVaultCompiler {
       this.headingMap.set(path, title);
       effectiveDepth = Math.min(6, depth);
       titleInjected = true;
-      if (clamped) {
+      if (clampedAt !== null) {
         const message = `Heading depth clamped to h6 in ${base}`;
         this.warnings.push(`Warning: ${message}`);
-        this.warningDetails.push({ message, link: base, file: path, line: 0 });
+        this.warningDetails.push({ message, link: base, ...clampedAt });
       }
     }
 
@@ -1103,7 +1144,7 @@ export class InMemoryVaultCompiler {
           if (skipTitle) skipTitle = false;
           else lastOriginal = heading.level;
         }
-        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index], quoted };
+        const context: EmbedContext = { depth: effectiveDepth, lastOriginal, line: lineMap[index], quoted, inSentence: holdsSentence(line) };
         // US-8.4 | AC-5: links carry their note and source line to link conversion.
         const expand = (text: string, embedContext = context) => {
           const marked = this.markLinks(text, path, lineMap[index]);
@@ -1277,7 +1318,7 @@ export class InMemoryVaultCompiler {
   // ── Provenance sentinel helpers ─────────────────────────────────────────────
   // A begin/end sentinel pair is injected around each vault file's content block
   // so post-assembly passes (convertLinks, sanitizeOutput) can attribute warnings
-  // to the correct source file rather than 'compiled-output'.
+  // to the note the text came from (US-8.4 AC-5, AC-6).
   // Sentinels are stripped from the final CompileResult.content.
 
   private static readonly SB = '<!-- __vs__:';  // sentinel begin prefix
@@ -1291,11 +1332,12 @@ export class InMemoryVaultCompiler {
   }
 
   /**
-   * Given the assembled content string and a character offset within it, return
-   * the vault file path and approximate line number for that position by
-   * consulting the nearest enclosing provenance sentinel pair.
+   * US-8.4 | AC-5, AC-6: the note and source line of the link at `offset` of
+   * the assembled `content`, read from the location marker right before it
+   * (`markLinks`). Without a marker, the note whose part holds the offset
+   * (`noteAt`, else the starting note) and the line counted inside that part.
    */
-  private findSourceLocation(content: string, offset: number): { file: string; line: number } {
+  private findSourceLocation(content: string, offset: number): Place {
     // US-8.4 | AC-5: a link carries its location in the marker right before it.
     // The note part may not run past a ` -->`, so only the last marker on the
     // line is read, not the first one up to the last's end (#98).
@@ -1303,55 +1345,29 @@ export class InMemoryVaultCompiler {
     if (marked) {
       return { file: marked[2], line: Number(marked[1]) };
     }
+    const file = this.noteAt(content, offset) ?? this.root;
+    const beginTag = InMemoryVaultCompiler.SB + file + InMemoryVaultCompiler.SS + '\n';
+    const begin = content.lastIndexOf(beginTag, offset);
+    const from = begin === -1 ? 0 : begin + beginTag.length;
+    return { file, line: content.slice(from, offset).split('\n').length };
+  }
 
-    const beginRe = /<!-- __vs__:(.*?) -->/g;
-    const endRe   = /<!-- __ve__:(.*?) -->/g;
-
-    type Ev = { pos: number; kind: 'b' | 'e'; path: string };
-    const evs: Ev[] = [];
-
-    let m: RegExpExecArray | null;
-    while ((m = beginRe.exec(content)) !== null) {
-      evs.push({ pos: m.index, kind: 'b', path: m[1] });
-    }
-    while ((m = endRe.exec(content)) !== null) {
-      evs.push({ pos: m.index, kind: 'e', path: m[1] });
-    }
-    evs.sort((a, b) => a.pos - b.pos);
-
-    // Simulate a stack up to (but not past) the target offset.
+  /**
+   * US-8.4 | AC-6: the note whose part of the assembled `content` (between
+   * its provenance sentinels) holds `offset` — the innermost one — or null
+   * outside every part.
+   */
+  private noteAt(content: string, offset: number): string | null {
     const stack: string[] = [];
-    for (const ev of evs) {
-      if (ev.pos >= offset) break;
-      if (ev.kind === 'b') {
-        stack.push(ev.path);
+    for (const m of content.slice(0, offset).matchAll(/<!-- __v([se])__:(.*?) -->/g)) {
+      if (m[1] === 's') {
+        stack.push(m[2]);
       } else {
-        const top = stack.lastIndexOf(ev.path);
+        const top = stack.lastIndexOf(m[2]);
         if (top !== -1) stack.splice(top, 1);
       }
     }
-
-    const file = stack[stack.length - 1] ?? 'compiled-output';
-
-    // Compute approximate line within this file's sentinel block.
-    if (file !== 'compiled-output') {
-      const beginTag = InMemoryVaultCompiler.SB + file + InMemoryVaultCompiler.SS + '\n';
-      let search = 0;
-      let lastBegin = -1;
-      while (true) {
-        const p = content.indexOf(beginTag, search);
-        if (p === -1 || p >= offset) break;
-        lastBegin = p;
-        search = p + 1;
-      }
-      if (lastBegin >= 0) {
-        const sectionStart = lastBegin + beginTag.length;
-        const line = content.slice(sectionStart, offset).split('\n').length;
-        return { file, line };
-      }
-    }
-
-    return { file: 'compiled-output', line: content.slice(0, offset).split('\n').length };
+    return stack[stack.length - 1] ?? null;
   }
 
   /** Strip all provenance sentinel comments from assembled content. */
@@ -1364,14 +1380,15 @@ export class InMemoryVaultCompiler {
 
   /**
    * US-8.4 | AC-5: puts a location marker (`<!-- __vl__:<line>:<note> -->`)
-   * in front of every link that `convertLinks` will read — wiki links and
-   * markdown links, not embeds — so its warnings name the note and source
-   * line however the document is assembled. `stripSentinels` removes them.
+   * in front of every link that `convertLinks` or `sanitizeOutput` will read
+   * — wiki links, markdown links and `<a href` (US-8.4 AC-6), not embeds — so
+   * its warnings name the note and source line however the document is
+   * assembled. `stripSentinels` removes them.
    */
   private markLinks(line: string, path: string, sourceLine: number): string {
     const marker = `<!-- __vl__:${sourceLine}:${path} -->`;
     const mark = (text: string) =>
-      text.replace(/(?<!!)(?:\[\[[^\]|]+(?:\|[^\]]*)?\]\]|\[[^\]]*\]\([^)]+\))/g, link => marker + link);
+      text.replace(/(?<!!)(?:\[\[[^\]|]+(?:\|[^\]]*)?\]\]|\[[^\]]*\]\([^)]+\))|<a\s+href="/g, link => marker + link);
     // Embeds are left whole: their targets are read by the embed passes.
     const EMBED = /!\[\[[^\]|]+(?:\|[^\]]*)?\]\]|!\[[^\]]*\]\([^)]+\)/g;
     let out = '';
@@ -1393,7 +1410,7 @@ export class InMemoryVaultCompiler {
    */
   private processTextMapperFences(
     content: string,
-    onBlock: (code: string) => string
+    onBlock: (code: string, start: number) => string
   ): { text: string; from: number[] } {
     const rawLines = content.split('\n');
     const result: string[] = [];
@@ -1415,7 +1432,7 @@ export class InMemoryVaultCompiler {
         const closeMatch = line.match(/^(`{3,})\s*$/);
         if (closeMatch && closeMatch[1].length === 3) {
           inTm = false;
-          push(onBlock(tmLines.join('\n')), blockStart);
+          push(onBlock(tmLines.join('\n'), blockStart), blockStart);
           tmLines = [];
         } else {
           tmLines.push(line);
@@ -1491,7 +1508,7 @@ export class InMemoryVaultCompiler {
    * goes one level below the last original heading above the embed, or one
    * below the embedding file when there is none (OD-2).
    */
-  private fileDepth(base: string, path: string, parentDepth: number, lastOriginal: number): number {
+  private fileDepth(base: string, parentDepth: number, lastOriginal: number, embeddedAt: Place): number {
     const prefixDepth = this.parsePrefixDepth(base);
     if (prefixDepth === null) {
       return lastOriginal > 0 ? lastOriginal + 1 : parentDepth + 1;
@@ -1500,7 +1517,7 @@ export class InMemoryVaultCompiler {
       const clampedTo = parentDepth + 1;
       const message = `Heading depth clamped: ${base} prefix depth ${prefixDepth} < parent depth ${parentDepth + 1}, clamped to ${clampedTo}`;
       this.warnings.push(`Warning: ${message}`);
-      this.warningDetails.push({ message, link: base, file: path, line: 0 });
+      this.warningDetails.push({ message, link: base, ...embeddedAt });
       return clampedTo;
     }
     return prefixDepth;
@@ -1514,18 +1531,20 @@ export class InMemoryVaultCompiler {
    *   replaced heading`.
    * - Preamble or headingless file: the title is put before the content at
    *   `depth`; internal headings shift so the first one lands at `depth + 1`.
-   * Levels are clamped to h1–h6; `clamped` is true when anything went past h6.
+   * Levels are clamped to h1–h6. `clamped` names what went past h6 first
+   * (US-8.4 AC-6): `'title'` when the title did, else the index in `content`
+   * of the first own heading that did, else null.
    * The title comes from `titleFromBasename` (US-6.4 title rule).
    */
   private applyHeadingNormalisation(
     content: string,
     depth: number,
     filePath: string,
-  ): { content: string; clamped: boolean; title: string } {
+  ): { content: string; clamped: 'title' | number | null; title: string } {
     const lines = content.split('\n');
     const inCode = codeBlockMask(lines);
     const title = titleFromBasename(this.basename(filePath));
-    let clamped = depth > 6;
+    let clamped: 'title' | number | null = depth > 6 ? 'title' : null;
     const titleHeading = '#'.repeat(Math.min(6, Math.max(1, depth))) + ' ' + title;
     // KD-3: lines inside code blocks are never headings and never shifted.
     const headingAt = (i: number) => (inCode[i] ? null : matchHeading(lines[i]));
@@ -1533,7 +1552,7 @@ export class InMemoryVaultCompiler {
       const h = headingAt(i);
       if (!h) return lines[i];
       const raw = h.level + shift;
-      if (raw > 6) clamped = true;
+      if (raw > 6 && clamped === null) clamped = i;
       return '#'.repeat(Math.min(6, Math.max(1, raw))) + h.rest;
     };
 
@@ -1561,9 +1580,10 @@ export class InMemoryVaultCompiler {
    * US-6.3 | AC-7, US-6.5 | AC-6: move a section so its shallowest heading
    * lands at `depth`, up or down (OD-3); the other headings keep their
    * distance to it. Levels are clamped to h1–h6, and going past h6 records a
-   * warning naming `label`. Heading text is never changed.
+   * warning naming `label`, at `embeddedAt` — the embed whose place sets the
+   * depth (US-8.4 AC-6). Heading text is never changed.
    */
-  private shiftSectionTo(section: string, depth: number, label: string, warnFile: string): string {
+  private shiftSectionTo(section: string, depth: number, label: string, embeddedAt: Place): string {
     const lines = section.split('\n');
     const inCode = codeBlockMask(lines);
     // KD-3: lines inside code blocks are never headings and never shifted.
@@ -1583,7 +1603,7 @@ export class InMemoryVaultCompiler {
     if (clamped) {
       const message = `Heading depth clamped to h6 in ${label}`;
       this.warnings.push(`Warning: ${message}`);
-      this.warningDetails.push({ message, link: label, file: warnFile, line: 0 });
+      this.warningDetails.push({ message, link: label, ...embeddedAt });
     }
     return shifted;
   }
@@ -1642,6 +1662,34 @@ export class InMemoryVaultCompiler {
   }
 
   /**
+   * US-1.6 | AC-1 to AC-5: the text a note embedded in a sentence puts into
+   * it, or null when the note — or its section `anchor` — is not one
+   * paragraph as stored (`isOneParagraph`; the caller then reports and
+   * embeds it as a block, AC-6). The decision is read before anything is
+   * processed, so the note is processed once either way. It is processed in
+   * quote mode without a title (no normalising, no place in the book, no
+   * entry block — AC-5, US-1.5 AC-8); its heading lines, provenance lines and
+   * empty lines are dropped and the rest joined by single spaces, each line
+   * trimmed. A missing section gives the US-1.2 comment.
+   */
+  private sentenceText(target: string, anchor: string | null, currentFile: string, line: number): string | null {
+    const body = this.readNote(target).body;
+    const asWritten = anchor === null ? body : this.extractSection(body, anchor, true);
+    if (asWritten !== null && !isOneParagraph(asWritten)) return null;
+    let text = this.processMarkdown(target, false, 0, 0, null, true);
+    if (anchor !== null) {
+      const section = this.extractSection(text, anchor, true);
+      if (section === null) return this.missingSection(target, anchor, currentFile, line).trim();
+      text = section;
+    }
+    return text
+      .split('\n')
+      .filter(l => !isSentinelLine(l) && l.trim() !== '' && matchHeading(l) === null)
+      .map(l => l.trim())
+      .join(' ');
+  }
+
+  /**
    * US-1.5 | AC-3 to AC-6: a note embedded in a quote — the whole note with
    * its quote title, or the named section without one — in quote mode, so
    * nothing in it is normalised or registered as a place in the book.
@@ -1658,71 +1706,96 @@ export class InMemoryVaultCompiler {
   private quotedSection(path: string, anchor: string, rawLink: string, currentFile: string, line: number): string {
     const processed = this.processMarkdown(path, false, 0, 0, null, true);
     const section = this.extractSection(processed, anchor, true);
-    if (section === null) {
-      const anchorRef = `${path}#${anchor}`;
-      const message = `Missing heading anchor: ${anchorRef}`;
-      this.warnings.push(`Warning: ${message}`);
-      this.warningDetails.push({ message, link: anchorRef, file: currentFile, line });
-      return `\n<!-- Warning: ${message} -->\n`;
-    }
+    if (section === null) return this.missingSection(path, anchor, currentFile, line);
     return `\n${this.wrapWithSentinel(section, path)}\n`;
   }
 
   /**
-   * US-6.5 | Definitions: returns the wrapped embed when `content` is a
-   * pass-through wrapper, otherwise null.
+   * US-6.5 | Definitions, AC-11: the single embed of a wrapper, read as every
+   * embed is read, or null when `content` is not one note embed.
    *
-   * A wrapper is exactly one markdown embed (wiki or markdown syntax, with or
-   * without anchor) once whitespace is ignored. It is a pass-through when the
-   * embed is an anchor embed or its target is effectively heading-first.
+   * `content` is a wrapper when, ignoring whitespace, it is exactly one embed
+   * in wiki or markdown syntax. The markdown destination is read by
+   * `parseEmbedDestination` (`<…>`, a title after it), and path and heading
+   * are looked up together by `resolve`, so percent escapes are decoded in
+   * both and a path may be relative or lack `.md`. Returns the path part as
+   * written (for reports), the target note and the decoded heading (null for
+   * a whole-note embed). A web address, a missing target or a file that is no
+   * note gives null. Reports nothing (US-8.5 AC-1).
    */
-  private matchPassThrough(content: string, path: string): PassThrough | null {
+  private readWrapper(content: string, path: string): { rawPath: string; resolved: ResolvedTarget } | null {
     const trimmed = content.trim();
-    const wiki = trimmed.match(/^!\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|[^\]]*)?\]\]$/s);
-    const md = trimmed.match(/^!\[[^\]]*\]\(([^)#]+\.md)(?:#([^)]*))?\)$/s);
-    const match = wiki ?? md;
-    if (!match) return null;
-
-    const rawPath = match[1].trim();
-    const anchor = match[2] != null ? match[2].trim() : null;
-    const resolved = this.resolve(rawPath, path);
+    const wiki = trimmed.match(/^!\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
+    const md = trimmed.match(/^!\[[^\]]*\]\(([^)]+)\)$/);
+    if (!wiki && !md) return null;
+    const link = (wiki ? wiki[1] : parseEmbedDestination(md![1]).path).trim();
+    if (isWebAddress(link)) return null;
+    const resolved = this.resolve(link, path);
     if (resolved.missing || !this.isMarkdownPath(resolved.path)) return null;
-    if (anchor === null && !this.isEffectivelyHeadingFirst(resolved.path)) return null;
-    return { rawPath, target: resolved.path, anchor, ambiguity: resolved.ambiguity };
+    const anchor = resolved.anchor === null ? null : resolved.anchor.trim();
+    return { rawPath: link.split('#')[0].trim(), resolved: { ...resolved, anchor } };
   }
 
   /**
-   * US-6.5 | AC-1, AC-6 to AC-8, "What the pass-through produces" (OD-6):
-   * expand a pass-through at the wrapper's `depth`.
+   * US-6.5 | Definitions, AC-11, AC-12: returns the wrapped embed when
+   * `content` is a pass-through wrapper, otherwise null.
+   *
+   * A wrapper (`readWrapper`) is a pass-through when its embed is an anchor
+   * embed or its target is effectively heading-first. `lineMap` gives the
+   * source line of each line of `content`; the embed's line goes with it.
+   */
+  private matchPassThrough(content: string, path: string, lineMap: number[]): PassThrough | null {
+    const wrapper = this.readWrapper(content, path);
+    if (wrapper === null) return null;
+    const { rawPath, resolved } = wrapper;
+    if (resolved.anchor === null && !this.isEffectivelyHeadingFirst(resolved.path)) return null;
+    const line = lineMap[content.split('\n').findIndex(l => l.trim() !== '')] ?? 0;
+    return { rawPath, target: resolved.path, anchor: resolved.anchor, ambiguity: resolved.ambiguity, line };
+  }
+
+  /**
+   * US-1.2 "missing heading"; US-6.5 | AC-12; US-1.5 | AC-5: the report of a
+   * section embed whose heading the note does not have. One warning, one
+   * detail (`<note>#<heading>`, the embedding note and the embed's line), and
+   * the comment that stands in the output for the section. The only place
+   * this report is made for an embed.
+   */
+  private missingSection(target: string, anchor: string, file: string, line: number): string {
+    const anchorRef = `${target}#${anchor}`;
+    const message = `Missing heading anchor: ${anchorRef}`;
+    this.warnings.push(`Warning: ${message}`);
+    this.warningDetails.push({ message, link: anchorRef, file, line });
+    return `\n<!-- Warning: ${message} -->\n`;
+  }
+
+  /**
+   * US-6.5 | AC-1, AC-6 to AC-8, AC-12, "What the pass-through produces"
+   * (OD-6): expand a pass-through at the wrapper's `depth`.
    *
    * A whole-file target is processed as if embedded directly at `depth`: its
    * own prefix is not consulted and its title replaces its first heading. An
-   * anchor target is the named section moved to `depth` with its text kept.
+   * anchor target is the named section moved to `depth` with its text kept;
+   * a heading the target does not have is reported by `missingSection`.
    * The wrapper's link anchor is the heading the pass-through shows.
    */
   private expandPassThrough(pt: PassThrough, path: string, depth: number): string {
     const base = this.basename(path);
     if (pt.anchor === null) {
       // US-9.3 | AC-3: the wrapper keeps what it writes; a repeated target is the comment.
-      const inner = this.repeatOf(pt.target, path, this.sourceLineOf(path, pt.rawPath))
-        ?? this.processMarkdown(pt.target, true, depth - 1, 0, depth);
+      const inner = this.repeatOf(pt.target, path, pt.line)
+        ?? this.processMarkdown(pt.target, true, depth - 1, 0, depth, false, { file: path, line: pt.line });
       this.headingMap.set(path, this.headingMap.get(pt.target) ?? titleFromBasename(this.basename(pt.target)));
       return inner;
     }
 
     const raw = this.processMarkdown(pt.target, false).replace(/<!-- __v[se]__:[^\s>]+ -->/g, '');
     const section = this.extractSection(raw, pt.anchor);
-    if (section === null) {
-      const message = `Missing heading anchor: ${pt.target}#${pt.anchor}`;
-      this.warnings.push(`Warning: ${message}`);
-      this.warningDetails.push({ message, link: pt.rawPath, file: path, line: 0 });
-      return '';
-    }
+    if (section === null) return this.missingSection(pt.target, pt.anchor, path, pt.line);
     // The section starts with its anchor heading (never inside a code block).
     const shown = section.split('\n').map(l => matchHeading(l.replace(LINE_MARKER, ''))).find(h => h !== null);
     this.headingMap.set(path, shown ? shown.rest.trim() : titleFromBasename(base));
     // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
-    return '\n' + this.wrapWithSentinel(this.shiftSectionTo(section, depth, base, path), pt.target) + '\n';
+    return '\n' + this.wrapWithSentinel(this.shiftSectionTo(section, depth, base, { file: path, line: pt.line }), pt.target) + '\n';
   }
 
   /**
@@ -1755,20 +1828,11 @@ export class InMemoryVaultCompiler {
     if (firstNonEmpty === undefined) return false;
     if (matchHeading(firstNonEmpty) !== null) return true;
 
-    // Not heading-first on its own — check if it is a pass-through.
-    const trimmed = raw.trim();
-    const wikiM = trimmed.match(/^!\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|[^\]]*)?\]\]$/s);
-    const mdM   = trimmed.match(/^!\[[^\]]*\]\(([^)#]+\.md)(?:#([^)]*))?\)$/s);
-
-    if (!wikiM && !mdM) return false;
-
-    const targetRaw  = wikiM ? wikiM[1].trim() : mdM![1].trim();
-    const hasAnchor  = wikiM ? wikiM[2] != null : mdM![2] != null;
-
-    if (hasAnchor) return true; // anchor embed is trivially heading-first
-
-    const resolved = this.resolve(targetRaw, filePath);
-    if (resolved.missing || !this.isMarkdownPath(resolved.path)) return false;
+    // Not heading-first on its own — check if it is a wrapper (US-6.5 AC-11).
+    const wrapper = this.readWrapper(raw, filePath);
+    if (wrapper === null) return false;
+    const { resolved } = wrapper;
+    if (resolved.anchor !== null) return true; // anchor embed is trivially heading-first
 
     visited.add(filePath);
     return this.isEffectivelyHeadingFirst(resolved.path, visited);
@@ -1795,6 +1859,12 @@ export class InMemoryVaultCompiler {
       if (resolved.ambiguity !== null) {
         this.report(resolved.ambiguity, link, currentFile, context.line);
       }
+      // US-1.6: a note embedded in a sentence.
+      if (this.isMarkdownPath(resolved.path) && context.inSentence) {
+        const text = this.sentenceText(resolved.path, resolved.anchor, currentFile, context.line);
+        if (text !== null) return text;
+        this.report(NOT_ONE_PARAGRAPH, link, currentFile, context.line);
+      }
       if (this.isMarkdownPath(resolved.path) && context.quoted) {
         return this.quotedNote(resolved.path, resolved.anchor, link, currentFile, context.line);
       }
@@ -1805,22 +1875,17 @@ export class InMemoryVaultCompiler {
           const processed = this.processMarkdown(resolved.path, false);
           let section = this.extractSection(processed, resolved.anchor);
           if (section === null) {
-            const lineNum = context.line;
-            const anchorRef = `${resolved.path}#${resolved.anchor}`;
-            const message = `Missing heading anchor: ${anchorRef}`;
-            this.warnings.push(`Warning: ${message}`);
-            this.warningDetails.push({ message, link: anchorRef, file: currentFile, line: lineNum });
-            return `\n<!-- Warning: ${message} -->\n`;
+            return this.missingSection(resolved.path, resolved.anchor, currentFile, context.line);
           }
           if (this.options.normaliseHeadings === true) {
-            section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), currentFile);
+            section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), { file: currentFile, line: context.line });
           }
           // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
           return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
         // US-9.3 | AC-2: an entry note compiled before becomes a comment.
         return this.repeatOf(resolved.path, currentFile, context.line)
-          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
+          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal, null, false, { file: currentFile, line: context.line });
       }
       const alt = display ? display.trim() : '';
       return this.assetTag(resolved.path, alt);
@@ -1901,6 +1966,12 @@ export class InMemoryVaultCompiler {
       if (resolved.ambiguity !== null) {
         this.report(resolved.ambiguity, destination.path, currentFile, context.line);
       }
+      // US-1.6: a note embedded in a sentence.
+      if (this.isMarkdownPath(resolved.path) && context.inSentence) {
+        const text = this.sentenceText(resolved.path, resolved.anchor, currentFile, context.line);
+        if (text !== null) return text;
+        this.report(NOT_ONE_PARAGRAPH, destination.path, currentFile, context.line);
+      }
       if (this.isMarkdownPath(resolved.path) && context.quoted) {
         return this.quotedNote(resolved.path, resolved.anchor, destination.path, currentFile, context.line);
       }
@@ -1910,22 +1981,17 @@ export class InMemoryVaultCompiler {
           const processed = this.processMarkdown(resolved.path, false);
           let section = this.extractSection(processed, resolved.anchor);
           if (section === null) {
-            const lineNum = context.line;
-            const anchorRef = `${resolved.path}#${resolved.anchor}`;
-            const message = `Missing heading anchor: ${anchorRef}`;
-            this.warnings.push(`Warning: ${message}`);
-            this.warningDetails.push({ message, link: anchorRef, file: currentFile, line: lineNum });
-            return `\n<!-- Warning: ${message} -->\n`;
+            return this.missingSection(resolved.path, resolved.anchor, currentFile, context.line);
           }
           if (this.options.normaliseHeadings === true) {
-            section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), currentFile);
+            section = this.shiftSectionTo(section, this.sectionDepth(context), this.basename(resolved.path), { file: currentFile, line: context.line });
           }
           // US-2.3 | AC-3 to AC-5: link conversion finds where the note is.
           return `\n${this.wrapWithSentinel(section, resolved.path)}\n`;
         }
         // US-9.3 | AC-2: an entry note compiled before becomes a comment.
         return this.repeatOf(resolved.path, currentFile, context.line)
-          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal);
+          ?? this.processMarkdown(resolved.path, true, context.depth, context.lastOriginal, null, false, { file: currentFile, line: context.line });
       }
       const tag = this.assetTag(resolved.path, alt);
       // US-2.6 | AC-3: an image keeps its title after the new path.

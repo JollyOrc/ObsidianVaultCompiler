@@ -60,59 +60,59 @@ const GLOW = /<text\b[^>]*stroke="white" stroke-width="5pt"/g;
 describe('US-4.10 AC-1: directive lines', () => {
   it('both words in one line', () => {
     assert.deepEqual(parse('# vault-compiler: no-outlines no-glow\n0101 forest "Peak"'),
-      { noOutlines: true, noGlow: true, unknown: [] });
+      { noOutlines: true, noGlow: true, unknown: [], captions: [] });
   });
 
   it('several lines anywhere add up; key and words ignore case', () => {
     const code = '# vault-compiler: no-outlines\n0101 forest\n0102 forest\n#Vault-Compiler: NO-GLOW';
-    assert.deepEqual(parse(code), { noOutlines: true, noGlow: true, unknown: [] });
+    assert.deepEqual(parse(code), { noOutlines: true, noGlow: true, unknown: [], captions: [] });
   });
 
   it('spaces after `#` and between words are allowed', () => {
     assert.deepEqual(parse('#   vault-compiler:   no-glow   \n0101 forest'),
-      { noOutlines: false, noGlow: true, unknown: [] });
+      { noOutlines: false, noGlow: true, unknown: [], captions: [] });
   });
 
   it('a line with leading spaces is not a directive line, and is not reported', () => {
     assert.deepEqual(parse('  # vault-compiler: no-glow\n0101 forest'),
-      { noOutlines: false, noGlow: false, unknown: [] });
+      { noOutlines: false, noGlow: false, unknown: [], captions: [] });
   });
 
   it('`vault compiler` without the hyphen is an ordinary comment', () => {
     assert.deepEqual(parse('# vault compiler: no-glow\n0101 forest'),
-      { noOutlines: false, noGlow: false, unknown: [] });
+      { noOutlines: false, noGlow: false, unknown: [], captions: [] });
   });
 
   it('a map without directive lines switches nothing', () => {
     assert.deepEqual(parse('# a comment\n0101 forest "Peak"'),
-      { noOutlines: false, noGlow: false, unknown: [] });
+      { noOutlines: false, noGlow: false, unknown: [], captions: [] });
   });
 
   it('a directive word in a label or a non-comment line is not a directive', () => {
     assert.deepEqual(parse('0101 forest "vault-compiler: no-glow"'),
-      { noOutlines: false, noGlow: false, unknown: [] });
+      { noOutlines: false, noGlow: false, unknown: [], captions: [] });
   });
 });
 
 describe('US-4.10 AC-2: unknown words', () => {
   it('an unknown word is listed and switches nothing', () => {
     assert.deepEqual(parse('# vault-compiler: no-outline\n0101 forest'),
-      { noOutlines: false, noGlow: false, unknown: ['no-outline'] });
+      { noOutlines: false, noGlow: false, unknown: ['no-outline'], captions: [] });
   });
 
   it('words joined by a comma are one unknown word', () => {
     assert.deepEqual(parse('# vault-compiler: no-outlines,no-glow\n0101 forest'),
-      { noOutlines: false, noGlow: false, unknown: ['no-outlines,no-glow'] });
+      { noOutlines: false, noGlow: false, unknown: ['no-outlines,no-glow'], captions: [] });
   });
 
   it('the same unknown word twice in one map is listed once; known words still apply', () => {
     const code = '# vault-compiler: no-outline no-glow\n# vault-compiler: no-outline';
-    assert.deepEqual(parse(code), { noOutlines: false, noGlow: true, unknown: ['no-outline'] });
+    assert.deepEqual(parse(code), { noOutlines: false, noGlow: true, unknown: ['no-outline'], captions: [] });
   });
 
   it('an empty word list switches nothing and lists nothing', () => {
     assert.deepEqual(parse('# vault-compiler:\n0101 forest'),
-      { noOutlines: false, noGlow: false, unknown: [] });
+      { noOutlines: false, noGlow: false, unknown: [], captions: [] });
   });
 });
 

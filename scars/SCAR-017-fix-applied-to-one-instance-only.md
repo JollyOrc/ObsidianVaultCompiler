@@ -64,6 +64,20 @@ step in the fix asked "where else does this exist?".
   US-029): the toggles' missing built-ins were found at G0; the details
   table read the same incomplete table (16 rows showed `—`) and was found
   only at G3.
+- A check that only classifies an input (is this a wrapper, a list of
+  links, an embed on its own line?) reads it through the same function as
+  the step that then uses it, never through its own copy of the syntax. A
+  copied pattern drifts: it misses the forms the main reader learnt later
+  (escapes, other spellings), and the classifier then hands the user step a
+  different reading than the user step would have made. When a fix touches a
+  reader, search for every regex of the same syntax, not only for calls of
+  the reader. Example (2026-11-10, Vault Compiler US-6.5, #123): a note that
+  is only `![x](Rules%20Book.md#Duel%20Checks)` was classified by two copied
+  regexes that took the heading undecoded and knew no `<…>` or paths without
+  `.md`; the main embed reader decoded it. The section was dropped with a
+  false *Missing heading anchor* in exactly the notes the classifier claimed.
+  Both copies now call one `readWrapper`, with a text check that no copy of
+  the old pattern is left.
 - Applies next to: every defect found in M-checks (stale screens SCAR-016,
   confirmations SCAR-014, Enter key SCAR-013, validation, number formats), and to
   every refactor that copies a block between rows.

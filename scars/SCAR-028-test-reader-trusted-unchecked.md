@@ -38,5 +38,12 @@ against the reader.
   not only for the strings seen so far.
 - An explanation that a reader "cannot see" some part of the output is marked
   unverified (SCAR-024) until a test of the reader shows it.
+- An instrument placed into the output to measure it (position marks,
+  debug labels, metadata) can change what it measures. Before its numbers
+  are used, compare one value it reports with the same value from the
+  output without it. Example (2026-11-10, Obsidian2Typst #157): Typst marks
+  written `[#metadata(x) <kp>]` put a space (about 1 mm) into every measured
+  item; the gaps and "before" counts offered to the user and written into
+  the story were too high, found only when the code's own fact disagreed.
 - Applies next to: PDF, YAML, CSS and source-text readers in tests, log
   parsers, any helper that turns output into data for an assertion.

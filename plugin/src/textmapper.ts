@@ -22,14 +22,14 @@ export interface MapDom {
   serialize(svg: Element): string;
 }
 
-export function altForTextMapper(code: string): string {
-  const labeled = code.match(/\d{4}\s+\S+(?:\s+"([^"]+)")?/);
-  if (labeled && labeled[1]) return labeled[1];
-  const includeMatch = code.match(/include\s+(\S+)/);
-  if (includeMatch) {
-    return includeMatch[1].replace(/\.[^.]+$/, '') + ' Map';
-  }
-  return 'TextMapper Map';
+/**
+ * US-4.11 | AC-1 to AC-3: the alt text of a compiled map — the first caption
+ * of its directive lines with backslash, `[` and `]` escaped by a backslash, or
+ * empty when the map sets none. The only place a map's alt text is made.
+ */
+export function mapAlt(code: string): string {
+  const caption = parseMapDirectives(code).captions[0];
+  return caption === undefined ? '' : caption.replace(/[\\[\]]/g, '\\$&');
 }
 
 /**
@@ -651,6 +651,8 @@ export interface MapDirectives {
   noGlow: boolean;
   /** Unknown words, each once, as first written (AC-2). */
   unknown: string[];
+  /** US-4.11 | AC-2, AC-4: the caption of each caption line, in order; empty ones left out. */
+  captions: string[];
 }
 
 /**
@@ -666,14 +668,19 @@ const DIRECTIVE_LINE = /^#\s*vault-compiler:(.*)$/i;
  * `no-outlines` and `no-glow` switch, every other word is listed in `unknown`
  * once (by its lower-case form), in the spelling it first had. Lines with
  * leading spaces are no directive lines.
+ * US-4.11 | AC-2: the word `caption` (any case) ends a line's words; the
+ * rest of that line, trimmed, is listed in `captions` when not empty.
  */
 export function parseMapDirectives(code: string): MapDirectives {
-  const result: MapDirectives = { noOutlines: false, noGlow: false, unknown: [] };
+  const result: MapDirectives = { noOutlines: false, noGlow: false, unknown: [], captions: [] };
   const seen = new Set<string>();
   for (const line of code.split('\n')) {
     const match = DIRECTIVE_LINE.exec(line.replace(/\r$/, ''));
     if (!match) continue;
-    for (const word of match[1].trim().split(/\s+/).filter(w => w !== '')) {
+    const captioned = /^(.*?)(?:^|\s)caption(?:\s+(.*))?$/i.exec(match[1]);
+    const words = captioned === null ? match[1] : captioned[1];
+    if (captioned !== null && (captioned[2] ?? '').trim() !== '') result.captions.push(captioned[2].trim());
+    for (const word of words.trim().split(/\s+/).filter(w => w !== '')) {
       const key = word.toLowerCase();
       if (key === 'no-outlines') {
         result.noOutlines = true;

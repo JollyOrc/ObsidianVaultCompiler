@@ -198,8 +198,31 @@ A section embed (`#Fog`) shows just that section, without the bold name.
 Lists of links inside a quoted note stay lists; they are not expanded like a
 table of contents. A note that appears only as a quote is not part of the
 document, so a link to it elsewhere gives the warning *link target … not
-embedded*. The embed must be the only thing on its quote line; an embed in
-the middle of a sentence is not supported yet.
+embedded*. The embed must be the only thing on its quote line; for an embed
+inside a sentence, see the next section.
+
+### Embedding a note inside a sentence
+
+An embed with other text on the same line puts the note's words into that
+sentence, without its heading and without line breaks:
+
+```markdown
+He said ![[Sage]] and left.      →   He said Wise words. and left.
+```
+
+(`Sage.md` holds `Wise words.`) This works in quotes, list items and
+headings, with `![[Sage#Section]]` for one section, and with both settings of
+"Normalise headings". The note's text is kept exactly, full stop included;
+its headings are left out, and lines of one paragraph are joined by a space.
+Links and pictures in it work as anywhere else. A note put into a sentence is
+not a part of the document of its own: a link to it elsewhere gives *link
+target … not embedded*, unless the note is also embedded on a line of its own.
+
+This works only for a note that is **one paragraph** once its headings are
+left out. A note with several paragraphs, a list, a table, a code block or a
+quote is embedded as before (its heading lands in the middle of your line)
+and the warnings file says *Note embedded in a sentence is not one
+paragraph*. Put such an embed on a line of its own.
 
 ### Links can be written any way Obsidian understands
 
@@ -494,6 +517,7 @@ that start with ` ```text-mapper `), the compiler turns each map into a picture
 - The picture has a **transparent background** and is up to 2048 pixels on its
   longest side.
 - The same map used in several notes is drawn only once.
+- The picture has **no caption** unless you give it one (see below).
 - If Text Mapper is not installed or not switched on, you see a message saying
   so, and each map is replaced by a hidden placeholder.
 - If you switch off **Enable TextMapper rendering** in the settings, the maps
@@ -539,6 +563,24 @@ anywhere in the map:
   `green` or `water` are taken; `skill-red` or `my-water` are safe.
 - If your map defines SVG filters (for rough, hand-drawn edges), add the line
   `option global`, or the filters are not found.
+
+### A caption for a map
+
+A compiled map is written as `![](assets/textmapper/….png)`, with no text, so
+a typesetter such as Obsidian2Typst prints it without a caption. To give one
+map a caption, put this line anywhere in the map:
+
+```
+# vault-compiler: caption Branches of the fighting skills
+```
+
+- Everything after `caption` is the caption, as written.
+- It can follow the other words: `# vault-compiler: no-glow caption Moss and Stone`.
+- Like the line above, it starts with `#` at the very beginning of the line,
+  and Text Mapper ignores it.
+- Avoid `|` in a caption: Obsidian2Typst ends the caption there. The warnings
+  file tells you if a caption has one, or if a map has two caption lines (the
+  first one is used).
 
 ### Small boxes in the hex corners, with and without a tick
 
@@ -641,7 +683,11 @@ columns:
 | **filename** | the note where you wrote it |
 | **line number** | the line in that note |
 
-So you can open the named note, go to that line, and fix the link.
+So you can open the named note, go to that line, and fix the link. Every
+warning names a note and a line: a map's warnings name the line where the
+map starts (` ```text-mapper `); *Heading depth clamped* names the heading,
+or the line of the embed when the note's title or a section is the one that
+would go too deep.
 
 ### Hidden notes in the document
 
@@ -666,7 +712,10 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 | **Circular dependency avoided** | Notes embed each other in a circle. | Remove one of the embeds. |
 | **TextMapper …** | A map couldn't be drawn. | See [section 9](#9-hex-maps-text-mapper). |
 | **Code block not closed; closed at the end of the note** | A note opens a code block (` ``` `) and never closes it. | Add the closing ` ``` ` line in the note. |
-| **Map directive "…" is unknown and was ignored** | A word in a `# vault-compiler:` line is misspelt. | Use `no-outlines` or `no-glow` (see [section 9](#9-hex-maps-text-mapper)). |
+| **Map directive "…" is unknown and was ignored** | A word in a `# vault-compiler:` line is misspelt. | Use `no-outlines`, `no-glow` or `caption` (see [section 9](#9-hex-maps-text-mapper)). |
+| **Map caption contains "\|"; Obsidian2Typst ends the caption there** | A map's caption holds a `\|`. | Use another character. |
+| **Map caption is given more than once; the first is used** | A map has two `caption` lines. | Remove one. |
+| **Note embedded in a sentence is not one paragraph; embedded as a block** | An embed inside a sentence names a note with several paragraphs, a list, a table or code. | Put the embed on a line of its own, or shorten the note to one paragraph. |
 | **Duplicate entry omitted** | An entry note is listed a second time; the second place holds a hidden note instead. | Usually fine; remove the second listing if you don't want the warning. |
 | **Not compiled** (also *section embed only*, *quoted only*) | A note in an *Expect compiled folders* folder isn't in the document as a whole note. | List or embed it, or check the tags that should bring it into a list. |
 | **Folder not found in the vault: …** | A folder in *Expect compiled folders* doesn't exist (names are case-sensitive). | Check the spelling, and use `/` between folders. |

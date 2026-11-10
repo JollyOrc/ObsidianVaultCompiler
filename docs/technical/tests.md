@@ -181,6 +181,21 @@ written 2026-11-01 before the code):
   paragraph, indented code in a quote, a quoted embed inside inline code);
   tests added, all 22 caught.
 
+US-1.6 embed a note in a sentence (#107, #125, 2026-11-10):
+- `tests/unit/one-paragraph.test.ts` — 36 tests, one per block start of the
+  "one paragraph" definition and the cases that stay one paragraph.
+- `tests/integration/sentence-embed.test.ts` — 54 tests, AC-1 to AC-6, each
+  with "Normalise headings" on and off: wiki and markdown syntax,
+  heading-first and two-line notes, start/end of line, two embeds, empty
+  note, frontmatter, section and missing section, quote, list item, heading,
+  quoted note, links and their warning lines, nested sentence embed, image,
+  circular embed, links to an inlined note, entry note, the block fallback
+  with its one warning and no double reports; guards: a sole embed and
+  `> - ![[Sage]]` keep the v0.23.0 output (measured on `main`).
+- Mutation check (2026-11-10): no paragraph check, not quote mode, lines
+  joined without a space, quote prefix as text, no fallback warning — caught;
+  list marker as text — survived until the `> - ![[Sage]]` guard was added.
+
 ### Epic 2 — Asset handling and deduplication
 - Images, PDFs, audio, video and generic files are copied to `assets/`.
 - Asset reference is rewritten to `assets/filename.ext`.
@@ -427,6 +442,23 @@ Map directives (US-4.10, #92, v0.17.0; `tests/unit/map-directives.test.ts`,
   Obsidian's canvas, the directive line in reading view (AC-11), and the
   look — manual check M16.
 
+US-4.11 map caption (#119, #126, 2026-11-10):
+- `tests/unit/map-caption.test.ts` — 18 tests: no label by default (hex
+  label, include, plain, ordinary comment, directive without caption,
+  empty); the caption line (case, after other words, empty, leading spaces,
+  `no-caption` is a word, CRLF); escaping; every caption listed, the first
+  used. Replaces the 8 `altForTextMapper` tests of `textmapper.test.ts`.
+- `map-directives-compiler.test.ts` (US-4.11 block, 11 tests) — the image
+  line in the compiled text, the `|` and repeated-caption warnings at the
+  fence, PNG name, two notes, quote, maps off. `textmapper-compiler.test.ts`
+  — no label and the caption after rendering. Fuzz: the alt text is empty
+  for every block without a caption line. `map-directives.test.ts` pins the
+  whole result with `captions: []`.
+- The fixture hashes of US-8.5 AC-5 changed; a line diff showed only the
+  six map image lines losing their alt text.
+- Mutation check (2026-11-10): hex-label fallback, no escaping, `caption`
+  without a word boundary, last caption wins, no `|` warning — all caught.
+
 ### Epic 5 — Obsidian control commands
 - `meta-bind-embed`, `leaflet`, `calendarium` and `compressed-json` fences are
   removed from output.
@@ -469,7 +501,13 @@ Heading rules of 2026-10-27 (US-6.1, US-6.3 to US-6.5, US-2.3; v0.11.0):
 - `tests/integration/preamble-heading-injection.test.ts` — US-6.4 AC-1 to AC-10
   and the title rule.
 - `tests/integration/pass-through-embed.test.ts` — US-6.5 AC-1 to AC-10 and
-  what a pass-through shows (target's title, wrapper's depth, wrapper's anchor).
+  what a pass-through shows (target's title, wrapper's depth, wrapper's anchor);
+  AC-11 and AC-12 (#123, #124): every markdown form of the wrapper's embed
+  (percent escapes, relative path, `<…>`, no `.md`) against the wiki-form
+  oracle, in a chain and in a quote with the toggle on and off; a missing
+  heading reported with the comment, `<note>#<heading>` and the embed's line;
+  a text check that the wrapper is read only through `readWrapper`. Mutation
+  check (2026-11-10): the undecoded heading (7 red) and `line: 0` (3 red).
 - `tests/integration/heading-anchors.test.ts` — every anchor link in a composed
   document has a matching heading, toggle on and off (5 links counted).
 - Mutation check (2026-10-27): nine mutants of these rules (old depth rule,
@@ -594,6 +632,21 @@ Source lines in warnings (US-8.4 AC-5, #95; `tests/integration/warning-lines.tes
   a wrong line. Mutation check 2026-11-01 (#98): 2 mutants (the old pattern;
   the pattern without its end anchor); the second first survived for want of
   that input, test added, both caught.
+
+US-8.4 AC-6, warnings that are not about a link (#56, 2026-11-10):
+- `tests/integration/warning-places.test.ts` — 15 tests: map warnings at the
+  opening fence (renderer missing, render failed, frontmatter, a map drawn
+  once for two places, first place in document order, unknown directive);
+  clamps at the first clamped heading or at the embed (title injected or
+  replacing, prefix depth, section embed, through a pass-through); `<a href>`
+  at its source line; a text check that `compiled-output` and `line: 0` are
+  gone from the compiler. `map-directives-compiler.test.ts` now expects the
+  fence line (3) instead of 0. Mutation check (2026-11-10): fence line →
+  first line, title clamp in the note, prefix clamp in the note, map place
+  without the note part (caught after a document-order test was added), no
+  `<a href` marker — all caught. `findSourceLocation`'s fallback without a
+  marker is reached by no test (checked with a throw); it names the note
+  part or the starting note, never `compiled-output`.
 
 ### Epic 9 — Entry data from note properties (#108, G2 2026-11-07)
 

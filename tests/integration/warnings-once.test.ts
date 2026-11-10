@@ -194,11 +194,15 @@ describe('US-8.5 AC-5: the compiled text does not change', () => {
   // diff against v0.20.1 on the same notes showed only that note's two quotes
   // (US-1.5) and its `> ~~~` block, where v0.20.1 pasted `1.1 Moving`
   // (US-1.4 AC-7, #105).
+  // #119 (US-4.11, 2026-11-10): a line diff against the commit before showed
+  // only the map image lines losing their alt text — `![Peak](…)` in
+  // index2compile.md, two `![TextMapper Map](…)` and `![Swift Talents](…)`
+  // in the smoke book, toggle on and off — and no other change.
   const BEFORE: Array<[string, boolean, string]> = [
-    ['index2compile.md', false, '6f08f48986a530b4'],
-    ['index2compile.md', true, '61fc2cd03fc90d87'],
-    ['Smoke/Smoke book.md', false, '5969c3fde82c4d82'],
-    ['Smoke/Smoke book.md', true, '65519756a67322bb'],
+    ['index2compile.md', false, 'be2d962028c669f5'],
+    ['index2compile.md', true, '87350c12109b87d1'],
+    ['Smoke/Smoke book.md', false, 'f4c55b97643748b5'],
+    ['Smoke/Smoke book.md', true, '753d7b2381bfa042'],
   ];
   for (const [start, normaliseHeadings, hash] of BEFORE) {
     it(`${start}, "Normalise headings" ${normaliseHeadings ? 'on' : 'off'}: byte-identical`, () => {

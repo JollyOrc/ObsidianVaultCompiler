@@ -182,8 +182,10 @@ data is loaded counts, so the loader announces every load.
 When a defect is found, search for the pattern, list every instance in the
 ticket, state the rule for the whole class in the story, and put the pattern in
 one function with a text check over the file that fails for a new copy. A story
-that adds a way to change a value finds every writer by grepping the value. The
-fix's own story, tests and tickets go through the same check.
+that adds a way to change a value finds every writer by grepping the value. A
+check that only classifies an input reads it through the same function as the
+step that uses it, not through a copy of the syntax. The fix's own story,
+tests and tickets go through the same check.
 
 **Guards that miss their criterion** (SCAR-023)
 A guard checks exactly its criterion, not less and not more: it counts the
@@ -225,7 +227,8 @@ criterion or a named change of that user.
 **Test readers are checked too** (SCAR-028)
 When a reader of output returns less than the source holds, the reader is
 checked on a known input first; a reader of a format is tested per syntax rule
-of the format.
+of the format; an instrument inserted into the output (marks, labels) is
+checked against the output without it.
 
 **One file per human step** (SCAR-029)
 What a human runs, answers or approves on its own is a file of its own with an
@@ -281,7 +284,9 @@ change the result.
 **Synthetic data only** (SCAR-035)
 Measure on real data, keep only the numbers; build fixtures and story
 examples with invented words of the same shape; no build file points into a
-data folder; a forbidden-word check guards anything published.
+data folder; a forbidden-word check guards anything published, and new
+public text is also grepped for names (views, templates, folders,
+properties) found in the private working copies.
 
 **Licences of what is shipped** (SCAR-036)
 Check a dependency's licence before it is bundled; when one is removed for

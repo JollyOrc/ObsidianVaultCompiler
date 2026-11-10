@@ -489,3 +489,109 @@ describe('pass-through embed: the target is shown as if embedded directly at the
     assert.match(result.content, /^# B$/m);
   });
 });
+
+// ---------------------------------------------------------------------------
+// AC-11, AC-12 — the wrapper's embed is read like every embed (#123)
+// ---------------------------------------------------------------------------
+
+describe('pass-through embed: AC-11 the wrapper\'s embed is read like every embed (#123)', () => {
+  const DUEL = '# Intro\n\nIntro.\n\n## Duel Checks\n\nRoll both.\n\n## Other\n\nX.\n';
+  const ROOT = '# Book\n\n![[A]]\n';
+  const SECTION = '# Book\n\n## Duel Checks\nRoll both.\n';
+  const run = (files: Record<string, string>, normalise = true) =>
+    new InMemoryVaultCompiler({ 'Duel Rules.md': DUEL, ...files }, { normaliseHeadings: normalise }).compile('index.md');
+
+  it('oracle: the wiki form gives the section at the wrapper\'s depth (v0.23.0)', () => {
+    /** US-6.5 | AC-11: the output every markdown form below must equal. */
+    const result = run({ 'index.md': ROOT, 'A.md': '![[Duel Rules#Duel Checks]]\n' });
+    assert.equal(result.content, SECTION);
+    assert.deepEqual(result.warnings, []);
+  });
+
+  const forms: Array<[string, Record<string, string>]> = [
+    ['percent escapes in path and heading', { 'index.md': ROOT, 'A.md': '![x](Duel%20Rules.md#Duel%20Checks)\n' }],
+    ['a relative path with escapes', { 'index.md': '# Book\n\n![[Bits/A]]\n', 'Bits/A.md': '![x](../Duel%20Rules.md#Duel%20Checks)\n' }],
+    ['a <…> destination', { 'index.md': ROOT, 'A.md': '![x](<Duel Rules.md#Duel Checks>)\n' }],
+    ['a path without .md', { 'index.md': ROOT, 'A.md': '![x](Duel%20Rules#Duel%20Checks)\n' }],
+  ];
+  for (const [name, files] of forms) {
+    it(`${name} gives the same section, no title, no warning`, () => {
+      /** US-6.5 | AC-11, table rows 1 to 4. */
+      const result = run(files);
+      assert.equal(result.content, SECTION);
+      assert.deepEqual(result.warnings, []);
+      assert.deepEqual(result.warningDetails, []);
+    });
+  }
+
+  it('a whole-note embed without .md is a pass-through', () => {
+    /** US-6.5 | AC-11, table row 5: the target's title at the wrapper's depth, no `## A`. */
+    const result = run({ 'index.md': ROOT, 'A.md': '![x](Duel%20Rules)\n' });
+    assert.equal(result.content, '# Book\n\n## Duel Rules\nIntro.\n\n### Duel Checks\nRoll both.\n\n### Other\nX.\n');
+  });
+
+  it('a chain through a wrapper with escapes collapses', () => {
+    /** US-6.5 | AC-11 composed, AC-8. */
+    const result = run({ 'index.md': '# Book\n\n![[W]]\n', 'W.md': '![[A]]\n', 'A.md': '![x](Duel%20Rules.md#Duel%20Checks)\n' });
+    assert.equal(result.content, SECTION);
+    assert.deepEqual(result.warnings, []);
+  });
+
+  for (const normalise of [true, false]) {
+    it(`in a quote the wrapper with escapes shows the section (toggle ${normalise ? 'on' : 'off'})`, () => {
+      /** US-6.5 | AC-11 composed with US-1.5 AC-6: the quote reads every wrapper. */
+      const result = run({ 'index.md': '# Book\n\n> ![[A]]\n', 'A.md': '![x](Duel%20Rules.md#Duel%20Checks)\n' }, normalise);
+      assert.equal(result.content, '# Book\n> ## Duel Checks\n>\n> Roll both.\n');
+      assert.deepEqual(result.warnings, []);
+    });
+  }
+
+  it('toggle off: unchanged, the wrapper gets its title (AC-10)', () => {
+    /** US-6.5 | AC-11 composed with AC-10. */
+    const result = run({ 'index.md': ROOT, 'A.md': '![x](Duel%20Rules.md#Duel%20Checks)\n' }, false);
+    assert.equal(result.content, '# Book\n\n## A\n\n## Duel Checks\nRoll both.\n');
+  });
+
+  it('one reader: the wrapper is read through one function, not copied embed regexes', async () => {
+    /**
+     * US-6.5 | AC-11 (SCAR-017): `matchPassThrough` and `isEffectivelyHeadingFirst`
+     * read the wrapper through `readWrapper`; the two copied regexes of v0.23.0
+     * (`[^)#]+\.md`) are gone from the compiler.
+     */
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../../plugin/src/compiler.ts', import.meta.url), 'utf8');
+    assert.equal(src.match(/\[\^\)#\]\+\\\.md/g), null);
+    assert.equal(src.match(/this\.readWrapper\(/g)?.length, 2);
+  });
+});
+
+describe('pass-through embed: AC-12 a missing heading is reported like any missing heading (#123)', () => {
+  const DUEL = '# Intro\n\nIntro.\n\n## Duel Checks\n\nRoll both.\n';
+  const COMMENT = '<!-- Warning: Missing heading anchor: Duel Rules.md#Gone Now -->';
+  const DETAIL = { message: 'Missing heading anchor: Duel Rules.md#Gone Now', link: 'Duel Rules.md#Gone Now', file: 'A.md', line: 2 };
+  const run = (wrapper: string, normalise = true) =>
+    new InMemoryVaultCompiler({ 'index.md': '# Book\n\n![[A]]\n', 'A.md': wrapper, 'Duel Rules.md': DUEL }, { normaliseHeadings: normalise }).compile('index.md');
+
+  for (const [name, wrapper] of [['wiki', '\n![[Duel Rules#Gone Now]]\n'], ['markdown with escapes', '\n![x](Duel%20Rules.md#Gone%20Now)\n']]) {
+    it(`${name}: the comment in the output, one detail with the embed's line`, () => {
+      /** US-6.5 | AC-12; US-1.2, US-8.4 AC-5, US-8.5 AC-2. */
+      const result = run(wrapper);
+      assert.equal(result.content, `# Book\n${COMMENT}\n`); // US-6.6: no empty line after a heading
+      assert.deepEqual(result.warnings, ['Warning: Missing heading anchor: Duel Rules.md#Gone Now']);
+      assert.deepEqual(result.warningDetails, [DETAIL]);
+    });
+  }
+
+  it('frontmatter above the embed counts in the line (line 5)', () => {
+    /** US-6.5 | AC-12: source lines, US-5.2 AC-12. */
+    const result = run('---\ntags: [x]\n---\n\n![[Duel Rules#Gone Now]]\n');
+    assert.deepEqual(result.warningDetails, [{ ...DETAIL, line: 5 }]);
+  });
+
+  it('toggle off: the same detail as before, after the wrapper\'s title', () => {
+    /** US-6.5 | AC-12 with AC-10: the ordinary section embed, unchanged. */
+    const result = run('\n![[Duel Rules#Gone Now]]\n', false);
+    assert.equal(result.content, `# Book\n\n## A\n${COMMENT}\n`);
+    assert.deepEqual(result.warningDetails, [DETAIL]);
+  });
+});

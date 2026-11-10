@@ -1,7 +1,7 @@
 /**
  * Unit tests for TextMapper rendering helpers.
  *
- * Covers US-4.1 through US-4.7: block detection, alt text, hash stability,
+ * Covers US-4.1 through US-4.7: block detection, hash stability,
  * SVG dimension parsing, PNG sizing, include directive extraction, placeholder
  * formatting, and plugin-detection helpers.
  *
@@ -13,9 +13,6 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-// Existing exports (already in textmapper.ts or compiler.ts)
-import { altForTextMapper } from '../../plugin/src/textmapper.ts';
 
 // New exports required by US-4.4 / US-4.5 / US-4.6.
 // These functions do not exist yet; adding them here makes the test suite
@@ -29,51 +26,7 @@ import {
 
 import { computeContentHash } from '../../plugin/src/utils.ts';
 
-// ---------------------------------------------------------------------------
-// US-4.1 — block alt-text derivation
-// ---------------------------------------------------------------------------
-
-describe('altForTextMapper', () => {
-  it('extracts the quoted label from the first labelled hex', () => {
-    const code = '0101 forest "The Great Forest"\n0102 mountain';
-    assert.equal(altForTextMapper(code), 'The Great Forest');
-  });
-
-  it('returns the include stem with " Map" suffix when no label is present', () => {
-    const code = 'include gnomeyland.txt\n0101 forest';
-    assert.equal(altForTextMapper(code), 'gnomeyland Map');
-  });
-
-  it('strips the file extension from the include name', () => {
-    const code = 'include worldmap.txt\n0101 sea';
-    assert.equal(altForTextMapper(code), 'worldmap Map');
-  });
-
-  it('returns "TextMapper Map" as the default fallback', () => {
-    const code = '0101 forest\n0102 mountain';
-    assert.equal(altForTextMapper(code), 'TextMapper Map');
-  });
-
-  it('prefers the hex label over an include line', () => {
-    const code = 'include gnomeyland.txt\n0101 forest "Named Forest"';
-    assert.equal(altForTextMapper(code), 'Named Forest');
-  });
-
-  it('handles an empty block without throwing', () => {
-    assert.doesNotThrow(() => altForTextMapper(''));
-    assert.equal(altForTextMapper(''), 'TextMapper Map');
-  });
-
-  it('handles whitespace-only blocks', () => {
-    assert.equal(altForTextMapper('   \n\t  '), 'TextMapper Map');
-  });
-
-  it('works when the label contains special markdown characters', () => {
-    const code = '0101 sea "Arcane [Reach]"';
-    // Label should be returned as-is; escaping is the caller's concern.
-    assert.equal(altForTextMapper(code), 'Arcane [Reach]');
-  });
-});
+// US-4.1 alt text: replaced by US-4.11 (#119); see map-caption.test.ts.
 
 // ---------------------------------------------------------------------------
 // US-4.7 — hash stability and deduplication key

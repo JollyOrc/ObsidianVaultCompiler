@@ -1,7 +1,7 @@
 /**
  * Fuzz tests for TextMapper block parsing (TT-1.8).
  *
- * Exercises altForTextMapper, extractIncludes, and buildPlaceholder with
+ * Exercises mapAlt (US-4.11), extractIncludes, and buildPlaceholder with
  * empty blocks, comment-only blocks, blocks with 0–10 random terrain labels,
  * and random include lines.  Asserts no exception is thrown and the return
  * type matches the declared signature.
@@ -9,7 +9,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { altForTextMapper } from '../../plugin/src/textmapper.ts';
+import { mapAlt } from '../../plugin/src/textmapper.ts';
 
 // New exports required by US-4.6 — imported the same way as textmapper.test.ts
 import {
@@ -89,37 +89,30 @@ function randomErrorMessage(rand: () => number): string | undefined {
 
 const SAMPLES = 1000;
 
-describe('fuzz — altForTextMapper', () => {
+describe('fuzz — mapAlt (US-4.11)', () => {
   it('never throws for any block content', () => {
     const rand = lcg(0xfacade42);
     for (let i = 0; i < SAMPLES; i++) {
       const block = randomBlock(rand);
       assert.doesNotThrow(
-        () => altForTextMapper(block),
-        `altForTextMapper threw for block: ${JSON.stringify(block.slice(0, 80))}`,
+        () => mapAlt(block),
+        `mapAlt threw for block: ${JSON.stringify(block.slice(0, 80))}`,
       );
     }
   });
 
-  it('always returns a non-empty string', () => {
+  it('is empty for every block without a caption line (AC-1)', () => {
     const rand = lcg(0xc001beef);
     for (let i = 0; i < SAMPLES; i++) {
       const block = randomBlock(rand);
-      const result = altForTextMapper(block);
-      assert.ok(
-        typeof result === 'string' && result.length > 0,
-        `altForTextMapper returned empty for block: ${JSON.stringify(block.slice(0, 80))}`,
-      );
+      assert.equal(mapAlt(block), '', `mapAlt gave a label for block: ${JSON.stringify(block.slice(0, 80))}`);
     }
   });
 
   it('handles empty and whitespace-only blocks without throwing', () => {
     const empties = ['', ' ', '\n', '\t', '\r\n', '   \n   '];
     for (const block of empties) {
-      assert.doesNotThrow(
-        () => altForTextMapper(block),
-        `altForTextMapper threw for empty/whitespace block: ${JSON.stringify(block)}`,
-      );
+      assert.equal(mapAlt(block), '', `mapAlt for empty/whitespace block: ${JSON.stringify(block)}`);
     }
   });
 });
