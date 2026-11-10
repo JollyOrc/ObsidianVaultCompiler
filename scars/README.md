@@ -9,8 +9,14 @@ Project-specific implementation bugs live in each project's git history;
 SCARs are for patterns that will recur if not consciously addressed.
 
 Each project includes this repository as a git submodule at `scars/`, so all
-three read the same files under the same numbers. How and when SCARs are
-checked (the gates) is part of each project's own process, in its `CLAUDE.md`.
+three read the same files under the same numbers.
+
+[`AGENT-RULES.md`](AGENT-RULES.md) holds the development directives the
+three projects share (process steps 0 to 4, the SCAR gates G0 to G5, code
+style, agent rules 1 to 15); each project's `CLAUDE.md` imports it with
+`@scars/AGENT-RULES.md` and adds its own specifics. Which SCARs are checked
+again at which gate is the shared table [`GATES.md`](GATES.md); a new SCAR
+adds its row there in the same commit.
 
 ## Adding or changing a SCAR
 

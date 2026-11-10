@@ -984,7 +984,7 @@ version just built. Text Mapper v1.1.0 enabled, "Map font" empty.
 Result 2026-10-31: passed (reported by the user). One change asked for: the
 corner boxes get a white fill (fixture changed, step 4 updated).
 
-No step edits a note (CLAUDE.md agent rule 10); unknown words
+No step edits a note (CLAUDE.md agent rule 2, project rule V6); unknown words
 are covered by `map-directives-compiler.test.ts`. On the fixture vault from `Smoke/Smoke book.md`, Text Mapper
 v1.1.0 enabled, "Map font" empty, "Tidy map labels" on.
 
@@ -1015,7 +1015,7 @@ v1.1.0 enabled, "Map font" empty, "Tidy map labels" on.
 
 Result 2026-11-01 with v0.19.0: passed (reported by the user).
 
-No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
+No step edits a note (CLAUDE.md agent rule 2, project rule V6). On the fixture vault, from
 `Smoke/Smoke book.md`, output folder `Export`.
 
 1. The plugin list shows the version under test.
@@ -1041,7 +1041,7 @@ heading above and the next line restyled) — the same in the source note, so
 it is Obsidian's drawing, not the compiler's output, which is the note as
 written. The warnings table shows the ```` ``` ```` cell normally.
 
-No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
+No step edits a note (CLAUDE.md agent rule 2, project rule V6). On the fixture vault, from
 `Smoke/Smoke book.md`, output folder `Export`.
 
 1. The plugin list shows the version under test.
@@ -1067,7 +1067,7 @@ No step edits a note (CLAUDE.md agent rule 10). On the fixture vault, from
 
 Result 2026-11-01 with v0.20.1: passed (reported by the user).
 
-On the fixture vault. No step edits a note (CLAUDE.md agent rule 10); every
+On the fixture vault. No step edits a note (CLAUDE.md agent rule 2, project rule V6); every
 compile writes below `Export/`, which git ignores.
 
 1. The plugin list shows the version under test.
@@ -1119,7 +1119,7 @@ written, except that a heading inside a quote is no link target — recorded
 in US-1.5 AC-8.
 
 On the fixture vault, from `Smoke/Smoke book.md`, output folder `Export`.
-No step edits a note (CLAUDE.md agent rule 10).
+No step edits a note (CLAUDE.md agent rule 2, project rule V6).
 
 1. The plugin list shows the version under test.
 2. Compile with "Normalise headings" on. Open the compiled book in reading

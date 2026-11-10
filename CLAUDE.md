@@ -7,51 +7,71 @@ for a compiler that converts a vault into one portable markdown file.
 
 Important files:
 
-- `docs/user-stories/userstories.md` — authoritative user stories and acceptance criteria.
+- `docs/state/*.md` — the working state (rules 9 and 10). Read it first.
+- `docs/user-stories/userstories.md` — authoritative user stories and
+  acceptance criteria.
 - `docs/technical/dependencies.md` — dependencies and build requirements.
 - `docs/technical/tests.md` — quality gates and required tests.
+- `scars/GATES.md` — the SCAR gate table, shared by the three plugins.
+- `development/decisions/` — architecture decisions (ADR 001 to 015).
 - `tests/fixtures/basic-vault/` — the sample vault for development, manual
   smoke tests and the fixture integration tests (synthetic data only).
-- `tests/fixtures/basic-vault/index2compile.md` — default compilation starting point.
+- `tests/fixtures/basic-vault/index2compile.md` — default compilation starting
+  point.
 
-The intended product is an **Obsidian community plugin**, not a standalone CLI or Python script.
+The intended product is an **Obsidian community plugin**, not a standalone CLI
+or Python script.
 
----
+## Shared rules
 
-## Development process
+The development process (steps 0 to 4), code style, function headers, agent
+rules 1 to 15, documentation maintenance and versioning are shared with the
+two sibling plugins and live in the SCARs repository:
 
-Follow this order strictly — do not skip ahead:
+@scars/AGENT-RULES.md
 
-0. **SCAR review** — before touching any user story, test, or code, read
-   `scars/README.md` and every SCAR file under `scars/`. Check the new
-   instructions, issue or user story against each documented failure pattern:
-   - Are all ACs stated with concrete input/output examples? (SCAR-007)
-   - Do the ACs cover nested/composed usage, not just the top-level case? (SCAR-002)
-   - Is there a test stub for every AC before any code is written? (SCAR-003)
-   - Does any shared utility get a new call site? If so, are all its transforms
-     documented and verified as appropriate for this use? (SCAR-001)
-   - Is the test suite required to be fully green before this work ships? (SCAR-006)
-   Flag any gap to the user before proceeding; do not paper over it with a
-   guess or a TODO.
+What follows is specific to this project and refines the shared rules.
 
-   **After** a problem is resolved or a requirement is refined, ask: can the
-   root cause be generalised beyond this specific case? If yes, add a new SCAR
-   in the shared repository (following the existing format) and update its
-   `README.md`. The SCARs are shared with the other
-   two plugins: `scars/` is the git submodule of
-   <https://github.com/JollyOrc/scars>. Edit SCARs only there, never in
-   `scars/`, then `git submodule update --remote scars` and commit the new
-   pointer. A new SCAR takes the next free number.
-   Numbers changed on 2026-11-05 (this project's SCAR-026 to 034 are now
-   SCAR-033 to 041); history keeps the old numbers, mapped in
-   `scars/README.md`.
-   A SCAR is warranted when the same underlying failure mode could recur on
-   any future feature, not just the one just fixed.
+## SCAR gates and numbers
 
-1. **User story** — write or amend the story and acceptance criteria first.
-2. **Tests** — specify and implement tests against the acceptance criteria.
-3. **Tickets** — create the necessary work items as GitHub issues (see below).
-4. **Code** — write the implementation against the tests and tickets.
+The gates of rule 9 are recorded in `docs/state/30_scar_checks.md`: **G0**
+story review, **G1** story written, **G2** tests written, **G3** tickets
+written, **G4** ticket done or manual-test handover, **G5** closing a story.
+Which SCARs are checked again at G1, G2 and G4 is in the shared table
+`scars/GATES.md`. The state directory was adopted on 2026-11-10;
+the reviews before it are in `development/drafts/*-scar-review.md`.
+
+SCAR numbers changed on 2026-11-05 (this project's SCAR-026 to 034 are now
+SCAR-033 to 041); history keeps the old numbers, mapped in `scars/README.md`.
+
+Agent rule numbers changed on 2026-11-10, when the shared rules were adopted.
+Older documents cite the former numbers: 1 → 1; 2, 3 and 10 → 2 (with
+project rule V6); 4 to 8 → V1 to V5; 9 → 3.
+
+## What the shared rules mean here
+
+- **Rule 1.** The source of truth is `userstories.md`.
+- **Rule 2.** Never modify notes under `tests/fixtures/basic-vault/` except
+  configured compiler output and assets; a fixture change is a test change
+  (steps 1–2). The example vault `Example Vault/` was removed on 2026-10-30
+  because it held real data (SCAR-035); leftovers in tests and documents:
+  [#87](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/87).
+- **Rules 6 to 8.** The compiled markdown is valid for its named reader
+  (SCAR-040); the same vault and settings give the same output; failed
+  renders become placeholders plus warnings that name a note and a source
+  line.
+
+## Project rules
+
+- **V1.** Keep generated compiler code in `plugin/`.
+- **V2.** Prefer TypeScript and the Obsidian plugin API.
+- **V3.** Do not add a separate `--vault` option. The active Obsidian vault
+  is the only vault context.
+- **V4.** Use Obsidian's metadata/link database before fallback filesystem
+  search.
+- **V5.** Use Obsidian vault and file APIs for all read/write operations.
+- **V6.** Do not edit Obsidian source files while testing. Always compare
+  hashes.
 
 ---
 
@@ -66,16 +86,17 @@ release notes, a **ticket** is a GitHub issue.
   2026-10-30 and is read-only: never add or change tickets there.
   `development/tickets/README.md` maps old ticket IDs (`T-6.6-B`) to issues.
 - **Incoming issues are requests, not specifications.** A bug report or
-  feature request from anyone goes through steps 0–4 above: the behaviour is
+  feature request from anyone goes through steps 0–4: the behaviour is
   written into `userstories.md` with concrete examples (SCAR-007) before tests
   or code. Questions go back to the reporter on the issue. While the wanted
   behaviour is not decided, the issue carries the label `needs-decision`;
   only the user decides.
 - **Writing a ticket (step 3).** One issue per work item, in the format of the
   "Ticket (maintainers)" template: source story and ACs, change, class search
-  (SCAR-017), guard search (SCAR-023), tests, what is not measured. Link the
-  issue it came from. Labels: `bug`, `enhancement`, `tests`,
-  `needs-decision`; `backlog` marks work carried over from the archive.
+  (SCAR-017), guard search (SCAR-023), SCAR check (rule 9, G3), tests, what is
+  not measured. Link the issue it came from. Labels: `bug`, `enhancement`,
+  `tests`, `needs-decision`; `backlog` marks work carried over from the
+  archive.
 - **Issue text is public.** Write it the way `prepare-github-publish.sh`
   writes the public copy: no personal names, book or vault titles, local
   paths or e-mail addresses.
@@ -100,13 +121,15 @@ a change made there is overwritten by the next publish. Bring such a change
 into this repository first.
 
 `github-publish/` (ignored here) is a clone of the public repository. To
-publish:
+publish (rule 14: only on the user's go):
 
 1. Commit the change in this repository.
 2. Run `development/scripts/prepare-github-publish.sh`. It rebuilds everything
-   in `github-publish/` except `.git`, replaces personal names and stops if a
-   forbidden word or a real e-mail address is left (also inside the release
-   zips). Only the account name `JollyOrc`, spelt exactly so, is allowed.
+   in `github-publish/` except `.git` from tracked files only (so the
+   git-ignored `docs/state/` and `CLAUDE.local.md` never reach it), replaces
+   personal names and stops if a forbidden word or a real e-mail address is
+   left (also inside the release zips). Only the account name `JollyOrc`,
+   spelt exactly so, is allowed.
 3. In `github-publish/`: `git status` and `git diff` — every change must come
    from step 1; a deleted file means something exists only on GitHub (see
    above).
@@ -120,68 +143,8 @@ then step 2.
 
 ## Code style
 
-All code must adhere to the **Google Style Guides**: <https://google.github.io/styleguide/>
-
-Relevant guides for this project:
-
-- **TypeScript/JavaScript:** <https://google.github.io/styleguide/tsguide.html>
-- **Shell scripts:** <https://google.github.io/styleguide/shellguide.html>
-
-Additional TypeScript requirements:
-
-- Use TypeScript with strict checking.
-- Add TSDoc comments for public APIs.
-- Use `eslint-plugin-obsidianmd` and resolve all lint findings before release.
-
----
-
-## Function documentation
-
-Every function and method must carry a comment header that states:
-
-1. **User story** — which US it supports (e.g. `US-7.1`, `US-7.2`).
-2. **Technical requirement / acceptance criterion** — the specific AC it implements
-   (e.g. `AC-3: Internal headings shift under the injected title`).
-
-### TypeScript example
-
-```typescript
-/**
- * US-7.2 | AC-4: Internal headings of a prefix preamble file are normalised
- * by embedding context.
- *
- * Shifts all headings in `content` uniformly so that the first heading lands
- * at `targetDepth`. Heading text is always preserved; only the level changes.
- * Headings that would exceed h6 are clamped to h6 (see AC-7).
- */
-private applyHeadingNormalisation(
-  content: string,
-  targetDepth: number,
-  _filePath: string,
-): { content: string; clamped: boolean } { … }
-```
-
----
-
-## Agent rules
-
-1. Treat `userstories.md` as the source of truth for behavior.
-2. Preserve the fixture vault. Never modify notes under
-   `tests/fixtures/basic-vault/` except configured compiler output and assets;
-   a fixture change is a test change (steps 1–2 of the process).
-3. **No real data in the repository.** Notes, books, vaults and names from
-   real use never go into this repository, its fixtures or its tests — not
-   even temporarily. Measurements on a real vault are recorded as numbers,
-   not as copied content. The example vault `Example Vault/` was removed on
-   2026-10-30 because it held real data (SCAR-035); leftovers in tests and
-   documents: [#87](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/87).
-4. Keep generated compiler code in `plugin/`.
-5. Prefer TypeScript and the Obsidian plugin API.
-6. Do not add a separate `--vault` option. The active Obsidian vault is the only vault context.
-7. Use Obsidian's metadata/link database before fallback filesystem search.
-8. Use Obsidian vault and file APIs for all read/write operations.
-9. Run the quality gates from `tests.md` before declaring work complete.
-10. Do not edit Obsidian source files while testing. Always compare hashes.
+Shared rules, plus: `eslint-plugin-obsidianmd`, with all findings resolved
+before release.
 
 ---
 
@@ -319,9 +282,7 @@ check via Obsidian APIs and fail gracefully if absent.
 
 ---
 
-## Testing expectations
-
-Before finalizing any change, run:
+## Quality gate
 
 ```bash
 npm run typecheck
@@ -337,35 +298,16 @@ Vault file hashes must be unchanged except for configured outputs.
 
 ---
 
-## Documentation maintenance
+## Release checklist
 
-When behavior changes, update:
-
-- `docs/user-stories/userstories.md`
-- `docs/technical/dependencies.md`
-- `docs/technical/tests.md`
-
-Keep all three documents coherent with the implementation.
-
----
-
-## Versioning
-
-- Any ticket-driven (issue-driven) change: bump by at least `0.0.1`.
-- New features: bump by `0.1`.
-- Update `manifest.json`, `package.json`, and `versions.json` together.
-
-### Release checklist
+Versioning: shared rules; in this project every issue-driven change bumps at
+least `0.0.1`, a new feature `0.1`.
 
 1. In `plugin/`, run `npm version <x.y.z> --no-git-tag-version`. This sets
    `package.json` and, through `version-bump.mjs`, `manifest.json` and
    `versions.json`.
-2. Write `releases/v<version>.md` containing:
-   - Version number and release date.
-   - Summary of new features, changed behaviour, and bug fixes.
-   - Breaking changes and migration steps.
-   - Issues (`#n`) and user stories addressed.
-   - Test count from the build (e.g. "360/360 tests passing").
+2. Write `releases/v<version>.md` (contents: shared rules, "Versioning";
+   issues as `#n`).
 3. Run `npm run build`. It stops on any type, lint or test failure; otherwise it
    bundles, deploys to the fixture vault, writes
    `releases/obsidian-vault-compiler-v<version>.zip` and updates
