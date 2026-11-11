@@ -148,5 +148,14 @@ more blocks the next correct change.
   Example (2026-10-31, webpage-export #8): 7 unit tests failed on inputs the
   parser had emptied, not on the code; `tests/support/dom.ts` builds the
   render's shape.
+- A stand-in for a dependency in a test (a fixture plugin, a fake service)
+  copies the dependency's mechanism that the rule depends on, above all its
+  timing (when it returns, what runs later), not only the visible result;
+  and the test is shown to fail under the old rule before the code is
+  written. Example (2026-11-11, webpage-export US-004): the fixture plugin
+  awaited its drawing inside the code-block processor, while Dataview
+  starts its script without awaiting it; the test passed under the broken
+  rule. Rewritten to return at once and draw later, it failed as on the
+  user's desktop.
 - Applies next to: text checks over source files, guards over generated
   output, wiring tests, fakes of a framework.

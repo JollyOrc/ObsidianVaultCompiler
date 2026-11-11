@@ -164,6 +164,8 @@ Make the test environment complete and current before the handover (build
 installed and compared, fixtures in place), name where the test runs, and give
 every test build its own visible version so a stale build is spotted at once.
 A fixture that names a file uses a name that is unique where it is looked up.
+The settings a check depends on are read before every run, and the tester
+waits for a go between runs into one output folder.
 
 **Interaction rules nobody wrote down** (SCAR-013, SCAR-014)
 Specify how a dialog is operated (Enter confirms, Escape cancels, IME
@@ -203,7 +205,8 @@ and its rivals give different output, and is proven by a mutation check; a test 
 shows the other side was in effect; before tickets, the tests are searched
 for guards that forbid a call the ticket adds or removes and, by function name, for
 tests that pin the whole result the ticket widens; a "same output twice" test
-runs from two fresh starts.
+runs from two fresh starts; a stand-in for a dependency copies its timing,
+not only its result, and the test is shown red under the old rule.
 
 **Statements about tools are measured** (SCAR-024)
 Every sentence in a story about what a dependency does is split into its
@@ -269,6 +272,8 @@ meant to be new is written only to a path checked to be free. After a manual
 check, `git status` comes first; commits stage files by name. The backup
 holds the state to return to: for a manual check, the state as handed over.
 A scripted edit leaves out files that change only with the user's approval.
+A snapshot that may be restored as it is gets a content check, not only a
+checksum.
 A loop of outward steps checks all its inputs before the first call.
 
 **Shared code underdocumented** (SCAR-001)

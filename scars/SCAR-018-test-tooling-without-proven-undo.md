@@ -115,6 +115,13 @@ the restore is wrong, every later mutant tests something else, and the report
   text between every character of the ledger (648 MB). The size check of the
   next gate found it; the file was rebuilt by removing every copy of the
   inserted text, which was possible only because that text was known.
+- A snapshot of a file that may be restored as it is gets a content
+  check (not empty, parses in its format), not only a checksum against its
+  source: a checksum proves the copy equals the source, also when the
+  source was already empty. Example (2026-11-11, webpage-export M12): the
+  plugin's settings file was empty when it was snapshotted; the check
+  reported it "unchanged", and the empty copy would have been the undo.
+  An older snapshot (with a content check) was used instead.
 - Applies next to: every mutation run, every scripted refactor, probe setups
   that write into the project, install scripts, manual-check fixtures,
   commits and publishes after a manual check, new files written by a tool.

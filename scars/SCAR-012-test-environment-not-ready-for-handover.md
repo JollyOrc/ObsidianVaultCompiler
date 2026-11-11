@@ -54,5 +54,15 @@ indistinguishable from a current one.
   depending on an input the measurement did not have. Example (2026-10-28,
   M15): the warning count was measured without the font catalog and said 148;
   the export lists 149, and four checks had copied the number.
+- Before a manual check that depends on settings, read those settings
+  where the check runs and compare them with what the check assumes; read
+  them again before every run, because a setting can change between runs.
+  A check that runs several times into one output folder says that the
+  tester waits for the developer's go after each run, so that each result
+  is copied away before the next one replaces it. Example (2026-11-11,
+  webpage-export M12): the plugin's settings had been reset to defaults,
+  including "export only modified files"; three runs wrote 8 of 413 pages,
+  and only the last run was still on disk. The settings were restored and
+  checked, and the next three runs were copied one by one.
 - Applies next to: every manual check (M1, M2, M3, later ones), release
   candidates, builds sent to other testers.
