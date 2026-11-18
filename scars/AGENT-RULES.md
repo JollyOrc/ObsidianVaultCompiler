@@ -181,7 +181,13 @@ any non-obvious constraint (clamping, ordering, side effects):
       evidence shows. When a promise cannot be kept, say so before the
       `BY-WHEN` and renegotiate; do not let it lapse.
 14. **Git only on the user's word.** No commit, push, tag or release unless
-    the user asks. Commits stage files by name. A change to the shared scars
+    the user asks. Commits stage files by name. A git action is its own
+    command, run only when the latest directive names it; it is never bundled
+    into a command that does other work (a push after edits, a commit after a
+    file change), where it would run without its own go. This includes git
+    run by another tool's hooks or scripts (`npm version` with a `version`
+    script that stages files): such hooks are switched off and their steps
+    run one by one. A change to the shared scars
     repository is pushed first (on the user's go); then each project runs
     `git submodule update --remote scars` and commits the new pointer.
 15. **Subagents.** Subagents run on the default model set in the user's

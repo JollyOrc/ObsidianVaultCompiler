@@ -51,5 +51,11 @@ drops it — SCAR-032).
   images, but not at 10+ images in one flow; in a long book the padding
   pages and back notes that appear only in the last pass printed folio `1`
   and the last chapter's header.
+- A rule that measures across the whole run (one size for all cards, a common height) is timed and compiled on
+  runs of growing size up to the largest the user makes, before the code, not at the code stage: a call per item
+  with the data of every item grows with the square of the run. Example (2026-11-16, Game Card Creator US-012 #48):
+  equal title bands called the run-wide measurement from every card's builder with the statblocks of all cards;
+  38 cards took 1.3 s, 120 took 7.7 s and 200 failed in typst.ts (`unreachable`). Measured once and kept in a
+  state, 200 take 1.3 s; a test now compiles 200 cards. The story had listed this as "not measured yet".
 - Applies next to: running headers, "continued" markers, keep-together rules,
   anything that reads a page number or a position.

@@ -55,7 +55,7 @@ Your original notes are **never changed**. The plugin only reads them.
 
 ## 2. What you need
 
-- **Obsidian** version 1.0 or newer. The plugin works on computers and on
+- **Obsidian** version 1.6.6 or newer. The plugin works on computers and on
   phones/tablets. Saving the result to a folder *outside* your vault only works
   in the desktop app.
 - **Optional:** the community plugin **Text Mapper**, installed and switched
@@ -246,45 +246,61 @@ but it gives you the most control over the structure.
 
 ## 5. Running a compilation
 
-There are two ways to start.
+There are three ways to start.
 
-### Option A: from the command palette
+### Option A: the compile window
 
-1. Press **Ctrl + P** (Windows/Linux) or **Cmd + P** (Mac) to open the command
-   palette.
-2. Type **Compile vault** and press Enter.
+Click the **Compile vault…** icon in the ribbon on the left, or open the
+command palette (**Ctrl + P** on Windows/Linux, **Cmd + P** on Mac) and run
+**Compile vault…**. A window titled *Compile vault* opens with the values from
+the settings:
 
-This uses the starting note, output folder and file name from the settings.
+- **Starting file** — the note the compilation begins with.
+- **Output folder** — where to save the result. Leave it empty for the top
+  level of your vault, type a folder name such as `Exports`, or click
+  **Choose folder…** to pick one.
+- **Output filename** — the name of the document, for example
+  `My Rulebook.md`, with the **Compile** button at the end of its row.
+- A grey line says what will happen, and changes as you type:
+  *Exports/My Rulebook.md will be written.*, or, when the document is already
+  there, *Exports/My Rulebook.md exists (from 2026-11-17 14:02) and will be
+  replaced.*
+- When the folder or file name can't be used, a red line says why instead and
+  **Compile** is greyed out (see [section 10](#output-folder-rules)).
+- **More options** — the gear opens the plugin's settings.
 
-### Option B: from any note (right-click)
+Click **Compile** or press **Enter** to compile. **Escape**, the **×** or a
+click outside the window closes it without compiling and without saving
+anything.
+
+> **Note:** When you click **Compile**, the starting file, folder and file
+> name you chose are saved to the settings, so the next run starts with them.
+> Picking a folder with **Choose folder…** alone saves nothing.
+
+### Option B: at once, with the settings
+
+Run **Compile vault** (without the dots) from the command palette. It compiles
+straight away with the starting note, output folder and file name from the
+settings — no window, no question.
+
+### Option C: from any note (right-click)
 
 1. In the file list on the left, **right-click** the note you want to start
    from. (You can also use the **⋯** menu at the top of an open note.)
 2. Choose **Compile vault from this file**.
-3. A small window opens, titled *Export compiled markdown*:
-   - **Output folder** — where to save the result. Leave it empty for the top
-     level of your vault, type a folder name such as `Exports`, or click
-     **Browse** to pick a folder.
-   - **Output filename** — the name of the document, for example
-     `My Rulebook.md`.
-   - The line *Resolved output path* shows where the file will actually go,
-     and changes as you type.
-4. Click **Compile** or press **Enter** (or **Cancel** or **Escape** to stop).
+3. The compile window of Option A opens, with that note as the starting file.
 
-> **Note:** Everything you choose here — the note you right-clicked, the
-> folder (also one picked with **Browse**) and the file name — is used for
-> this one compilation only. Your settings stay as they are, so **Compile
-> vault** from the command palette still uses the starting note, folder and
-> file name from the settings.
+> **Note:** The note you right-clicked is used for this one run only; the
+> starting file in the settings stays as it is. The folder and file name are
+> saved when you click **Compile**, as in Option A.
 
 ### While it runs
 
-- If a file with the same name already exists in the output folder, Obsidian
-  asks whether to **overwrite** it. Choose *Cancel* to stop without changing
-  anything.
-- A message *"Vault compilation started."* appears in the top-right corner.
+- An existing document with the same name is **replaced** without a question,
+  together with its `assets` folder: they are the plugin's own output. The
+  compile window tells you beforehand when this will happen.
 - When it finishes, you see a summary such as:
-  *"Compilation complete: 142 files, 37 assets, 12 deduplicated."*
+  *"✅ Compiled Exports/My Rulebook.md: 142 files, 37 assets, 12 deduplicated."*
   That means 142 notes were processed, 37 files were copied into `assets`, and
   12 more uses of already-copied files were found (those were not copied a
   second time).
@@ -621,12 +637,28 @@ skill-green attributes fill="none" stroke="#4f7d4a" stroke-width="6"
 
 ## 10. Settings reference
 
-Open **Settings → Obsidian Vault Compiler**.
+Open **Settings → Obsidian Vault Compiler** (or click the gear of **More
+options** in the compile window).
+
+The first line shows the plugin's version, with a **Copy debug info** button
+(bug icon) at its right. It copies the plugin's and Obsidian's versions, your
+enabled plugins and the plugin's settings as plain text, for a bug report;
+nothing is sent anywhere.
+
+The settings are grouped in four sections, which you can fold: **Compile**
+(starting file, output folder, file name), **Maps** (TextMapper rendering; its
+gear holds the map font and the label tidying), **Headings** and **Entry
+data** (the five comma lists). Each section ends with **Reset this section to
+defaults**; it asks first, and only that section's settings go back to their
+defaults.
+
+A text field is saved when you press **Enter** or leave the field (Tab, or a
+click elsewhere), not while you type. Switches are saved at once.
 
 | Setting | What it does | Default |
 |---|---|---|
 | **Starting file** | The note the compilation begins with. Write its path inside the vault, including folders and `.md`, e.g. `Books/Rulebook index.md`. | `index2compile.md` |
-| **Output folder** | Where the document is saved. Empty means the top level of your vault. Type a folder in the vault such as `Exports` or `Exports/2026` (use `/` between folders), or click **Browse**. In the desktop app you may also choose a folder **outside** the vault, such as your Desktop. | empty |
+| **Output folder** | Where the document is saved. Empty means the top level of your vault. Type a folder in the vault such as `Exports` or `Exports/2026` (use `/` between folders), or click **Choose folder…**. In the desktop app you may also choose a folder **outside** the vault, such as your Desktop. | empty |
 | **Output filename** | The name of the compiled document, e.g. `My Rulebook.md`. Just the name, no folders. | `compiledtext.md` |
 | **Resolved output path** | Not a setting — it shows where the document will actually be saved, or why the current choice won't work. It changes as you type. | — |
 | **Enable TextMapper rendering** | On: hex maps become pictures. Off: maps stay as text blocks. | On |
@@ -646,11 +678,11 @@ start, nothing is written, and a message explains why:
 
 | What you entered | Why it's refused | What to do instead |
 |---|---|---|
-| A folder starting with `~` (e.g. `~/Desktop`) | `~` shortcuts aren't understood | Use **Browse**, or type the full path, e.g. `/Users/yourname/Desktop` |
-| A folder containing `..` | could point anywhere | Use **Browse** |
+| A folder starting with `~` (e.g. `~/Desktop`) | `~` shortcuts aren't understood | Use **Choose folder…**, or type the full path, e.g. `/Users/yourname/Desktop` |
+| A folder containing `..` | could point anywhere | Use **Choose folder…** |
 | `Exports\Sub` (backslash, inside the vault) | vault folders use `/` | Write `Exports/Sub` |
 | `.obsidian` or a folder inside it | that is Obsidian's own settings folder | Choose a normal folder |
-| A folder outside the vault that doesn't exist | folders outside the vault are never created | Create the folder first, or use **Browse** |
+| A folder outside the vault that doesn't exist | folders outside the vault are never created | Create the folder first, or use **Choose folder…** |
 | A folder outside the vault on a phone or tablet | only the desktop app can write outside the vault | Use a folder inside the vault |
 | A file name containing `/` or `\` | the file name must be just a name | Put folders into **Output folder** |
 | An empty file name | — | Type a name such as `Book.md` |
@@ -730,12 +762,11 @@ PDF), but you can see them in Obsidian's source mode or a text editor.
 
 | Message | Meaning |
 |---|---|
-| *Vault compilation started.* | The run has begun. |
-| *Compilation complete: …* | Finished successfully, with a short summary. When entries were left out as repeats or expected notes were missing, it adds how many, e.g. *1 duplicate entry omitted, 2 notes not compiled: see warnings_….md.* |
+| *✅ Compiled …: …* | Finished successfully, names the document and gives a short summary. When entries were left out as repeats or expected notes were missing, it adds how many, e.g. *1 duplicate entry omitted, 2 notes not compiled: see warnings_….md.* |
 | *Starting file not found.* | The starting note in the settings doesn't exist. Check the path. |
 | *Compilation not started: …* | The output folder or file name was refused; the message says why (see [section 10](#output-folder-rules)). |
-| *Compilation cancelled.* | You chose not to overwrite an existing document. |
-| *Compilation failed: …* | Something went wrong; the message gives the reason. |
+| *❌ Compilation failed: …* | Something went wrong; the message gives the reason. |
+| *Debug info copied.* | The **Copy debug info** button in the settings worked; paste the text into your bug report. |
 | *… the Text Mapper plugin is not installed or enabled …* | Install or switch on Text Mapper to get map pictures. |
 | *… map font "…" could not be embedded …* | That font wasn't available; the next font in your list is used. |
 | *… map directive "…" could not be applied …* | Text Mapper drew a map differently than expected (perhaps a new version); that map keeps its outlines or glow. |
@@ -750,7 +781,9 @@ The plugin is built so that compiling can never damage your vault:
   headings, rewriting links) happen on a copy in memory.
 - It **only writes** three things: your document, the `assets` folder next to
   it, and the warnings file. Any attempt to write anywhere else is blocked.
-- It **asks before overwriting** an existing document of the same name.
+- It **replaces only its own output**: the document of the name you chose
+  and its `assets` folder. The compile window says beforehand when a
+  document of that name will be replaced.
 - It **refuses** output locations that could cause harm, such as Obsidian's
   settings folder or the starting note itself.
 - After every run it **checks that no note was changed or added**. If anything
@@ -802,7 +835,7 @@ names. The jump links are made for Obsidian; other programs that show markdown
 Yes. The only limit is that the document must be saved inside the vault.
 
 **Can I compile into a folder that's synced (Dropbox, iCloud, OneDrive)?**
-Yes, in the desktop app. Pick the folder with **Browse**. The folder must
+Yes, in the desktop app. Pick the folder with **Choose folder…**. The folder must
 already exist.
 
 ---

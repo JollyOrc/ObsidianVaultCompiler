@@ -45,13 +45,19 @@ describe('US-9.5: main.ts decides nothing about details (SCAR-031)', () => {
     assert.match(src, /detailMarkerKeys:\s*parseListSetting\(\s*this\.settings\.detailMarkerKeys,\s*\{\s*lowerCase:\s*true/);
   });
 
+  // US-7.4 AC-11, AC-12 (amended at G2, 2026-11-18): the defaults moved to
+  // settings-layout.ts, the rows to settings-tab.ts, the texts to strings.ts;
+  // text rows commit on Enter or blur.
   it('the default is empty (off)', () => {
-    assert.match(src, /detailMarkerKeys:\s*''/);
+    assert.match(readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8'), /detailMarkerKeys:\s*''/);
   });
 
-  it('the settings row exists and saves through the delayed saver', () => {
-    assert.match(src, /listSetting\('Detail marker keys'/);
-    assert.match(src, /'detailMarkerKeys'/);
+  it('the settings row exists, in Entry data, and commits like every text row', () => {
+    const tab = readFileSync(new URL('../../plugin/src/settings-tab.ts', import.meta.url), 'utf8');
+    const strings = readFileSync(new URL('../../plugin/src/strings.ts', import.meta.url), 'utf8');
+    assert.match(tab, /detailMarkerKeys: \{ name: STRINGS\.tab\.detailMarker/);
+    assert.match(strings, /detailMarker: 'Detail marker keys'/);
+    assert.match(readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8'), /'detailMarkerKeys'\]/);
   });
 
   it('no YAML and no o2t-details in main.ts', () => {

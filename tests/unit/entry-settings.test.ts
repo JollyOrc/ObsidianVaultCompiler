@@ -34,21 +34,23 @@ describe('US-9.4 AC-5: the completion Notice', () => {
     warningDetails: messages.map(message => ({ message, link: '', file: '', line: 0 })),
     stats: { filesProcessed: 12, assetsCopied: 3, assetsDeduplicated: 0, missingReferences: 0 },
   });
-  const base = 'Compilation complete: 12 files, 3 assets, 0 deduplicated.';
+  // US-7.4 AC-10 (amended at G2, 2026-11-18): ✅ and the output path.
+  const base = '✅ Compiled Exports/compiledtext.md: 12 files, 3 assets, 0 deduplicated.';
+  const path = 'Exports/compiledtext.md';
 
   it('nothing to report → unchanged', () => {
-    assert.equal(completionNotice(result(['Missing asset']), 'warnings_20261107_1530.md'), base);
+    assert.equal(completionNotice(result(['Missing asset']), 'warnings_20261107_1530.md', path), base);
   });
 
   it('both counts', () => {
-    assert.equal(completionNotice(result(['Duplicate entry omitted', 'Not compiled', 'Not compiled (quoted only)']), 'warnings_20261107_1530.md'),
+    assert.equal(completionNotice(result(['Duplicate entry omitted', 'Not compiled', 'Not compiled (quoted only)']), 'warnings_20261107_1530.md', path),
       `${base} 1 duplicate entry omitted, 2 notes not compiled: see warnings_20261107_1530.md.`);
   });
 
   it('one count only; plural forms', () => {
-    assert.equal(completionNotice(result(['Duplicate entry omitted', 'Duplicate entry omitted']), 'w.md'),
+    assert.equal(completionNotice(result(['Duplicate entry omitted', 'Duplicate entry omitted']), 'w.md', path),
       `${base} 2 duplicate entries omitted: see w.md.`);
-    assert.equal(completionNotice(result(['Not compiled (section embed only)']), 'w.md'),
+    assert.equal(completionNotice(result(['Not compiled (section embed only)']), 'w.md', path),
       `${base} 1 note not compiled: see w.md.`);
   });
 
@@ -68,11 +70,13 @@ describe('Epic 9: main.ts decides nothing about entries (SCAR-031)', () => {
     }
   });
 
+  // US-7.4 AC-11 (amended at G2, 2026-11-18): the defaults are in settings-layout.ts.
   it('the defaults are the story\'s', () => {
-    assert.match(src, /entryMarkerKeys:\s*''/);
-    assert.match(src, /entryExcludeKeys:\s*'aliases, cssclasses, publish'/);
-    assert.match(src, /entryAssetKeys:\s*'illustration'/);
-    assert.match(src, /expectCompiledFolders:\s*''/);
+    const layout = readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8');
+    assert.match(layout, /entryMarkerKeys:\s*''/);
+    assert.match(layout, /entryExcludeKeys:\s*'aliases, cssclasses, publish'/);
+    assert.match(layout, /entryAssetKeys:\s*'illustration'/);
+    assert.match(layout, /expectCompiledFolders:\s*''/);
   });
 
   it('no YAML and no o2t-entry in main.ts', () => {

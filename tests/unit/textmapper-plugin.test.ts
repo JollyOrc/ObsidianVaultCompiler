@@ -205,7 +205,8 @@ describe('US-4.4 / US-4.3 withdrawn: no Node file access, no npm text-mapper', (
   });
 
   it('US-4.8 AC-1: main passes the map font setting, read at compile time', () => {
-    assert.match(main, /mapFont: ''/);
+    // US-7.4 AC-11 (amended at G2): the default is in settings-layout.ts.
+    assert.match(readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8'), /mapFont: ''/);
     assert.match(main, /prepareMapFont\(this\.settings\.mapFont\)/);
   });
 });

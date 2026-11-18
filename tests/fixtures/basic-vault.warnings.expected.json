@@ -1,0 +1,19 @@
+{
+  "warnings": [
+    "Warning: Missing include"
+  ],
+  "warningDetails": [
+    {
+      "message": "Missing include",
+      "link": "missing.md",
+      "file": "index2compile.md",
+      "line": 6
+    }
+  ],
+  "stats": {
+    "filesProcessed": 6,
+    "assetsCopied": 1,
+    "assetsDeduplicated": 2,
+    "missingReferences": 1
+  }
+}

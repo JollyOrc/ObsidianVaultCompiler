@@ -293,7 +293,8 @@ describe('US-4.9 AC-7: one setting, on by default, read at compile time', () => 
   const renderer = readFileSync(new URL('src/textmapper.ts', root), 'utf8');
 
   it('the setting defaults to true and is passed to the renderer', () => {
-    assert.match(main, /tidyMapLabels: true/);
+    // US-7.4 AC-11 (amended at G2): the default is in settings-layout.ts.
+    assert.match(readFileSync(new URL('src/settings-layout.ts', root), 'utf8'), /tidyMapLabels: true/);
     assert.match(main, /renderTextMapperBlock\(this\.app, code, destinationPath, writer, mapFont, this\.settings\.tidyMapLabels\)/);
   });
 

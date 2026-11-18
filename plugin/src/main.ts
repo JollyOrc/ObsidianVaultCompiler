@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { Notice, Plugin, TFile, apiVersion, normalizePath } from 'obsidian';
 import { InMemoryVaultCompiler } from './compiler.ts';
 import { completionNotice, parseListSetting } from './entries.ts';
 import { ObsidianLinkResolver } from './resolver.ts';
@@ -14,8 +14,13 @@ import {
   foldersToIgnore,
 } from './output-location.ts';
 import { OutputWriter, type WriterFs } from './output-writer.ts';
-import { DelayedSave } from './delayed-save.ts';
-import { isConfirmKey } from './prompt-keys.ts';
+import { CompileDialog } from './compile-dialog.ts';
+import type { CompileRun } from './compile-dialog-rules.ts';
+import { debugInfo } from './debug-info.ts';
+import { failedNotice } from './notices.ts';
+import { DEFAULT_SETTINGS, type VaultCompilerSettings } from './settings-layout.ts';
+import { VaultCompilerSettingTab } from './settings-tab.ts';
+import { STRINGS } from './strings.ts';
 import {
   getTextMapperPlugin,
   mapImageKey,
@@ -31,88 +36,52 @@ function isDesktopRuntime(): boolean {
   return typeof (window as any).require === 'function';
 }
 
-interface VaultCompilerSettings {
-  startingFile: string;
-  outputFolder: string;
-  outputFile: string;
-  enableTextMapper: boolean;
-  normaliseHeadings: boolean;
-  /** US-4.8 | AC-1: map font; empty means Obsidian's note font. */
-  mapFont: string;
-  /** US-4.9 | AC-7: no hex numbers, centred and wrapped labels in compiled maps. */
-  tidyMapLabels: boolean;
-  /** Epic 9 | Settings: comma-separated lists, read with `parseListSetting`. */
-  entryMarkerKeys: string;
-  entryExcludeKeys: string;
-  entryAssetKeys: string;
-  expectCompiledFolders: string;
-  detailMarkerKeys: string;
-}
-
-/**
- * US-7.2 | AC-3, US-7.3 | AC-3: the values one compile runs with — from the
- * settings, or from the export prompt for that run only.
- */
-interface CompileRun {
-  startingFile: string;
-  outputFolder: string;
-  outputFile: string;
-}
-
-/** US-7.1 | AC-S1: how long a settings text field waits before it is saved. */
-const SAVE_DELAY_MS = 500;
-
-const DEFAULT_SETTINGS: VaultCompilerSettings = {
-  startingFile: 'index2compile.md',
-  outputFolder: '',
-  outputFile: 'compiledtext.md',
-  enableTextMapper: true,
-  normaliseHeadings: false,
-  mapFont: '',
-  tidyMapLabels: true,
-  entryMarkerKeys: '',
-  entryExcludeKeys: 'aliases, cssclasses, publish',
-  entryAssetKeys: 'illustration',
-  expectCompiledFolders: '',
-  detailMarkerKeys: '',
-};
-
 export default class VaultCompilerPlugin extends Plugin {
   settings: VaultCompilerSettings;
-  /** US-7.1 | AC-S1: saves the settings text fields after typing stops. */
-  settingsSaver = new DelayedSave(() => this.saveSettings(), SAVE_DELAY_MS);
+  /** US-7.4 | AC-12: the settings tab, flushed on unload. */
+  private settingTab: VaultCompilerSettingTab | null = null;
 
   async onload() {
     await this.loadSettings();
 
+    // US-7.4 AC-1: the direct command, the dialog command and the ribbon icon.
     this.addCommand({
       id: 'compile-vault',
-      name: 'Compile vault',
+      name: STRINGS.commands.compile,
       callback: () => void this.compileVault(),
     });
+    this.addCommand({
+      id: 'compile-vault-dialog',
+      name: STRINGS.commands.compileDialog,
+      callback: () => new CompileDialog(this.app, this, this.settingsRun(), 'settings').open(),
+    });
+    this.addRibbonIcon('combine', STRINGS.commands.ribbon, () =>
+      new CompileDialog(this.app, this, this.settingsRun(), 'settings').open(),
+    );
 
     this.registerEvent(
       this.app.workspace.on('file-menu', (menu, file) => {
         if (file instanceof TFile && file.extension.toLowerCase() === 'md') {
           menu.addItem(item => {
             item
-              .setTitle('Compile vault from this file')
+              .setTitle(STRINGS.menus.compileFromFile)
               .setIcon('document')
               .onClick(() => {
-                // US-7.2 | AC-3: one-shot — the chosen note is used for this run only.
-                new ExportPathModal(this.app, this, { ...this.settingsRun(), startingFile: file.path }).open();
+                // US-7.2 | AC-3, US-7.4 AC-1: the dialog; the note is this run's starting file.
+                new CompileDialog(this.app, this, { ...this.settingsRun(), startingFile: file.path }, 'file-menu').open();
               });
           });
         }
       })
     );
 
-    this.addSettingTab(new VaultCompilerSettingTab(this.app, this));
+    this.settingTab = new VaultCompilerSettingTab(this.app, this);
+    this.addSettingTab(this.settingTab);
   }
 
-  /** US-7.1 | AC-S1: a value typed just before switching off is still saved. */
+  /** US-7.4 | AC-12: a value typed just before switching off is still saved. */
   onunload() {
-    void this.settingsSaver.flush();
+    this.settingTab?.flushAll();
   }
 
   /** US-7.2 | AC-3: the run values stored in the settings. */
@@ -185,7 +154,7 @@ export default class VaultCompilerPlugin extends Plugin {
   async compileVault(run: CompileRun = this.settingsRun()) {
     const resolved = this.resolveOutputLocation(run);
     if (!resolved.ok) {
-      new Notice(`Compilation not started: ${resolved.reason}`);
+      new Notice(STRINGS.notices.notStarted(resolved.reason), 5000);
       return;
     }
     const location = resolved.location;
@@ -193,17 +162,12 @@ export default class VaultCompilerPlugin extends Plugin {
 
     const startingFile = this.app.vault.getAbstractFileByPath(run.startingFile);
     if (!(startingFile instanceof TFile)) {
-      new Notice('Starting file not found.');
+      new Notice(STRINGS.notices.noStartingFile, 5000);
       return;
     }
 
+    // US-7.4 AC-3: the tool replaces its own output; no question, no start notice.
     const outputFile = location.outputPath;
-    if (writer.exists(outputFile) && !window.confirm(`Overwrite existing file ${outputFile}?`)) {
-      new Notice('Compilation cancelled.');
-      return;
-    }
-
-    new Notice('Vault compilation started.');
 
     try {
       const sourceSnapshot = new Map(this.app.vault.getFiles().map(file => [file.path, file.stat.mtime]));
@@ -221,7 +185,7 @@ export default class VaultCompilerPlugin extends Plugin {
       const mapFont = await prepareMapFont(this.settings.mapFont);
       if (this.settings.enableTextMapper) {
         for (const family of mapFont.failed) {
-          new Notice(`Vault Compiler: map font "${family}" could not be embedded; maps use the next font in the list.`);
+          new Notice(STRINGS.notices.mapFontFailed(family), 5000);
         }
       }
 
@@ -277,7 +241,7 @@ export default class VaultCompilerPlugin extends Plugin {
 
         if (refs.size > 0 && getTextMapperPlugin(this.app) === null) {
           // US-4.2 | AC-5: one notice per compile; each map gets a placeholder below.
-          new Notice('Vault Compiler: the Text Mapper plugin is not installed or enabled, so maps are left as placeholders.');
+          new Notice(STRINGS.notices.noTextMapper, 5000);
         }
         const skippedSteps = new Set<string>();
         const skippedDirectives = new Set<string>();
@@ -300,7 +264,7 @@ export default class VaultCompilerPlugin extends Plugin {
             if (tidy.unbreakable) {
               // US-4.9 | AC-4: once per map.
               const alt = result.content.match(new RegExp('!\\[([^\\]]*)\\]\\(' + this.escapeRegExp(ref) + '\\)'))?.[1] ?? ref;
-              new Notice(`Vault Compiler: a label in map "${alt}" has a word too wide for its hex.`);
+              new Notice(STRINGS.notices.wideLabel(alt), 5000);
             }
           } catch (error) {
             const message = (error as Error).message;
@@ -312,14 +276,11 @@ export default class VaultCompilerPlugin extends Plugin {
         }
         if (skippedSteps.size > 0) {
           // US-4.9 | AC-6: once per compile.
-          new Notice(
-            `Vault Compiler: some maps were not tidied (${[...skippedSteps].join(', ')}): ` +
-            'the Text Mapper plugin drew them differently than expected.',
-          );
+          new Notice(STRINGS.notices.notTidied([...skippedSteps].join(', ')), 5000);
         }
         for (const directive of skippedDirectives) {
           // US-4.10 | AC-7: once per compile and directive.
-          new Notice(`Vault Compiler: map directive "${directive}" could not be applied; the map is drawn as the plugin made it.`);
+          new Notice(STRINGS.notices.directiveSkipped(directive), 5000);
         }
       }
 
@@ -349,9 +310,9 @@ export default class VaultCompilerPlugin extends Plugin {
       await this.verifySourceVaultUnchanged(sourceSnapshot, writer);
 
       // US-9.4 | AC-5: the wording lives in entries.ts.
-      new Notice(completionNotice(result, warningsName));
+      new Notice(completionNotice(result, warningsName, location.outputPath), 5000);
     } catch (error) {
-      new Notice(`Compilation failed: ${(error as Error).message}`);
+      new Notice(failedNotice((error as Error).message), 5000);
     }
   }
 
@@ -370,10 +331,10 @@ export default class VaultCompilerPlugin extends Plugin {
       }
       const before = snapshot.get(file.path);
       if (before === undefined) {
-        throw new Error(`Unexpected new vault file created during compilation: ${file.path}`);
+        throw new Error(STRINGS.errors.newVaultFile(file.path));
       }
       if (before !== file.stat.mtime) {
-        throw new Error(`Source vault file was modified during compilation: ${file.path}`);
+        throw new Error(STRINGS.errors.vaultFileModified(file.path));
       }
     }
   }
@@ -394,7 +355,7 @@ export default class VaultCompilerPlugin extends Plugin {
     }
 
     if (remoteDialog) {
-      const result = await remoteDialog.showOpenDialog({ properties: ['openDirectory'], title: 'Choose output folder' });
+      const result = await remoteDialog.showOpenDialog({ properties: ['openDirectory'], title: STRINGS.dialog.pickerTitle });
       if (!result.canceled && result.filePaths?.length) {
         const absolute: string = result.filePaths[0];
         const vaultRoot = this.getVaultRoot();
@@ -403,250 +364,41 @@ export default class VaultCompilerPlugin extends Plugin {
       }
       return null;
     }
-    return window.prompt('Output folder', current);
-  }
-}
-
-/**
- * US-7.2, US-7.3 | AC-1 to AC-6: the export prompt of a file-menu compile.
- * Its values are used for this run only and never saved.
- */
-class ExportPathModal extends Modal {
-  private plugin: VaultCompilerPlugin;
-  private run: CompileRun;
-
-  constructor(app: App, plugin: VaultCompilerPlugin, run: CompileRun) {
-    super(app);
-    this.plugin = plugin;
-    this.run = run;
-  }
-
-  /** US-7.3 | AC-1 to AC-6: folder and filename, the live path, Compile and Cancel. */
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.createEl('h2', { text: 'Export compiled markdown' });
-
-    const folder = new Setting(contentEl).setName('Output folder');
-    // US-7.3 | AC-6: the resolved path is computed from this prompt's values.
-    const showPath = () => folder.setDesc(`Resolved output path: ${this.plugin.getOutputPath(this.run)}`);
-    showPath();
-    let folderInput: { setValue(value: string): unknown } | null = null;
-    folder
-      .addText(text => {
-        folderInput = text;
-        text.setValue(this.run.outputFolder).onChange(value => {
-          this.run.outputFolder = value;
-          showPath();
-        });
-        this.confirmOnEnter(text.inputEl);
-      })
-      .addButton(button => button.setButtonText('Browse').onClick(async () => {
-        // US-7.3 | AC-4: the picked folder goes into this prompt only.
-        const chosen = await this.plugin.pickOutputFolder(this.run.outputFolder);
-        if (chosen === null) return;
-        this.run.outputFolder = chosen;
-        folderInput?.setValue(chosen);
-        showPath();
-      }));
-
-    new Setting(contentEl)
-      .setName('Output filename')
-      .addText(text => {
-        text.setValue(this.run.outputFile).onChange(value => {
-          this.run.outputFile = value;
-          showPath();
-        });
-        this.confirmOnEnter(text.inputEl);
-      });
-
-    new Setting(contentEl)
-      .addButton(button => button.setButtonText('Compile').setCta().onClick(() => this.compile()))
-      .addButton(button => button.setButtonText('Cancel').onClick(() => this.close()));
-  }
-
-  /** US-7.3 | AC-3: compiles with this prompt's values; nothing is saved. */
-  private compile(): void {
-    const run = { ...this.run };
-    this.close();
-    void this.plugin.compileVault(run);
-  }
-
-  /** US-7.3 | AC-5: Enter in a field compiles, not while an input method composes. */
-  private confirmOnEnter(input: HTMLInputElement): void {
-    input.addEventListener('keydown', event => {
-      if (!isConfirmKey(event)) return;
-      event.preventDefault();
-      this.compile();
-    });
-  }
-
-  onClose() {
-    this.contentEl.empty();
-  }
-}
-
-class VaultCompilerSettingTab extends PluginSettingTab {
-  plugin: VaultCompilerPlugin;
-
-  constructor(app: App, plugin: VaultCompilerPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  /** US-7.1 | AC-S1: a value typed just before the window closes is still saved. */
-  hide() {
-    void this.plugin.settingsSaver.flush();
+    return window.prompt(STRINGS.dialog.outputFolder, current);
   }
 
   /**
-   * US-0.3, US-7.1 | AC-S1, AC-S2: the settings. Text fields are saved after
-   * typing stops; the resolved output path follows every change at once.
+   * US-7.4 | AC-3: The existing output file's modification time, or null when
+   * there is none (or the location is refused).
    */
-  display() {
-    const { containerEl } = this;
-    containerEl.empty();
-    const FOLDER_DESC =
-      'Vault-relative folder for the compiled master file, or an absolute folder outside the vault ' +
-      '(desktop app only). Resolved output path: ';
-    let folder: Setting | null = null;
-    let resolved: Setting | null = null;
-    // US-7.1 | AC-S2: both places that show the resolved path.
-    const showPaths = () => {
-      const path = this.plugin.getOutputPath();
-      folder?.setDesc(FOLDER_DESC + path);
-      resolved?.setDesc(path);
-    };
+  outputModified(result: OutputLocationResult): Date | null {
+    if (!result.ok) return null;
+    const { location } = result;
+    if (location.kind === 'vault') {
+      const file = this.app.vault.getAbstractFileByPath(location.outputPath);
+      return file instanceof TFile ? new Date(file.stat.mtime) : null;
+    }
+    const fs = this.getNodeFs() as unknown as { existsSync(p: string): boolean; statSync(p: string): { mtime: Date } } | null;
+    return fs && fs.existsSync(location.outputPath) ? fs.statSync(location.outputPath).mtime : null;
+  }
 
-    new Setting(containerEl)
-      .setName('Starting file')
-      .setDesc('Vault-relative path of the markdown file used as the compilation entry point.')
-      .addText(text =>
-        text
-          .setPlaceholder('index2compile.md')
-          .setValue(this.plugin.settings.startingFile)
-          .onChange(value => {
-            this.plugin.settings.startingFile = value;
-            this.plugin.settingsSaver.request();
-            showPaths();
-          })
-      );
-
-    folder = new Setting(containerEl)
-      .setName('Output folder')
-      .addText(text =>
-        text
-          .setPlaceholder('')
-          .setValue(this.plugin.settings.outputFolder)
-          .onChange(value => {
-            this.plugin.settings.outputFolder = value;
-            this.plugin.settingsSaver.request();
-            showPaths();
-          })
-      )
-      .addButton(button => button.setButtonText('Browse').onClick(async () => {
-        const chosen = await this.plugin.pickOutputFolder(this.plugin.settings.outputFolder);
-        if (chosen === null) return;
-        this.plugin.settings.outputFolder = chosen;
-        await this.plugin.saveSettings();
-        this.display();
-      }));
-
-    new Setting(containerEl)
-      .setName('Output filename')
-      .setDesc('Filename of the compiled master file.')
-      .addText(text =>
-        text
-          .setPlaceholder('compiledtext.md')
-          .setValue(this.plugin.settings.outputFile)
-          .onChange(value => {
-            this.plugin.settings.outputFile = value;
-            this.plugin.settingsSaver.request();
-            showPaths();
-          })
-      );
-
-    resolved = new Setting(containerEl).setName('Resolved output path');
-    showPaths();
-
-    new Setting(containerEl)
-      .setName('Enable TextMapper rendering')
-      .setDesc('Render text-mapper code blocks to PNG path references when supported.')
-      .addToggle(toggle =>
-        toggle
-          .setValue(this.plugin.settings.enableTextMapper)
-          .onChange(async value => {
-            this.plugin.settings.enableTextMapper = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Map font')
-      .setDesc(
-        'Font for the text in compiled TextMapper maps, as a CSS font list (e.g. "Georgia, serif"). ' +
-        'Leave empty to use the font Obsidian shows your notes in.'
-      )
-      .addText(text =>
-        text
-          .setPlaceholder('Obsidian note font')
-          .setValue(this.plugin.settings.mapFont)
-          .onChange(value => {
-            this.plugin.settings.mapFont = value;
-            this.plugin.settingsSaver.request();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Tidy map labels')
-      .setDesc(
-        'In compiled maps, leave out the hex numbers, centre each label in its hex and break ' +
-        'long labels into lines. Maps inside Obsidian are not changed.'
-      )
-      .addToggle(toggle =>
-        toggle
-          .setValue(this.plugin.settings.tidyMapLabels)
-          .onChange(async value => {
-            this.plugin.settings.tidyMapLabels = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Normalise headings')
-      .setDesc(
-        'Automatically adjust heading levels when embedding files, so each file\u2019s headings ' +
-        'nest correctly within the document hierarchy. Files with a numeric prefix (e.g. "1.3.2 ") ' +
-        'are placed at the corresponding depth; unprefixed files inherit depth from their parent.'
-      )
-      .addToggle(toggle =>
-        toggle
-          .setValue(this.plugin.settings.normaliseHeadings)
-          .onChange(async value => {
-            this.plugin.settings.normaliseHeadings = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    // Epic 9 (#108): entry data from note properties.
-    const listSetting = (name: string, desc: string, key: 'entryMarkerKeys' | 'entryExcludeKeys' | 'entryAssetKeys' | 'expectCompiledFolders' | 'detailMarkerKeys') =>
-      new Setting(containerEl)
-        .setName(name)
-        .setDesc(desc)
-        .addText(text =>
-          text
-            .setPlaceholder('')
-            .setValue(this.plugin.settings[key])
-            .onChange(value => {
-              this.plugin.settings[key] = value;
-              this.plugin.settingsSaver.request();
-            })
-        );
-    listSetting('Entry marker keys', 'A note with one of these properties (comma-separated) keeps its properties as an entry block. Empty: off.', 'entryMarkerKeys');
-    listSetting('Entry exclude keys', 'Properties never written into an entry block (comma-separated).', 'entryExcludeKeys');
-    listSetting('Entry image keys', 'Entry properties that name an image to copy (comma-separated).', 'entryAssetKeys');
-    listSetting('Expect compiled folders', 'Notes in these folders that are never compiled are listed in the warnings file (comma-separated). Empty: off.', 'expectCompiledFolders');
-    // US-9.5 (#118): detail data from note properties.
-    listSetting('Detail marker keys', 'A note with one of these properties (comma-separated) gets a details block with only these properties, in this order. Empty: off.', 'detailMarkerKeys');
+  /**
+   * US-7.4 | AC-13: Gathers the debug info at the click, copies it, then a
+   * notice. The enabled plugins are private API: a structural type.
+   */
+  async copyDebugInfo(): Promise<void> {
+    const adapter = this.app.vault.adapter;
+    const file = normalizePath(`${this.manifest.dir ?? ''}/data.json`);
+    const plugins = (this.app as unknown as {
+      plugins?: { enabledPlugins?: Set<string>; manifests?: Record<string, { version: string }> };
+    }).plugins;
+    const text = debugInfo({
+      pluginVersion: this.manifest.version,
+      obsidianVersion: apiVersion,
+      settingsText: (await adapter.exists(file)) ? await adapter.read(file) : null,
+      plugins: [...(plugins?.enabledPlugins ?? [])].map((id) => ({ id, version: plugins?.manifests?.[id]?.version ?? '?' })),
+    });
+    await navigator.clipboard.writeText(text);
+    new Notice(STRINGS.notices.debugInfoCopied, 5000);
   }
 }

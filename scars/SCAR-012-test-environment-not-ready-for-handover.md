@@ -54,6 +54,12 @@ indistinguishable from a current one.
   depending on an input the measurement did not have. Example (2026-10-28,
   M15): the warning count was measured without the font catalog and said 148;
   the export lists 149, and four checks had copied the number.
+- Every number, name or order a manual check predicts (a count, a file name, the order of a
+  list of warnings) is read from the rule or measured, never written from memory. Example
+  (2026-11-12, Game Card Creator): M01 step 4 listed the warnings in an order that US-005 AC-8
+  does not give (it is card order), and M05 step 3 expected the file name `Reed Sweep cards`
+  where AC-6 names a single chosen note `Cards`; both were found by reading the author's run
+  against the rule, and both checks were corrected, not the code.
 - Before a manual check that depends on settings, read those settings
   where the check runs and compare them with what the check assumes; read
   them again before every run, because a setting can change between runs.
@@ -64,5 +70,23 @@ indistinguishable from a current one.
   including "export only modified files"; three runs wrote 8 of 413 pages,
   and only the last run was still on disk. The settings were restored and
   checked, and the next three runs were copied one by one.
+- Before a manual check is handed over, each step is walked through against
+  the real application, or its code when it cannot be run: where is the
+  control the step names, is it there, and are the files the step needs
+  prepared? A step that names a control that does not exist, or that is
+  unprepared and "may be skipped if easier", is a step that was not checked.
+  Example (2026-11-16, Obsidian2Typst M30, step 7): the step said "in the
+  settings tab set the band's font size through the preset"; the size is a
+  field of the preset note, not a control of the tab, and nothing was
+  prepared. The tester could not run it; the step was rewritten with two
+  prepared presets and run a day later, after a Node rehearsal gave the
+  expected values for both.
+  Walking a step against the code includes every refusal on its path: a step
+  that sets a value the code refuses (a check, a range, a commit that keeps the
+  last valid value) cannot reach the state the step expects. Example
+  (2026-11-17, Game Card Creator US-013 M12 step 3): to see the tab open the
+  section with a problem, the step typed a card width of 10; the commit refuses
+  it and keeps 62, so the problem never existed; the step needed a hand-edited
+  settings file instead.
 - Applies next to: every manual check (M1, M2, M3, later ones), release
   candidates, builds sent to other testers.

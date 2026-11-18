@@ -268,8 +268,11 @@ describe('US-4.10 AC-7: unknown structure', () => {
   });
 
   it('main shows one notice per compile with the agreed text', () => {
+    // US-7.4 AC-14 (amended at G2, 2026-11-18): the text is in the string table.
     const main = readFileSync(new URL('../../plugin/src/main.ts', import.meta.url), 'utf8');
-    assert.match(main, /`Vault Compiler: map directive "\$\{[^}]+\}" could not be applied; the map is drawn as the plugin made it\.`/);
+    const strings = readFileSync(new URL('../../plugin/src/strings.ts', import.meta.url), 'utf8');
+    assert.match(strings, /`Vault Compiler: map directive "\$\{[^}]+\}" could not be applied; the map is drawn as the plugin made it\.`/);
+    assert.match(main, /new Notice\(STRINGS\.notices\.directiveSkipped\(directive\)/);
   });
 });
 

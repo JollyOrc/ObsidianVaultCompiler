@@ -8,6 +8,7 @@
 import { LineCounter, parseDocument, stringify, isMap, isScalar } from 'yaml';
 import type { CompileResult } from './compiler.ts';
 import { decodeLink } from './utils.ts';
+import { STRINGS } from './strings.ts';
 
 /**
  * Epic 9 | Settings: a comma-separated setting as a list. Items are trimmed
@@ -304,15 +305,15 @@ export function headingForm(link: string): string {
  * zero is not shown.
  * `… 0 deduplicated. 1 duplicate entry omitted, 2 notes not compiled: see warnings_….md.`
  */
-export function completionNotice(result: CompileResult, warningsFile: string | null): string {
+export function completionNotice(result: CompileResult, warningsFile: string | null, outputPath: string): string {
   const { filesProcessed, assetsCopied, assetsDeduplicated } = result.stats;
-  const base = `Compilation complete: ${filesProcessed} files, ${assetsCopied} assets, ${assetsDeduplicated} deduplicated.`;
+  const base = STRINGS.notices.compiled(outputPath, filesProcessed, assetsCopied, assetsDeduplicated);
   const messages = result.warningDetails.map(detail => detail.message);
   const repeats = messages.filter(message => message === 'Duplicate entry omitted').length;
   const missing = messages.filter(message => message.startsWith('Not compiled')).length;
   const parts: string[] = [];
-  if (repeats > 0) parts.push(`${repeats} duplicate ${repeats === 1 ? 'entry' : 'entries'} omitted`);
-  if (missing > 0) parts.push(`${missing} ${missing === 1 ? 'note' : 'notes'} not compiled`);
+  if (repeats > 0) parts.push(STRINGS.notices.repeatsOmitted(repeats));
+  if (missing > 0) parts.push(STRINGS.notices.notCompiled(missing));
   if (parts.length === 0) return base;
-  return `${base} ${parts.join(', ')}${warningsFile === null ? '.' : `: see ${warningsFile}.`}`;
+  return `${base} ${parts.join(', ')}${warningsFile === null ? '.' : STRINGS.notices.seeWarnings(warningsFile)}`;
 }

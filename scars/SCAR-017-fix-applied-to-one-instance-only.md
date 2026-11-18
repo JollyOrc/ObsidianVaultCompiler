@@ -78,6 +78,27 @@ step in the fix asked "where else does this exist?".
   false *Missing heading anchor* in exactly the notes the classifier claimed.
   Both copies now call one `readWrapper`, with a text check that no copy of
   the old pattern is left.
+- An operation that can be started by several input routes (typed, picked in a dialog,
+  pasted, dragged) is a class: the story lists every route and gives the refusal example for
+  each, and the tests and the manual check run the refusal through each route, not only the
+  first. Example (2026-11-12, Game Card Creator US-007, M04): the output folder could be typed
+  or chosen in the system's folder dialog; the refusal of the vault's own folder was tested for
+  the typed route (the message under the field), but the dialog route committed the same value,
+  showed the message and then redrew the page at once, which erased it: the author saw the old
+  value come back with no warning. The route's handling moved into one function
+  (`pickOutputFolder`) with a test per outcome.
+- A value added to an enumeration (a kind, a mode, a list of settings or fields)
+  is a class: at G2 every place that enumerates it is searched (`'skill'`, the
+  field list, the kind check, an `else` branch that means "the other one"), and
+  the **whole** suite is run against the enumeration as implemented, not only
+  the new tests. A test that pins the old size or membership, and a branch that
+  silently takes the new value for an old one, show up in that run, not in the
+  user's output. Example (2026-11-13, Game Card Creator US-004 #21): the new
+  rule kind `creature` turned five older tests red (the field count, the page
+  groups, the unknown kind used in two examples, the defaults) and an `else`
+  in the run that meant "not a skill, so a spell" would have made spell cards
+  from creature notes; both were found when the code of the ticket ran, not
+  when its tests were written.
 - Applies next to: every defect found in M-checks (stale screens SCAR-016,
   confirmations SCAR-014, Enter key SCAR-013, validation, number formats), and to
   every refactor that copies a block between rows.

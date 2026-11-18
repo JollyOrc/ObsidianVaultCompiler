@@ -52,5 +52,24 @@ test; the rest was taken from expectation, not from the tool.
 - An outcome that varies between runs is reported with every measured
   count, not the first or the best one. Example (2026-10-30, webpage-export US-001 AC-14):
   3/3 in one run, 2/3 in the next; both recorded.
+- The review lists the **premises that carry a decision**, not only the
+  facts used in the examples, and each is measured or written as "not
+  measured". Example (2026-11-17, Game Card Creator US-010): the coverage call
+  and the behaviour for a missing character were measured at G0 and the review
+  said "measured"; decision D2 ("a character that some other font of the
+  compile has is drawn: Typst falls back to any font it has") was written as a
+  fact and measured only at the code stage, after a rehearsal picture showed
+  boxes where characters should have been (a harness that left out the extra
+  fonts). It held: without the extra fonts `✓ 😀 漢 ⌘` were the font's empty
+  glyph, with them `✓ 😀 ⌘` were drawn. Ask of each decision: what must the
+  dependency do for this to be right, and was that measured?
+- A test that compares a dependency's output byte for byte first measures
+  which bytes the dependency takes from the clock, chance or the machine
+  (produce it twice across a second boundary), sets those aside by name, and
+  makes the case that failed by chance happen in every run. Example
+  (2026-11-18, Obsidian2Typst #183): Typst writes the dates, to the second,
+  and a document ID derived from them into every PDF; a "same bytes twice"
+  test failed whenever its two compiles fell on two sides of a second. The
+  test now compiles 1.1 s apart and compares with those seven fields blanked.
 - Applies next to: compiler and renderer behaviour, Obsidian API timing and
   events, file formats, library defaults.

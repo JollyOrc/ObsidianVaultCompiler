@@ -32,6 +32,14 @@ two sibling plugins and live in the SCARs repository:
 
 What follows is specific to this project and refines the shared rules.
 
+Shared knowledge about Obsidian plugins (API findings and pitfalls, past
+problems, tooling, and the **preferred UI standard**) lives in
+<https://github.com/JollyOrc/ObsidianKnowledge> (local clone
+`~/Documents/ObsidianKnowledge`). Read the files that touch the work at
+step 0; a new or changed screen, dialog, menu or notice follows its
+`ui-standard.md`. A fact about Obsidian learned here goes there; a general
+failure mode goes to a SCAR.
+
 ## SCAR gates and numbers
 
 The gates of rule 9 are recorded in `docs/state/30_scar_checks.md`: **G0**
@@ -303,9 +311,12 @@ Vault file hashes must be unchanged except for configured outputs.
 Versioning: shared rules; in this project every issue-driven change bumps at
 least `0.0.1`, a new feature `0.1`.
 
-1. In `plugin/`, run `npm version <x.y.z> --no-git-tag-version`. This sets
-   `package.json` and, through `version-bump.mjs`, `manifest.json` and
-   `versions.json`.
+1. In `plugin/`, run `npm version <x.y.z> --no-git-tag-version --ignore-scripts`
+   (sets `package.json` and the lock file), then
+   `npm_package_version=<x.y.z> node version-bump.mjs` (sets `manifest.json`
+   and `versions.json`). `--ignore-scripts` keeps the `version` script's
+   `git add` from running inside a non-git command (rule 14); staging is its
+   own command at the commit.
 2. Write `releases/v<version>.md` (contents: shared rules, "Versioning";
    issues as `#n`).
 3. Run `npm run build`. It stops on any type, lint or test failure; otherwise it

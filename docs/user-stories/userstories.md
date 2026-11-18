@@ -105,7 +105,8 @@ entry point
   inside the vault. A folder outside the vault (AC-OL-2) is written with the
   Node.js file system of the desktop app, because the vault API cannot reach it.
 - Before overwriting an existing configured output file or assets, the plugin
-  asks for explicit confirmation.
+  asks for explicit confirmation. *(Amended by US-7.4 AC-3, 2026-11-18: no
+  question; the compile dialog says what will be replaced.)*
 
 **Output location rules (added 2026-10-27, v0.12.0)**
 
@@ -2252,7 +2253,8 @@ plugin
 - Plugin commands are available from the command palette to run a compilation.
 - Plugin settings let the user choose the vault-relative starting file and output
   file paths.
-- **AC-S1 Saving settings** *(decided 2026-11-01,
+- **AC-S1 Saving settings** *(amended by US-7.4 AC-12, 2026-11-18: saved on
+  Enter or leaving the field; decided 2026-11-01,
   [#82](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/82))*. A text
   field in the settings (starting file, output folder, output filename, map
   font) is saved half a second after the last key press, not on every key
@@ -2283,7 +2285,7 @@ plugin
 
 **Acceptance criteria**
 - **AC-1** A file explorer context-menu item is available for markdown files.
-- **AC-2** Selecting it opens the export-path prompt (US-7.3) with the chosen
+- **AC-2** *(Amended by US-7.4 AC-1: the compile dialog.)* Selecting it opens the export-path prompt (US-7.3) with the chosen
   file pre-set as the starting file and the configured output path
   pre-filled.
 - **AC-3 One-shot** *(examples added 2026-11-01,
@@ -2305,7 +2307,9 @@ before running
 settings first.
 
 **Acceptance criteria** *(AC-3 to AC-6 made concrete 2026-11-01, #81; AC-5
-and AC-6 decided the same day)*
+and AC-6 decided the same day. Amended by US-7.4, 2026-11-18: the prompt
+becomes the compile dialog (AC-2); folder and filename are saved when Compile
+runs (AC-4), which replaces AC-3 and AC-4 below.)*
 - **AC-1** Starting from the context menu opens a prompt with output folder
   and filename fields.
 - **AC-2** Fields default to the preset output folder and filename.
@@ -2329,6 +2333,139 @@ and AC-6 decided the same day)*
   `ch2.md` as filename → `Drafts/ch2.md`. Values that are refused show
   `not usable: <reason>` as today (US-0.3). *(v0.20.0: computed once from
   the settings when the prompt opened.)*
+
+### US-7.4 The preferred UI standard: a compile dialog, settings in sections, one string table
+
+*(G1 2026-11-18; released in 0.25.0, 2026-11-18. Follows the preferred UI standard for Obsidian plugins (Obsidian Knowledge
+`ui-standard.md`) and the owner's decisions of 2026-11-17/18 (VC-1 to VC-8). Amends US-0.3 (the overwrite
+question), US-7.1 AC-S1 (saving while typing), US-7.2 AC-2, US-7.3 AC-1 to AC-4. Planned for 0.25.0.
+Issue [#127](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/127); tickets #128 (T-7.4-A) to #133 (T-7.4-F),
+G3 2026-11-18.)*
+
+**As an** Obsidian user  
+**I want** the compile to follow the same patterns as my other plugins — a dialog when I want to choose, a direct
+command when I don't, settings in sections  
+**So that** I can compile without learning another set of controls.
+
+**Measured (SCAR-020, 024; `docs/technical/spike-compile-time.md`):** spike S1 inside Obsidian (2026-11-18): the
+core of a 323-note book takes **410 ms** on the main thread (today's freeze) and 350–407 ms per pass in a Web Worker,
+whose start (2 ms) and transfer (1 ms) are negligible; the main thread's longest gap during the worker was 21 ms; with
+the link table of AC-6 the result is byte-identical (content, warnings, details, stats; 2 passes, 108 misses in the
+first). *The earlier figure of 2.4–2.7 s was the core's fallback search in Node, without the plugin's resolver:
+withdrawn.* Spike S2: a whole compile of the book inside Obsidian (maps, asset copies, writes) takes **1.0–1.2 s**;
+the longest pause of the main thread is the core (0.42–0.46 s). The owner dropped the worker (VC-8) and the progress
+tab (VC-5) on these numbers.
+
+**Acceptance criteria**
+
+- **AC-1 (entries).** A ribbon icon (P2) and a command `Compile vault…` open the compile dialog (AC-2) with the
+  starting file, folder and filename of the settings. `Compile vault` stays and compiles at once with the saved
+  settings, without a dialog. The file menu's `Compile vault from this file` on a Markdown note opens the dialog
+  with that note as the starting file (US-7.2 AC-2, amended: the dialog instead of the prompt).
+- **AC-2 (the compile dialog; amends US-7.3 AC-1, AC-2).** A modal titled `Compile vault` (the modal's title, no
+  heading in its content) holds, top to bottom: `Starting file` (a vault path); the destination row — `Output
+  folder` as a full-width field with `Choose folder…` (today's `Browse`, P6) — and `Output filename` with the
+  button `Compile` at the end of its row; under them a red line with the reason when the values are refused
+  (US-0.3 AC-OL-1 to AC-OL-6, unchanged reasons) and a grey line saying what happens (AC-3); a row `More
+  options` with a gear that opens the plugin's settings tab. `Compile` is disabled while the values are refused.
+  Enter in a field compiles when `Compile` is enabled, not while an input method composes (SCAR-013); Escape, the
+  X and a click outside close the dialog and save nothing.
+- **AC-3 (what is at the destination; VC-1, amends US-0.3's last bullet).** The grey line names the output file:
+  `Exports/compiledtext.md will be written.` or `Exports/compiledtext.md exists (from 2026-11-17 14:02) and will be
+  replaced.` (the file's modification time, local, `YYYY-MM-DD HH:MM`), made again on every change of a field
+  (SCAR-016). **No question follows:** the compiled file and its `assets/` are the tool's own output and are
+  replaced, from the dialog and from `Compile vault` alike. The native `window.confirm` is gone.
+- **AC-4 (when values are saved; VC-2, amends US-7.3 AC-3, AC-4).** Folder and filename chosen in the dialog are
+  saved to the settings **when `Compile` runs**; `Choose folder…` alone saves nothing. The starting file is saved
+  too when the dialog was opened from the ribbon or `Compile vault…` (P1); from the file menu it is used for that
+  run only (US-7.2 AC-3 kept). Example: settings `index2compile.md`, `Exports`, `compiledtext.md`; file menu on
+  `Chapter 2.md`, folder `Drafts`, Compile → writes `Drafts/compiledtext.md`; the settings show
+  `index2compile.md`, `Drafts`, `compiledtext.md`.
+- **AC-5 (the core stays on the main thread; VC-8, revised 2026-11-18).** The compiler core runs on the main
+  thread as today (the book: 410 ms in Obsidian, measured in spike S1). *A worker was decided on a wrong timing and
+  dropped by the owner after S1 (the worker and its link table were proven byte-identical; recorded in
+  `docs/technical/spike-compile-time.md`).* Mobile is not checked (VC-6); its paths are unchanged.
+- **AC-6 (the compiled book unchanged).** The compiled book is byte-identical to 0.24.0's for the same vault and
+  settings (the timestamped warnings file excepted): the fixture by a golden test, the author's book at the manual
+  check (SCAR-040: Obsidian2Typst reads it). *(Revised 2026-11-18: the link table lapsed with the worker.)*
+- **AC-7, AC-8, AC-9 (a progress tab, its warnings, Cancel) — withdrawn 2026-11-18.** Spike S2 measured a whole
+  compile of the book inside Obsidian at 1.0–1.2 s, under the 2 s line of the standard; the owner dropped the tab:
+  a compile reports by notice only (AC-10).
+- **AC-10 (notices; D8).** A compile reports by notices in the standard's wording: `✅ Compiled
+  Exports/compiledtext.md: 12 files, 3 assets, 0 deduplicated.` with US-9.4 AC-5's additions unchanged (`… 1
+  duplicate entry omitted, 2 notes not compiled: see warnings_20261107_1530.md.`); `❌ Compilation failed:
+  <message>`. Refusals keep their texts (`Compilation not started: <reason>`, `Starting file not found.`). `Vault
+  compilation started.` is not shown any more (P3): a run is over in about a second (S2). The map notices (`Vault
+  Compiler: map …`) keep their texts. Notices last 5 s.
+- **AC-11 (settings in sections; VC-4).** The tab's first line is `Vault Compiler <version>` with a `Copy debug
+  info` button (bug icon) at its right; no heading with the plugin's name. Then collapsible sections: **Compile**
+  (Starting file; Output folder with `Choose folder…`; Output filename; Resolved output path), **Maps** (a feature
+  row `Enable TextMapper rendering` whose gear holds `Map font` and `Tidy map labels`), **Headings** (`Normalise
+  headings`), **Entry data** (the five comma lists). Each section ends with `Reset this section to defaults`
+  behind a question that starts on `Cancel` (F1: Game Card Creator #58, Obsidian2Typst #174): it sets that
+  section's values to the defaults of `DEFAULT_SETTINGS` and nothing else. Example: with the folder `Exports` and
+  `Tidy map labels` on, resetting *Compile* empties the folder and keeps `Tidy map labels` on.
+- **AC-12 (commit on Enter or leaving the field; amends US-7.1 AC-S1).** A text field of the settings is saved when
+  Enter is pressed or the field loses the focus, not while typing; closing the settings or switching the plugin off
+  saves a value still being typed. Example: typing `/Users/me/Exports` and pressing Tab writes `data.json` once,
+  with the whole value. Toggles save at once, as today. The resolved output path still follows every keystroke
+  (US-7.1 AC-S2 kept).
+- **AC-13 (Copy debug info; D7).** The button copies as plain text: the plugin's and Obsidian's versions, the
+  enabled plugins with their versions sorted by id, and the plugin's `data.json`; the notice `Debug info copied.`
+  Nothing is sent anywhere.
+- **AC-14 (one string table; VC-7).** Every text of the dialog, the settings tab and the notices comes from
+  `plugin/src/strings.ts`; the two checks of Obsidian2Typst (literals handed to text calls and shown fields; every
+  sentence-like literal against a named exemption list) guard it. The warning texts of the warnings file stay in the
+  compiler (named in the exemption list), as decided for Obsidian2Typst.
+- **AC-15 (checked in Obsidian, desktop).** A manual check on the fixture vault and, for AC-6, the author's book (numbers only, SCAR-035): every entry point, the dialog's keys and lines, every notice, the settings sections, the reset, Copy debug info, and the compiled book
+  byte-identical to 0.24.0's. Mobile not checked (VC-6).
+- **AC-16 (release 0.25.0).** Version 0.25.0 in every manifest, release notes, a line in `RELEASES.md`, the public
+  copy generated and published as for earlier releases.
+
+**Interface used by the tests (G2, 2026-11-18)** — the rules live in modules without an Obsidian import
+(SCAR-031); `main.ts` only wires them, checked by text.
+
+- `plugin/src/strings.ts` (AC-14): `STRINGS`, the one table; texts built from values are functions.
+- `plugin/src/compile-dialog-rules.ts` (AC-2 to AC-4): `destinationLine(result: OutputLocationResult, modified:
+  Date | null): {kind: 'refused' | 'info'; text: string}` — refused: the reason as US-0.3 gives it; info: `<path> will
+  be written.` or `<path> exists (from YYYY-MM-DD HH:MM) and will be replaced.` (local time); `dialogKey(event,
+  enabled): 'run' | 'cancel' | 'none'` (Enter only when enabled and not composing, Escape cancels);
+  `settingsAfterCompile(run: CompileRun, origin: 'settings' | 'file-menu'): Partial<CompileRun>` — what `Compile`
+  saves (P1).
+- `plugin/src/entries.ts` (AC-10): `completionNotice(result, warningsFile, outputPath)` — `✅ Compiled <outputPath>: …`
+  with US-9.4 AC-5's additions; `plugin/src/notices.ts`: `failedNotice(message)` — `❌ Compilation failed: <message>`.
+- `plugin/src/settings-layout.ts` (AC-11): `DEFAULT_SETTINGS`; `SETTINGS_SECTIONS` (`Compile`, `Maps`, `Headings`,
+  `Entry data`, each with its keys; `Maps` has the feature toggle `enableTextMapper` with `mapFont` and
+  `tidyMapLabels` behind its gear; every key in exactly one section); `sectionReset(settings, name)` — a copy with that
+  section's keys at their defaults; `resetQuestion(name)` — `Reset "<name>" to its defaults?`, the line `The settings of this section go back to
+  their defaults.`, `Reset`, `Cancel`.
+- `plugin/src/commit.ts` (AC-12): `attachCommit(input, save)` — saves the input's value on Enter (not composing) and
+  on `blur`, only when it changed since the last save; returns `{flush()}` for closing the tab or unloading.
+- The Obsidian side, checked by text: `plugin/src/compile-dialog.ts` (the `CompileDialog` modal: its title by
+  `setTitle`, no heading in its content; the lines from `destinationLine`; Enter and Escape through `dialogKey`; saves
+  through `settingsAfterCompile`; the gear opens the settings tab by `openTabById`), `plugin/src/confirm-modal.ts` (the
+  question, `Cancel` created first), `plugin/src/settings-tab.ts` (the header row with the version and the `bug`
+  button, the sections of `SETTINGS_SECTIONS`, the reset behind `ConfirmModal`, text fields through `attachCommit`),
+  `plugin/src/main.ts` (the ribbon icon, the two commands, the file menu, `compileVault` without `window.confirm`,
+  the notices, the debug info).
+- `plugin/src/debug-info.ts` (AC-13): `debugInfo({pluginVersion, obsidianVersion, settingsText, plugins})` — `Vault
+  Compiler <v>`, `Obsidian <v>`, `Enabled plugins:`, `- <id> <version>` sorted by id, `Settings file:`, the text (or
+  `(no settings file)`), a closing line break.
+
+**Proposals P1 to P8 — accepted by the owner, 2026-11-18**
+
+- **P1.** The starting file is saved on `Compile` when the dialog was opened from the ribbon or `Compile vault…`
+  (from the file menu: this run only).
+- **P2.** The ribbon icon `combine` (Lucide), tooltip `Compile vault…` (Obsidian2Typst uses `printer`).
+- **P3.** `Vault compilation started.` is dropped: a short run ends with its ✅ notice, a long one opens the tab.
+- **P4.** *(Lapsed 2026-11-18 with the progress tab.)*
+- **P5.** *(Lapsed 2026-11-18 with the progress tab.)*
+- **P6.** `Browse` becomes `Choose folder…` in the dialog and the settings (the standard's wording).
+- **P7.** Version 0.25.0 (new features).
+- **P8.** *(Lapsed 2026-11-18 with the worker.)*
+
+**Found while writing (not changed by this story):** US-0.2 says the starting file is chosen in Obsidian's
+quick-switcher picker; the plugin has a text field since its first release. Recorded, not part of this story.
 
 ## Epic 8 — Data safety and failsafes
 

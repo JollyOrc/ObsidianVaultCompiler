@@ -32,5 +32,9 @@ on the result.
   choice.
 - When an alternative cannot be measured in time, say so in the question
   ("not measured: …") so that the choice is made knowing it.
+- The effect an option claims is measured with that option's own rule, on the inputs named, not with a count
+  taken for another criterion. Example (2026-11-16, Game Card Creator US-011, M09 finding): "2 mm under the lower
+  of header and icon" was first offered as changing no card on the author's vault, counted as icons that stick
+  out today; measured with the option's own rule it changed 154 of 173 bands. Corrected before the decision.
 - Applies next to: every open decision in a story, every counter-offer, and
   every "A or B" put to the user.

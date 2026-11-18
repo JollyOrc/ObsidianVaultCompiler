@@ -556,6 +556,49 @@ AC-3 to AC-6; #81, #82; written 2026-11-01 before the code):
 - The manual described the old behaviour (the prompt's values saved in the
   settings) as intended; corrected with the stories.
 
+US-7.4, the preferred UI standard (G2 2026-11-18, written before the code; amends US-0.3's overwrite question,
+US-7.1 AC-S1, US-7.2 AC-2, US-7.3 AC-1 to AC-4):
+- `tests/unit/us-7.4-dialog.test.ts` (AC-2 to AC-4): `destinationLine` — the refusal's reason, `will be written.`,
+  `exists (from YYYY-MM-DD HH:MM) and will be replaced.` with padding and month; `dialogKey` — Enter only when enabled
+  and not composing (also keyCode 229), Escape cancels; `settingsAfterCompile` — file menu: folder and filename,
+  settings: also the starting file, a new object.
+- `tests/unit/us-7.4-notices.test.ts` (AC-10): `✅ Compiled <path>: …` with US-9.4 AC-5's additions; `❌ Compilation
+  failed: …`.
+- `tests/unit/us-7.4-settings.test.ts` (AC-11): the four sections in order, every key in exactly one, each section's
+  keys, the Maps feature row, the defaults of 0.24.0; `sectionReset` for every section with values in all (SCAR-019),
+  the input not changed; the question.
+- `tests/unit/us-7.4-commit.test.ts` (AC-12): typing saves nothing, blur saves once, Enter saves (not while
+  composing), an unchanged value is not saved again, `flush` saves a value being typed.
+- `tests/unit/us-7.4-debug-info.test.ts` (AC-13): the text, sorted plugins, no settings file.
+- `tests/unit/us-7.4-wiring.test.ts` (AC-1 to AC-4, AC-10 to AC-13): text checks over `main.ts`, `compile-dialog.ts`,
+  `settings-tab.ts`, `confirm-modal.ts` — the ribbon `combine`, the two commands, the file menu, the modal title, the
+  lines and keys, saving through `settingsAfterCompile`, the gear's `openTabById` with this plugin's id, no
+  `window.confirm`, the notices, the header row, the sections and their reset behind `ConfirmModal` (Cancel first),
+  `attachCommit`, no delayed save, the debug info copied.
+- `tests/unit/us-7.4-string-table.test.ts` (AC-14): every text-like literal of `plugin/src` (read with the TypeScript
+  parser) is in `strings.ts` or a named exemption (warning texts of the warnings file, comments of the compiled
+  output, SVG markup, guards, key names, the debug-info format; `compiler.ts` as a whole); no stale exemption; the
+  reader checks itself.
+- `tests/integration/us-7.4-golden.test.ts` (AC-6): the whole fixture vault compiles to the output of 0.24.0
+  (`tests/fixtures/basic-vault.compiled.expected.md`, `basic-vault.warnings.expected.json`, written by 0.24.0).
+- Amended: `settings-writes.test.ts` (rewritten for AC-4 and AC-12: the dialog saves only through
+  `settingsAfterCompile`, once, on Compile; text rows through `attachCommit`; flush on hide and unload; the file menu
+  saves nothing, a compile reads its run, `main.ts` assigns only while loading — kept), `entry-settings.test.ts` (the
+  completion notice's new form; the defaults read in `settings-layout.ts`), `detail-settings.test.ts`,
+  `map-labels.test.ts`, `textmapper-plugin.test.ts` (defaults in `settings-layout.ts`), `map-directives.test.ts` (the
+  notice text in `strings.ts`). Removed: `delayed-save.test.ts` (AC-12 replaces the delayed save; its module goes).
+- Proven on a throwaway reference (outside the repository; swapped into `plugin/src` with a checksum list and
+  restored, 13 of 13 equal): whole suite green there (unit 468, integration 1031), typecheck and lint clean. Mutation
+  round on the reference: 32 mutants, 31 caught first, one gap closed (the gear's check matched a type annotation;
+  tightened to the call) and then caught.
+- On 0.24.0 (red by design): unit 54 of 461 red, in the seven new files and the six amended ones; integration 1031
+  green (the golden included).
+- Added while coding: `tests/unit/us-7.4-wording.test.ts` (T-7.4-E: every table literal was changed in turn; the 47
+  read by no other test are pinned as written, five of them by key — two occur twice, one inside another); two wiring
+  checks tightened (the gear's call with this plugin's id at G2; Compile's `setDisabled(!this.enabled)` at T-7.4-C,
+  both had matched a type annotation). Per ticket on the real code: A 11, B 15, C 17, D 10, E 8 structural + 75
+  wording mutants, all caught at the end. After T-7.4-E: unit 516 of 516, integration 1031 of 1031.
+
 ### Epic 8 — Data safety and failsafes
 - Source vault file hashes are unchanged after compilation.
 - Temporary/rendering artifacts are not written into the source vault unless they
@@ -1092,6 +1135,13 @@ compile writes below `Export/`, which git ignores.
    to `Export`.
 10. Is anything missing, odd or ugly that this list did not ask about? Report
     it even if it seems unrelated.
+
+### M23 — The preferred UI standard (US-7.4, #127)
+
+The steps and the decision rules: `tests/manual/M23-ui-standard.md`. Build `0.25.0-m23.1`; the fixture vault for the
+UI, the author's book vault read only for AC-6 (the book compiled by 0.24.0 and by the test build into folders
+outside the vault, compared by SHA-256). Result 2026-11-18 (owner): passed — parts A, B and C;
+AC-6 holds, 68 of 68 files with the same SHA-256 (details in the M23 file).
 
 ### M22 — Detail data from note properties (Epic 9, US-9.5, #118, #122)
 

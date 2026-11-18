@@ -1,1 +1,8 @@
 /* Styles for the Obsidian Vault Compiler plugin */
+/* US-7.4 AC-2: the compile dialog's lines. */
+.vc-dialog-refused {
+  color: var(--text-error);
+}
+.vc-dialog-info {
+  color: var(--text-muted);
+}

@@ -57,3 +57,9 @@ unpushed commit amended.
 - Do not accumulate "will fix later" without a ticket (in every project: a
   GitHub issue). If it is worth fixing,
   it is worth tracking. If it is not worth tracking, it is not worth deferring.
+- Every full gate run keeps its whole output in a log file, from a story's
+  first run on, so that a failure which does not recur when the file runs
+  alone can be read afterwards. Example (2026-11-17/18, Obsidian2Typst #182):
+  integration files failed once each in full runs and passed alone; three
+  outputs were not kept and had no message. Logged, the next one showed an
+  assertion in a byte comparison, whose cause was then measured (#183).

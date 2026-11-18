@@ -1,3 +1,4 @@
+import { STRINGS } from './strings.ts';
 /**
  * Output location rules (US-0.3 AC-OL-1 to AC-OL-7).
  *
@@ -83,11 +84,11 @@ export function vaultRelativeFromAbsolute(absolute: string, vaultRoot: string): 
  * US-0.3 | AC-OL-5: Checks that the filename is a plain file name.
  */
 function checkFileName(file: string): string | null {
-  if (file === '') return 'Output filename is empty.';
+  if (file === '') return STRINGS.reasons.fileEmpty;
   if (/[\\/]/.test(file)) {
-    return `Output filename "${file}" must be a file name without "/" or "\\". Put folders into the output folder.`;
+    return STRINGS.reasons.fileHasFolder(file);
   }
-  if (file === '.' || file === '..') return `Output filename "${file}" is not a file name.`;
+  if (file === '.' || file === '..') return STRINGS.reasons.fileNotAName(file);
   return null;
 }
 
@@ -99,19 +100,19 @@ function checkFileName(file: string): string | null {
  */
 function vaultLocation(folder: string, shownFolder: string, request: OutputLocationRequest): OutputLocationResult {
   if (folder.includes('\\')) {
-    return { ok: false, reason: `Output folder "${shownFolder}" uses "\\"; use "/" between vault folders.` };
+    return { ok: false, reason: STRINGS.reasons.backslash(shownFolder) };
   }
   const normalised = folder.split('/').filter(part => part !== '' && part !== '.').join('/');
   const configDir = request.configDir;
   if (normalised === configDir || normalised.startsWith(`${configDir}/`)) {
     return {
       ok: false,
-      reason: `Output folder "${shownFolder}" is inside the Obsidian config folder ${configDir}.`,
+      reason: STRINGS.reasons.configFolder(shownFolder, configDir),
     };
   }
   const outputPath = joinOutputPath(normalised, request.file);
   if (outputPath === request.startingFile) {
-    return { ok: false, reason: `Output path "${outputPath}" is the starting file.` };
+    return { ok: false, reason: STRINGS.reasons.isStartingFile(outputPath) };
   }
   return {
     ok: true,
@@ -129,7 +130,7 @@ function vaultLocation(folder: string, shownFolder: string, request: OutputLocat
  * the export prompt show it — the path, or why the values are refused.
  */
 export function outputPathText(result: OutputLocationResult): string {
-  return result.ok ? result.location.outputPath : `not usable: ${result.reason}`;
+  return result.ok ? result.location.outputPath : STRINGS.tab.pathNotUsable(result.reason);
 }
 
 /**
@@ -148,11 +149,11 @@ export function resolveOutputLocation(request: OutputLocationRequest): OutputLoc
   if (folder.startsWith('~')) {
     return {
       ok: false,
-      reason: `Output folder "${folder}" starts with "~". Use the full path, e.g. /Users/<name>/Desktop.`,
+      reason: STRINGS.reasons.tilde(folder),
     };
   }
   if (folder.split(/[\\/]/).includes('..')) {
-    return { ok: false, reason: `Output folder "${folder}" must not contain "..".` };
+    return { ok: false, reason: STRINGS.reasons.dotDot(folder) };
   }
 
   if (!isAbsolutePath(folder)) return vaultLocation(folder, folder, request);
@@ -163,12 +164,12 @@ export function resolveOutputLocation(request: OutputLocationRequest): OutputLoc
   if (request.vaultRoot === null) {
     return {
       ok: false,
-      reason: `Output folder "${folder}" is outside the vault; writing outside the vault needs the desktop app.`,
+      reason: STRINGS.reasons.needsDesktop(folder),
     };
   }
   const absolute = stripTrailingSeparators(folder);
   if (!request.folderExists(absolute)) {
-    return { ok: false, reason: `Output folder "${absolute}" does not exist.` };
+    return { ok: false, reason: STRINGS.reasons.missingFolder(absolute) };
   }
   return {
     ok: true,

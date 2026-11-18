@@ -36,5 +36,12 @@ returns), and the decisions inherited the shell's untestability.
   a surviving mutant there is moved out, not explained away.
 - The line that remains in the entry point (passing a callback, a dialog) is
   guarded by a text check that names it.
+- What a screen does with a refused or failed result (which message it shows, whether it
+  redraws the page over it) is a decision too: a tested function returns what to show and
+  whether to redraw, and the two statements that carry it out in the shell are named by a text
+  check. Example (2026-11-12, Game Card Creator US-007, M04): a refused folder from the dialog
+  set its message and then redrew the page, erasing it; the first mutation round left the mutant
+  "redraw whatever the outcome" alive, and two text checks on `error.setText(outcome.message);`
+  and `if (outcome.saved) await this.draw();` caught it.
 - Applies next to: commands, menu handlers, ribbon actions, settings tab and
-  view wiring, event registrations.
+  view wiring, event registrations, a redraw after a call that can fail.

@@ -33,6 +33,18 @@ decision point before it.
   opens, Escape cancels, and Enter acts on the focused button. (Compare
   SCAR-013: in an input dialog Enter confirms; in a destructive confirmation
   the default is the safe button.)
+- The safe default is checked **after the framework has opened the dialog**, in
+  the real application, once after keyboard input and once after a mouse click:
+  a framework can move the focus after the dialog's own code ran, and the focus
+  ring may only show after keyboard input while Enter acts on the moved focus
+  all the same. Where the framework focuses the first focusable element (as
+  Obsidian's `Modal.open()` does after `onOpen`), the safe button is the first
+  button in the dialog, not merely the one focused in code. Example (2026-11-17,
+  Game Card Creator US-013 M12, #58): the replace and reset questions focused
+  Cancel in `onOpen`; Obsidian moved the focus to Replace within a millisecond,
+  in every path since 0.1.0; Enter replaced the cards; seen only when a run was
+  started from the keyboard (the ring showed), diagnosed with a focus trace,
+  fixed by putting Cancel first.
 - Refusals come before questions: an action that cannot be done (the last
   preset) is refused at once with its message and no dialog is shown.
 - The confirmation is part of the same code path as the action's button; a
