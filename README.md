@@ -28,12 +28,20 @@ at your own discretion.
 - **Hex maps:** `text-mapper` code blocks are drawn by the installed Text
   Mapper plugin and saved as transparent PNGs, optionally with centred,
   wrapped labels and without hex numbers.
+- **Entry data:** notes marked by chosen properties keep them as
+  `o2t-entry` or `o2t-details` blocks for the typesetting plugin
+  Obsidian2Typst; notes that never made it into the book are listed.
 - **Safe:** the plugin only reads your notes; it writes only the output file,
-  its `assets/` folder and a warnings file, and asks before overwriting.
+  its `assets/` folder and a warnings file. The compile window says
+  beforehand when an earlier output of the same name will be replaced.
+
+## Manual
+
+How to install and use the plugin: [`manual/manual.md`](manual/manual.md).
 
 ## Requirements
 
-- Obsidian 1.0 or later (desktop or mobile; writing outside the vault needs
+- Obsidian 1.6.6 or later (desktop or mobile; writing outside the vault needs
   the desktop app).
 - For hex maps: the community plugin **Text Mapper** (id `text-mapper`),
   installed and enabled. It is used at run time and not bundled; without it,
@@ -72,21 +80,31 @@ Other commands (run in `plugin/`): `npm test`, `npm run test:unit`,
 
 ## Usage
 
-- Command palette: **Compile vault** compiles from the configured starting
-  file (default `index2compile.md`).
-- File menu: **Compile vault from this file** on any note, with a prompt for
-  the output folder and file name.
+- Ribbon icon or command **Compile vault…**: opens the compile window with
+  the starting file, output folder and file name from the settings; it says
+  what will be written or replaced before you click **Compile**.
+- Command **Compile vault**: compiles at once with the settings, no window.
+- File menu: **Compile vault from this file** on any note opens the compile
+  window with that note as the starting file for this run.
 
 ### Settings
 
-| Setting | Meaning |
-|---|---|
-| Starting file | The note whose link list is the table of contents. |
-| Output folder / Output filename | Where the compiled document goes; `assets/` is created next to it. A folder outside the vault works on desktop. |
-| Enable TextMapper rendering | Draw `text-mapper` blocks as PNGs. |
-| Map font | Font for map labels; empty uses the font Obsidian shows your notes in. |
-| Tidy map labels | Leave out hex numbers, centre labels and break long labels into lines. |
-| Normalise headings | Set heading levels from numbered file names and nest all headings. |
+The settings tab has four sections, each with a reset to its defaults, and a
+**Copy debug info** button for bug reports.
+
+| Section | Setting | Meaning |
+|---|---|---|
+| Compile | Starting file | The note whose link list is the table of contents (default `index2compile.md`). |
+| Compile | Output folder / Output filename | Where the compiled document goes; `assets/` is created next to it. A folder outside the vault works on desktop. |
+| Maps | Enable TextMapper rendering | Draw `text-mapper` blocks as PNGs; its gear holds the two settings below. |
+| Maps | Map font | Font for map labels; empty uses the font Obsidian shows your notes in. |
+| Maps | Tidy map labels | Leave out hex numbers, centre labels and break long labels into lines. |
+| Headings | Normalise headings | Set heading levels from numbered file names and nest all headings. |
+| Entry data | Entry marker / exclude / image keys | Which notes become entries, which properties are left out, which name a picture to copy. |
+| Entry data | Expect compiled folders | Notes in these folders that are not in the document are listed in the warnings file. |
+| Entry data | Detail marker keys | Which notes get an `o2t-details` block, and with which properties. |
+
+Every setting is described in the [manual](manual/manual.md#the-settings-tab).
 
 ## Bugs, ideas and contributions
 
