@@ -80,6 +80,8 @@ export const STRINGS = {
     detailMarker: 'Detail marker keys',
     detailMarkerDesc:
       'A note with one of these properties (comma-separated) gets a details block with only these properties, in this order. Empty: off.',
+    encounterCallout: 'Encounter callout type',
+    encounterCalloutDesc: 'Callout type of an encounter list (empty: off)',
   },
   errors: {
     newVaultFile: (path: string): string => `Unexpected new vault file created during compilation: ${path}`,

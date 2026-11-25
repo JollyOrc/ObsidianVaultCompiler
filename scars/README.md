@@ -85,6 +85,9 @@ Each SCAR covers:
 | [SCAR-043](SCAR-043-count-over-generated-output.md) | A count over a folder includes generated output | Verification / Tooling | Medium | webpage-export |
 | [SCAR-044](SCAR-044-whole-tree-check-before-its-ticket.md) | A whole-tree check is assigned to a ticket that cannot make it green | Process / Specification | Low | webpage-export |
 | [SCAR-045](SCAR-045-fix-measured-only-in-the-test-environment.md) | A fix is measured only in the test environment and fails where the user runs it | Verification / Requirements | High | webpage-export |
+| [SCAR-046](SCAR-046-second-form-of-output-not-checked.md) | An output that ships in two forms is checked only in the one the checker looks at | Verification / Acceptance | Low | roa-character-sheets |
+| [SCAR-047](SCAR-047-parallel-tests-share-a-writable-folder.md) | Test files that run in parallel write the same folder | Verification / Test tooling | Low | roa-character-sheets |
+| [SCAR-048](SCAR-048-form-writing-space-drawn-over.md) | A printed form is drawn over the places where its user writes | Requirements / Design | Medium | roa-character-sheets |
 
 ## Former numbers (before 2026-11-05)
 
@@ -281,6 +284,7 @@ creates), not only what the installer writes.
 A scripted edit leaves out files that change only with the user's approval.
 A snapshot that may be restored as it is gets a content check, not only a
 checksum.
+A mutant counts only against test files that are green without it.
 The checksum list itself is checked before use (line count equals file count,
 all `OK`, names with spaces handled); a difference the run did not cause is
 reported and restored only from a byte-identical backup.
@@ -355,3 +359,19 @@ which it can be green.
 A failure seen only in the user's environment is fixed by an approach
 measured there before the story builds on it; every claim names the
 environment it was measured in.
+
+**Every form of the output is checked** (SCAR-046)
+When a build ships more than one form (a PDF and its editable document),
+name each form and its reader, test each by program, and let the manual
+check open each one.
+
+**A writable folder has one owner in a test run** (SCAR-047)
+A folder a test writes is private to that test or written once in the
+runner's global setup and only read afterwards; test files that run a
+product writing a fixed folder are serialised, with the reason beside the
+setting. Unplanned skipped tests are a failure to investigate.
+
+**A form keeps room where its user writes** (SCAR-048)
+List every place a printed form is written on and the room each needs;
+check that room by program as a clear zone; a mark meant to be filled in
+carries its label beside it, never inside.

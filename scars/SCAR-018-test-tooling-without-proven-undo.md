@@ -193,6 +193,21 @@ the restore is wrong, every later mutant tests something else, and the report
   0.25.0, before it ran. In the same story a `git rm --cached` ran while a
   test file was being removed, without the owner's word; it failed on a wrong
   path and changed nothing.
+- Before an exact-match edit of a file written by hand (a note, a style
+  guide), print the target lines with invisible characters made visible
+  (`od -c`, Python `repr`) and build the match string from that output, not
+  from the rendered or retyped text; check every match of every file before
+  the first write. Notes typed on a Mac carry non-breaking spaces (U+00A0)
+  that look like spaces. Example (2026-11-20, roa-bestiary palette script,
+  the one-time edits of a vault): the match for a colour list in a vault note
+  was found 0 times because two of its spaces were U+00A0; the match count
+  stopped the edit before any write, `od -c` showed the two characters, and the
+  second attempt matched them.
+- A mutant is run only with test files that are green without it, and a
+  file that is red before the run is not part of it. Example (2026-11-22,
+  roa-character-sheets US-002 #8): a mutant was counted "killed" because a
+  still-red test file of a later ticket ran beside it; run with its own test
+  file only, it survived, and a test was added.
 - Applies next to: every mutation run, every scripted refactor, probe setups
   that write into the project, install scripts, manual-check fixtures,
   commits and publishes after a manual check, new files written by a tool.

@@ -109,8 +109,11 @@ is your choice, so it is not listed in the warnings file. See
 | Detail value is not text: … | A detail property holds a list or a map. | Make it one text, or take it out of *Detail marker keys*. |
 | Detail keys differ only in case: … / … | A detail note has two properties such as `Pace` and `pace`. | Keep one of them; the first one is used. |
 | Entry keys and detail keys in one note: only the entry block is written | A note has both kinds of marker key. | Usually fine; the note is an entry. |
+| Encounter list: no rows | An encounter callout has no creature line. | Write lines like `2 × [[Creature]]`. |
+| Encounter list: … lines not read (lines …) | Lines of an encounter callout that are not creature lines. | Make them creature lines or move them out. |
+| Encounter list: no note "…" | A creature link names no note. | Fix the link. |
 
-See [Entries](entries.md) and [Details](details.md).
+See [Entries](entries.md), [Details](details.md) and [Encounters](encounters.md).
 
 ## Messages in the corner of the screen
 

@@ -24,7 +24,9 @@ import {
 } from './utils.ts';
 import { buildPlaceholder, mapAlt, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
-import { detailBlockText, detailPlan, entryBlock, flattenLinks, headingForm, imageLink } from './entries.ts';
+import { detailBlockText, detailPlan, entryBlock, entryData, flattenLinks, headingForm, imageLink } from './entries.ts';
+import { encounterBlockText, encounterType, findEncounterCallouts, readEncounterCallout } from './encounters.ts';
+import type { EncounterRow, EncounterTarget } from './encounters.ts';
 import type { DetailItem } from './entries.ts';
 import type { Heading } from './anchors.ts';
 
@@ -224,6 +226,8 @@ export interface CompilerOptions {
    * absent or `[]` → off.
    */
   detailMarkerKeys?: string[];
+  /** US-9.6: the callout type of an encounter list, as typed; trimmed, without case; empty or absent → off. */
+  encounterCalloutType?: string;
   /** US-9.4: folders whose notes must be compiled, as typed; absent or `[]` → off. Used by #114. */
   expectCompiledFolders?: string[];
 }
@@ -249,6 +253,13 @@ interface PendingDetails {
  * kind, not a sentinel); `insertEntryBlocks` replaces it last.
  */
 const ENTRY_PLACEHOLDER = /^<!-- __ventry__:(\d+) -->\n(?:[ \t]*\n)*/gm;
+
+/**
+ * US-9.6 | AC-6, AC-8: the line that holds an encounter block's place where
+ * its callout stood. Like `ENTRY_PLACEHOLDER` no step reads it; unlike it,
+ * the lines after it stay as they are.
+ */
+const ENCOUNTER_PLACEHOLDER = /^<!-- __vencounter__:(\d+) -->(\n?)/gm;
 
 /**
  * US-3.1 "Output folder": true when `path` lies in one of `folders` or below
@@ -373,6 +384,7 @@ export class InMemoryVaultCompiler {
     this.root = root;
     const assembled = this.processMarkdown(root, false);
     const converted = this.sanitizeOutput(this.convertLinks(assembled));
+    this.reportEncounters(converted);
     this.reportNotCompiled();
     return {
       content: this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(converted))),
@@ -441,7 +453,9 @@ export class InMemoryVaultCompiler {
       }
     });
 
-    const sanitized = this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(this.sanitizeOutput(processed))));
+    const stripped = tidyBlankLines(this.stripSentinels(this.sanitizeOutput(processed)));
+    this.reportEncounters(stripped);
+    const sanitized = this.insertEntryBlocks(stripped);
     // US-9.4 | AC-4: after every other row, as in `compile`.
     this.reportNotCompiled();
     return {
@@ -810,13 +824,119 @@ export class InMemoryVaultCompiler {
   }
 
   /**
+   * US-9.6 | AC-6, AC-9: the encounter blocks of this compile, by placeholder
+   * number, with the warnings of their callouts; `text` '' for a callout
+   * without rows. The warnings are given only for placeholders that reach
+   * the output (a callout outside an embedded section is not reported).
+   */
+  private encounterBlocks: Array<{ text: string; warnings: WarningDetail[] }> = [];
+
+  /** US-9.6 | AC-9: reports the warnings of every encounter placeholder in `content`, once each. */
+  private reportEncounters(content: string): void {
+    if (this.encounterBlocks.length === 0) return;
+    const seen = new Set<number>();
+    for (const m of content.matchAll(ENCOUNTER_PLACEHOLDER)) {
+      const index = Number(m[1]);
+      if (seen.has(index)) continue;
+      seen.add(index);
+      for (const w of this.encounterBlocks[index].warnings) this.reportOnce(w.message, w.link, w.file, w.line);
+    }
+  }
+
+  /**
+   * US-9.6 | AC-1 to AC-4, AC-9: replaces each encounter callout of `content`
+   * (a note's body, `lineMap` its source lines) by one placeholder line,
+   * keeping the header's source line; the block is built now from the
+   * callout's rows. A callout without rows is removed and warned. Lookups
+   * report nothing (US-8.5); warnings go through `reportOnce`.
+   */
+  private replaceEncounterCallouts(content: string, lineMap: number[], path: string): { content: string; lineMap: number[] } {
+    const type = encounterType(this.options.encounterCalloutType);
+    if (type === '') return { content, lineMap };
+    const lines = content.split('\n');
+    const callouts = findEncounterCallouts(lines, type, codeLines(content));
+    if (callouts.length === 0) return { content, lineMap };
+    const outLines: string[] = [];
+    const outMap: number[] = [];
+    let at = 0;
+    for (const callout of callouts) {
+      outLines.push(...lines.slice(at, callout.start));
+      outMap.push(...lineMap.slice(at, callout.start));
+      at = callout.end;
+      const header = lineMap[callout.start];
+      const warnings: WarningDetail[] = [];
+      const { rows, unread } = readEncounterCallout(lines, callout);
+      if (unread.length > 0) {
+        const where = unread.map(i => lineMap[i]);
+        const word = where.length === 1 ? 'line' : 'lines';
+        warnings.push({ message: `Encounter list: ${where.length} ${word} not read (${word} ${where.join(', ')})`, link: '', file: path, line: header });
+      }
+      let text = '';
+      if (rows.length === 0) {
+        warnings.push({ message: 'Encounter list: no rows', link: '', file: path, line: header });
+      } else {
+        const built: EncounterRow[] = rows.map(({ index, line }) => ({
+          ...this.encounterTarget(line.target, path, lineMap[index], warnings),
+          count: line.count,
+          note: line.note,
+        }));
+        text = encounterBlockText(callout.title, built);
+      }
+      this.encounterBlocks.push({ text, warnings });
+      outLines.push(`<!-- __vencounter__:${this.encounterBlocks.length - 1} -->`);
+      outMap.push(header);
+    }
+    outLines.push(...lines.slice(at));
+    outMap.push(...lineMap.slice(at));
+    return { content: outLines.join('\n'), lineMap: outMap };
+  }
+
+  /**
+   * US-9.6 | AC-3, AC-4, AC-5: the name and data of one row's target. A link
+   * that resolves names its note (file name without folder and `.md`; a
+   * section anchor is dropped) and gives that note's entry data without asset
+   * keys, or none when it is no entry note; reading does not compile it. A
+   * link that does not resolve keeps its target before `|` and `#`, with the
+   * warning `Encounter list: no note "<target>"`; plain text is the name.
+   */
+  private encounterTarget(target: EncounterTarget, path: string, line: number, warnings: WarningDetail[]): { name: string; data: Record<string, unknown> | null } {
+    if (target.kind === 'plain') return { name: target.text, data: null };
+    const raw = target.kind === 'wiki' ? target.link : parseEmbedDestination(target.destination).path;
+    const link = raw.replace(/#.*$/, '').trim();
+    const resolved = this.resolve(link, path);
+    if (resolved.missing || !this.isMarkdownPath(resolved.path)) {
+      warnings.push({ message: `Encounter list: no note "${link}"`, link, file: path, line });
+      return { name: link, data: null };
+    }
+    const name = this.basename(resolved.path).replace(/\.md$/i, '');
+    const markerKeys = this.options.entryMarkerKeys ?? [];
+    const yaml = this.readNote(resolved.path).yaml;
+    if (yaml === null) return { name, data: null }; // empty marker keys: `entryData` gives null
+    const result = entryData(yaml, {
+      markerKeys,
+      excludeKeys: this.options.entryExcludeKeys ?? ENTRY_EXCLUDE_DEFAULT,
+      assetKeys: this.options.entryAssetKeys ?? ENTRY_ASSET_DEFAULT,
+      asset: () => undefined,
+    });
+    for (const warning of result.warnings) warnings.push({ message: warning.message, link: warning.link, file: resolved.path, line: warning.line });
+    return { name, data: result.data };
+  }
+
+  /**
    * US-9.1 | AC-3, AC-11: the last step of a compile — each placeholder
    * becomes its block, and the empty lines after it go, so the body follows
    * the block directly. Nothing reads the output after this.
    */
   private insertEntryBlocks(content: string): string {
-    if (this.entryBlocks.length === 0) return content;
-    return content.replace(ENTRY_PLACEHOLDER, (_m, index: string) => `${this.entryBlocks[Number(index)] as string}\n`);
+    // US-9.6 | AC-6: encounter blocks first; they never sit on an entry placeholder's line.
+    const withEncounters = this.encounterBlocks.length === 0
+      ? content
+      : content.replace(ENCOUNTER_PLACEHOLDER, (_m, index: string, newline: string) => {
+        const text = this.encounterBlocks[Number(index)].text;
+        return text === '' ? '' : text + newline;
+      });
+    if (this.entryBlocks.length === 0) return withEncounters;
+    return withEncounters.replace(ENTRY_PLACEHOLDER, (_m, index: string) => `${this.entryBlocks[Number(index)] as string}\n`);
   }
 
   private isMarkdownPath(path: string): boolean {
@@ -939,6 +1059,9 @@ export class InMemoryVaultCompiler {
     // US-5.2 AC-12; US-8.4 AC-5: the source line of every line of `content`,
     // kept through every step below that changes the number of lines.
     let lineMap = content.split('\n').map((_line, index) => index + 1 + note.lines);
+    // US-9.6 | AC-2: encounter callouts become their blocks before any link step reads them.
+    // A quoted note (US-1.5) is never read for callouts: its lines are quoted, its callouts depth 2.
+    if (!quoted) ({ content, lineMap } = this.replaceEncounterCallouts(content, lineMap, path));
     try {
       // Basic readability check.
       // eslint-disable-next-line no-control-regex

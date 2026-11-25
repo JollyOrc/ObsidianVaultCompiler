@@ -241,5 +241,13 @@ more blocks the next correct change.
   count as caught, whatever it does. Example (2026-11-17, Game Card Creator
   US-013 #51): the first round ran a runner test red until #54 and reported 14 of
   14; with the set proven green first, one mutant survived and was a real gap.
+- A visual criterion (a gap, an overlap, a distance) is checked on what is
+  drawn — the ink from the glyph outlines, the drawn stroke — not on its
+  containers (text frames, advance boxes, bounding boxes of neighbours);
+  where only a container can be checked, the test says so and the output is
+  inspected. Example (2026-11-23, roa-character-sheets US-003): the gap after a
+  heading initial was set by advance widths and the visible gap came from the
+  side bearings; a title rule measured text frames, about 1.25 em taller than
+  the letters, and moved a title that fitted.
 - Applies next to: text checks over source files, guards over generated
   output, wiring tests, fakes of a framework.

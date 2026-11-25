@@ -1,7 +1,7 @@
 {
   "id": "obsidian-vault-compiler",
   "name": "Obsidian Vault Compiler",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "minAppVersion": "1.6.6",
   "description": "Compiles an Obsidian vault into a single markdown file with deduplicated assets.",
   "author": "JollyOrc",

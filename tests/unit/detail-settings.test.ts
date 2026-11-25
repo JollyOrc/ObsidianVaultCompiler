@@ -57,7 +57,7 @@ describe('US-9.5: main.ts decides nothing about details (SCAR-031)', () => {
     const strings = readFileSync(new URL('../../plugin/src/strings.ts', import.meta.url), 'utf8');
     assert.match(tab, /detailMarkerKeys: \{ name: STRINGS\.tab\.detailMarker/);
     assert.match(strings, /detailMarker: 'Detail marker keys'/);
-    assert.match(readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8'), /'detailMarkerKeys'\]/);
+    assert.match(readFileSync(new URL('../../plugin/src/settings-layout.ts', import.meta.url), 'utf8'), /'detailMarkerKeys'[,\]]/); // #135: narrowed to the criterion (in Entry data), not "last" (SCAR-023)
   });
 
   it('no YAML and no o2t-details in main.ts', () => {

@@ -31,6 +31,8 @@ at your own discretion.
 - **Entry data:** notes marked by chosen properties keep them as
   `o2t-entry` or `o2t-details` blocks for the typesetting plugin
   Obsidian2Typst; notes that never made it into the book are listed.
+- **Encounter lists:** an `[!encounter]` callout naming creatures becomes an
+  `o2t-encounter` block with their properties, for prefilled encounter rows.
 - **Safe:** the plugin only reads your notes; it writes only the output file,
   its `assets/` folder and a warnings file. The compile window says
   beforehand when an earlier output of the same name will be replaced.
@@ -103,6 +105,7 @@ The settings tab has four sections, each with a reset to its defaults, and a
 | Entry data | Entry marker / exclude / image keys | Which notes become entries, which properties are left out, which name a picture to copy. |
 | Entry data | Expect compiled folders | Notes in these folders that are not in the document are listed in the warnings file. |
 | Entry data | Detail marker keys | Which notes get an `o2t-details` block, and with which properties. |
+| Entry data | Encounter callout type | Which callout type is an encounter list (default `encounter`; empty: off). |
 
 Every setting is described in the [manual](manual/manual.md#the-settings-tab).
 

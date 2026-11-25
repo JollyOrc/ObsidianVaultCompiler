@@ -27,7 +27,7 @@ describe('US-7.4 AC-11: the sections', () => {
     assert.deepEqual(of('Compile'), ['startingFile', 'outputFolder', 'outputFile']);
     assert.deepEqual(of('Maps'), ['enableTextMapper', 'mapFont', 'tidyMapLabels']);
     assert.deepEqual(of('Headings'), ['normaliseHeadings']);
-    assert.deepEqual(of('Entry data'), ['entryMarkerKeys', 'entryExcludeKeys', 'entryAssetKeys', 'expectCompiledFolders', 'detailMarkerKeys']);
+    assert.deepEqual(of('Entry data'), ['entryMarkerKeys', 'entryExcludeKeys', 'entryAssetKeys', 'expectCompiledFolders', 'detailMarkerKeys', 'encounterCalloutType']); // + US-9.6 (#135)
   });
 
   it('Maps: a feature row, its toggle enableTextMapper, map font and tidy labels behind the gear', async () => {
@@ -53,6 +53,7 @@ describe('US-7.4 AC-11: the sections', () => {
       entryAssetKeys: 'illustration',
       expectCompiledFolders: '',
       detailMarkerKeys: '',
+      encounterCalloutType: 'encounter', // US-9.6 (#135): the one key added since 0.24.0
     });
   });
 });

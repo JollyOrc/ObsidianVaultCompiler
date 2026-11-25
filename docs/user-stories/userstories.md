@@ -2790,6 +2790,7 @@ items dropped; key lists are compared without case.
 | `entryAssetKeys` | `illustration` | US-9.2 |
 | `expectCompiledFolders` | *(empty: off)* | US-9.4 |
 | `detailMarkerKeys` | *(empty: off)* | US-9.5 |
+| `encounterCalloutType` | `encounter` | US-9.6 |
 
 Examples (SCAR-019): `entryMarkerKeys` `""` → off; `might` → one key;
 ` Might , attacks,,` → `might`, `attacks`. `entryExcludeKeys` `""` → nothing
@@ -2812,6 +2813,9 @@ anything about entries.
    `basic-vault`, the smoke book and every existing test is byte-identical to
    v0.22.0.
 4. `detailMarkerKeys` set, but no note has any of its keys → the same.
+5. *(2026-11-25, US-9.6)* No compiled note has a callout of type
+   `encounterCalloutType` → the compiled text of `basic-vault`, the smoke book
+   and every existing test is byte-identical to v0.25.0.
 
 **Not measured here (SCAR-024):** how Obsidian2Typst lays the entries out
 (its US-030 to US-036).
@@ -3254,3 +3258,206 @@ embed that has at least one top-level key of `detailMarkerKeys` and no key of
 - **AC-15 A long value reaches the block whole (SCAR-015).** A value of 400
   words (more than a page holds) is written in full, in order, in one line of
   the block; nothing is cut and no warning is given.
+
+### US-9.6 Turn an encounter list into an `o2t-encounter` block
+*(Released in 0.26.0, 2026-11-25; M24 passed. Ready 2026-11-25, G1 2026-11-25. Cross-plugin: control project
+`spec/Encounter Sheets Questions.md`, ES-1 to ES-17, answered by the user
+2026-11-25: "Yes, all proposals". Reader: Obsidian2Typst US-043, release
+0.17.0. Tickets [#134](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/134),
+[#135](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/135),
+[#136](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/136).)*
+
+**As a** referee preparing a session
+**I want** the creatures listed in a room note (`> [!encounter]`, `- 5 × [[Kettle Crab]]`)
+carried into the compiled file with their properties
+**So that** the typesetter can print each room's encounter rows already filled in.
+
+**The block's reader owns its format (SCAR-040):**
+[`docs/technical/encounter-block.md`](https://github.com/JollyOrc/Obsidian2Typst/blob/main/docs/technical/encounter-block.md)
+(Obsidian2Typst, Draft 2026-11-25, release 0.17.0). This story says what this
+compiler writes and does not restate the reader's rules.
+
+**Today (measured 2026-11-25, v0.25.0 core, `InMemoryVaultCompiler`, synthetic
+notes):** `index2compile.md` = `![[Mire Hollow]]`; `Mire Hollow.md` =
+`# 3. Mire Hollow` / blank / `> [!encounter]` / `> - 2 × [[Fen Hare]] — nibbling reeds` /
+`> - 1d4 × [[Bog Wight|wights]]` / `> - 1 × Lost Pilgrim — no stats`;
+`Fen Hare.md` and `Bog Wight.md` have properties and are **not** embedded.
+Output: `## Mire Hollow` / `> [!encounter]` /
+`> - 2 × <!-- Warning: link target 'Fen Hare' not embedded in compiled output --> — nibbling reeds` /
+`> - 1d4 × <!-- Warning: … 'Bog Wight' … -->` / `> - 1 × Lost Pilgrim — no stats`;
+two warnings. The creature names are lost, and the note's own `# 3. Mire Hollow`
+became `## Mire Hollow`.
+
+**Setting** (text field; read when a compile starts; written through
+`settingsSaver`, US-7.1 AC-S1): `encounterCalloutType`, default `encounter`;
+trimmed, compared without case; empty → off. Examples (SCAR-019): `""` → no
+block is ever written; `encounter` → `> [!encounter]` and `> [!Encounter]`;
+`foes` → only `> [!foes]`, an `[!encounter]` callout stays a callout.
+
+**Acceptance criteria**
+
+- **AC-1 Which callouts.** A callout whose type is `encounterCalloutType`, at
+  quote depth 1 (US-1.5's depth), in the starting file or in any compiled note
+  (whole-note or section embed), is replaced by one `o2t-encounter` block.
+  Not replaced, left as written (no warning): a callout at depth 2 or more
+  (`> > [!encounter]`), a callout in a code block, a `[!encounter]` written
+  inline. A callout `> [!encounter]-` or `+` (folded) counts as the same type.
+- **AC-2 Before links are resolved.** The replacement runs **before** the
+  link steps (Epic 0's and Epic 3's link resolution, US-8.3's output link
+  check), so a link inside the callout is never
+  turned into a warning comment or an in-book link; the measured example above
+  gives no `link target … not embedded` warning for `Fen Hare` or `Bog Wight`
+  (it gives today two).
+- **AC-3 The lines.** Each callout line of the form `- COUNT × TARGET` or
+  `- COUNT × TARGET — NOTE` is one row (`×`, `x` or `X`, spaces around it
+  optional; `*` and `+` bullets too). COUNT is digits, `NdM` or `dM`, written
+  as found. TARGET is a wikilink (`[[Fen Hare]]`, `[[Fen Hare|hares]]`,
+  `[[Bestiary/Fen Hare]]`), a Markdown link (`[hares](Fen%20Hare.md)`) or
+  plain text. Examples:
+
+  | Line | Row |
+  |---|---|
+  | `> - 2 × [[Fen Hare]] — nibbling reeds` | name `Fen Hare`, count `"2"`, note `nibbling reeds`, data |
+  | `> - 1d4 x [[Bog Wight\|wights]]` | name `Bog Wight`, count `"1d4"`, data |
+  | `> * 1 × Lost Pilgrim — no stats` | name `Lost Pilgrim`, count `"1"`, note, no data |
+  | `> - 3 × [hares](Fen%20Hare.md)` | name `Fen Hare`, count `"3"`, data |
+  | `> - **2** × [[Fen Hare]]` | count `"2"` (bold marks around the count removed) |
+  | `> - two × [[Fen Hare]]` | count `"two"` (written as found; the reader warns) |
+
+  A link to a section (`[[Fen Hare#Habits]]`) names the note (`Fen Hare`) and
+  takes its data; links inside NOTE are written as their text (`seen at
+  [[Old Weir]]` → `seen at Old Weir`) (owner Q-C, 2026-11-25).
+  The callout's title (`> [!encounter] Night watch`) → `title: Night watch`.
+  Any other line of the callout (a blank `>`, a paragraph, a line without
+  `×`) is left out, with one warning per callout:
+  `Encounter list: 2 lines not read (Mire Hollow.md, lines 5, 7)`.
+- **AC-4 The data.** A row whose target resolves (Obsidian's rules, the
+  compiler's lookup) to an **entry note** (a top-level key of
+  `entryMarkerKeys`, US-9.1) gets `data`: the map US-9.1 would write for that
+  note (keys, order, `entryExcludeKeys`, link flattening), **without the asset
+  keys** (`entryAssetKeys`): no image is copied (US-9.2 does not run for it).
+  A target that resolves to a note without a marker key, or plain text → no
+  `data`, no warning. A link that does not resolve → no `data` and the
+  warning `Encounter list: no note "Fen Hair" (Mire Hollow.md, line 4)`.
+  With `entryMarkerKeys` empty → no row has `data`; a link that does not
+  resolve still gives its warning (owner Q-B, 2026-11-25).
+- **AC-5 The creature note is not compiled.** Reading a creature's properties
+  does not embed it, list it (US-9.3) or count it as compiled for US-9.4's
+  report: a creature in an expected folder that only an encounter row reads
+  is reported `Not compiled` (owner Q-A, 2026-11-25: it is not in the book).
+  The compiled file has no heading or text of `Fen Hare` from this story.
+- **AC-6 The block.** Written exactly in the contract's form: the fence, then
+  `title` (only when set), then `rows`, each row's keys in the order `name`,
+  `count`, `note`, `data`, `count` always quoted; the same YAML writer as US-9.1.
+  The example above (with `entryMarkerKeys: vigour`) gives, in the place of
+  the callout, under `## Mire Hollow`:
+
+  ````
+  ```o2t-encounter
+  rows:
+    - name: Fen Hare
+      count: "2"
+      note: nibbling reeds
+      data:
+        vigour: 11
+        might: 4
+        attacks:
+          - "Kick: 2d6"
+    - name: Bog Wight
+      count: "1d4"
+      data:
+        vigour: 20
+        attacks:
+          - "Claw: 3d8"
+    - name: Lost Pilgrim
+      count: "1"
+      note: no stats
+  ```
+  ````
+
+  (Exact spacing and quoting fixed by G2 against the writer's real output;
+  SCAR-023.) A callout with no row line → no block, the callout removed, and
+  the warning `Encounter list: no rows (Mire Hollow.md, line 3)`.
+- **AC-7 Composed cases (SCAR-002, SCAR-041).**
+  - two callouts in one room → two blocks, in order;
+  - a room embedded twice → its block twice;
+  - a callout in a section embed (`![[Mire Hollow#Night]]`) → replaced;
+  - a room note that is the starting file → replaced;
+  - a callout inside a list item (`- > [!encounter]`) or a quote → left as is;
+  - a callout with a fenced code block in it → the fence's lines are not rows;
+  - the same creature twice in one callout → two rows (no merging);
+  - a creature that is also embedded as an entry in the same compile → its
+    entry is compiled as usual, and the encounter row still gets `data`.
+- **AC-8 Other steps leave the block alone (SCAR-039),** as US-9.1 AC-11: a
+  `data` value `"![c](x.png)"`, `"- [[A]]"`, `"<!-- x -->"`,
+  `"# Not a heading"` is in the output exactly as AC-4 writes it (after
+  AC-4's link flattening: `"![c](x.png)"` → `c`, `"- [[A]]"` → `- A`; the
+  others unchanged) and no warning names it. *(Corrected at G2, 2026-11-25:
+  "byte for byte" contradicted AC-4.)*
+- **AC-9 Warnings name the note** and the line as stored (US-8.4 AC-5).
+- **AC-10 The reader reads it back (SCAR-028):** every block in the tests is
+  compared as exact text and parsed with `yaml` 2.9 to the expected values;
+  the contract page's example block is produced exactly by a fixture that
+  holds its notes.
+- **AC-11 Invariant 5** holds: a test compiles `basic-vault`, the smoke book
+  and the detail and entry books with the setting at `encounter` and checks
+  them byte for byte against v0.25.0.
+- **AC-12 The setting's row.** The settings tab shows `encounterCalloutType`
+  in the section that holds `detailMarkerKeys`, as a text field of the same
+  kind (US-7.1 AC-S1; the UI standard of US-7.4), with the description
+  `Callout type of an encounter list (empty: off)`.
+
+
+**Interface (G2, 2026-11-25).** Fixed before the tests, so the tests and the
+code meet at one place:
+
+- **Compiler option:** `encounterCalloutType?: string` of `CompilerOptions`,
+  the setting as typed (like `detailMarkerKeys`, but one text, not a list).
+  The compiler trims it and compares the callout type without case; absent,
+  `''` or blanks → off. `main.ts` passes `this.settings.encounterCalloutType`
+  unchanged (SCAR-031: it decides nothing; a text check pins it). The default
+  `encounter` lives only in `settings-layout.ts`; a test that passes no option
+  gets no blocks (every existing test stays as it is).
+- **Settings key:** `encounterCalloutType` (text), default `'encounter'`, in
+  `DEFAULT_SETTINGS` and in the section `Entry data` of `SETTINGS_SECTIONS`,
+  directly after `detailMarkerKeys`; row in `settings-tab.ts`:
+  `encounterCalloutType: { name: STRINGS.tab.encounterCallout, desc: STRINGS.tab.encounterCalloutDesc }`.
+- **Strings keys:** `STRINGS.tab.encounterCallout` = `Encounter callout type`;
+  `STRINGS.tab.encounterCalloutDesc` = `Callout type of an encounter list (empty: off)`.
+- **Where the block stands:** it replaces exactly the callout's lines (the
+  header line up to the last line of the quote); the lines before and after
+  are untouched. Under a title heading it is the line after the heading, as
+  the contract page shows (the blank line there is dropped by the compiler's
+  existing heading-first rule, not by this story).
+- **Warnings** (all through the existing once-per-problem rule, US-8.5:
+  the same message, link, note and line is written once, also when the room
+  is embedded twice). Message / `link` / `file` / `line` of `warningDetails`;
+  `file` is the vault path of the note the callout is written in, lines are
+  as stored, frontmatter included (AC-9). The parentheses of the examples
+  above, `(Mire Hollow.md, line 4)`, are the `file` and `line` fields, not
+  message text; only the list of unread lines is in the message:
+  - `Encounter list: no rows` / `''` / note / line of the callout's header.
+  - `Encounter list: 2 lines not read (lines 5, 7)` / `''` / note / line of
+    the callout's header; one line: `Encounter list: 1 line not read (line 5)`.
+    Every line of the callout after its header that is not a row counts: a
+    blank `>`, a paragraph, a line without `×`, and the lines of a fenced code
+    block (fence lines included). A callout with no row and a paragraph gives
+    both warnings (the order is not fixed).
+  - `Encounter list: no note "Fen Hair"` / `Fen Hair` / note / line of the row.
+- **A row's `name`:** for a link that resolves, the note's file name without
+  folder and `.md` (`[[Bestiary/Fen Hare]]` → `Fen Hare`); for a link that
+  does not resolve, the target as written before `|`; for plain text, the text
+  trimmed.
+- **AC-8, read with AC-4:** a `data` value is what US-9.1 writes for that
+  note, links flattened (`"- [[A]]"` → `- A`, `"![c](x.png)"` → `c`);
+  "byte for byte" means that no later step changes it (no comment removal, no
+  heading, list or anchor step, no percent decoding).
+- **AC-5, read with US-9.4:** a creature note that only an encounter row
+  reads **is** reported as `Not compiled` in an expected folder (owner Q-A,
+  2026-11-25; changed at G2 from the first reading); a creature that is also embedded as an entry is compiled as
+  usual, is not a repeat (US-9.3) and is reported by nothing.
+- **The written YAML (AC-6, AC-10):** the tests build the expected text with
+  the writer of US-9.1, `stringify`/`Document.toString({ nullStr: '' })` of
+  `yaml` 2.9.1, with each `count` a double-quoted scalar (a plain `"1d4"` is
+  not quoted by the writer on its own; the contract says always quoted); the
+  fence is the one of US-9.1 AC-7.

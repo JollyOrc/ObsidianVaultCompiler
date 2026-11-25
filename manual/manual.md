@@ -8,7 +8,7 @@ heading, copies the pictures and files once, turns links between notes into
 jump links inside the document, and draws hex maps of the Text Mapper plugin
 as pictures. Your notes are only read, never changed.
 
-This manual describes version 0.25.0.
+This manual describes version 0.26.0.
 
 ## Contents
 
@@ -179,7 +179,7 @@ Open **Settings → Obsidian Vault Compiler**, or click the gear of **More
 options** in the compile window.
 
 The first line shows the installed version, for example `Vault Compiler
-0.25.0`, with a bug icon at its right: **Copy debug info**. It copies the
+0.26.0`, with a bug icon at its right: **Copy debug info**. It copies the
 plugin's and Obsidian's versions, your enabled plugins and the plugin's
 settings as plain text for a bug report; nothing is sent anywhere.
 
@@ -231,6 +231,7 @@ All five rows are lists of names separated by commas.
 | Entry image keys | `illustration` | Entry properties that name a picture to copy. | [Entries](entries.md#the-picture) |
 | Expect compiled folders | empty (off) | Every note in these folders (and their subfolders) that is not in the document is listed in the warnings file. | [Entries](entries.md#notes-that-never-made-it-into-the-book) |
 | Detail marker keys | empty (off) | A note with one of these properties gets an `o2t-details` block with only these properties, in this order. | [Details](details.md) |
+| Encounter callout type | `encounter` | A callout of this type becomes an `o2t-encounter` block with the listed creatures' properties. Empty: off. | [Encounters](encounters.md) |
 
 ## What the compiler does
 
@@ -264,5 +265,6 @@ The details are in [How a compilation works](compilation.md).
 | [Output location](output-location.md) | The output folder and file name, which choices are refused, folders outside the vault, the output folder is never read. |
 | [Entries](entries.md) | Creatures, spells and items with data: `o2t-entry` blocks, pictures, each entry once, notes that were never compiled. |
 | [Details](details.md) | A few facts under a heading: `o2t-details` blocks. |
+| [Encounters](encounters.md) | Creature lists of a room: `o2t-encounter` blocks. |
 | [Warnings and messages](warnings.md) | The warnings file, hidden notes in the document, a list of every warning and every notice. |
 | [Tips and questions](tips.md) | Old pictures, several books from one vault, lists that were not expanded, Dataview, headings, phones and synced folders. |

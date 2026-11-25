@@ -18,6 +18,8 @@ export interface VaultCompilerSettings {
   entryAssetKeys: string;
   expectCompiledFolders: string;
   detailMarkerKeys: string;
+  /** US-9.6: the callout type of an encounter list; empty → off. */
+  encounterCalloutType: string;
 }
 
 export const DEFAULT_SETTINGS: VaultCompilerSettings = {
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: VaultCompilerSettings = {
   entryAssetKeys: 'illustration',
   expectCompiledFolders: '',
   detailMarkerKeys: '',
+  encounterCalloutType: 'encounter',
 };
 
 type Key = keyof VaultCompilerSettings;
@@ -56,7 +59,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { name: STRINGS.sections.headings, keys: ['normaliseHeadings'] },
   {
     name: STRINGS.sections.entryData,
-    keys: ['entryMarkerKeys', 'entryExcludeKeys', 'entryAssetKeys', 'expectCompiledFolders', 'detailMarkerKeys'],
+    keys: ['entryMarkerKeys', 'entryExcludeKeys', 'entryAssetKeys', 'expectCompiledFolders', 'detailMarkerKeys', 'encounterCalloutType'],
   },
 ];
 

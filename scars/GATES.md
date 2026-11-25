@@ -66,3 +66,6 @@ A new SCAR adds its row here in the same commit.
 | SCAR-043 | A count over a folder includes generated output | G2, G4 | webpage-export |
 | SCAR-044 | A whole-tree check is assigned to a ticket that cannot make it green | G2 | webpage-export |
 | SCAR-045 | A fix is measured only in the test environment and fails where the user runs it | G1, G4 | webpage-export |
+| SCAR-046 | An output that ships in two forms is checked only in the one the checker looks at | G1, G2, G4 | confirmed 2026-11-22 |
+| SCAR-047 | Test files that run in parallel write the same folder | G2, G4 | confirmed 2026-11-23 |
+| SCAR-048 | A printed form is drawn over the places where its user writes | G1, G2, G4 | confirmed 2026-11-23 |

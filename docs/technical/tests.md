@@ -1136,12 +1136,56 @@ compile writes below `Export/`, which git ignores.
 10. Is anything missing, odd or ugly that this list did not ask about? Report
     it even if it seems unrelated.
 
+### M24 — Encounter lists in Obsidian (US-9.6, #136)
+
+`tests/manual/M24-encounters.md`: the setting's row, the compile of an invented adventure and its warnings, run with
+Obsidian2Typst's M34 in its scratch vault (test build `0.26.0-m24.1`).
+
 ### M23 — The preferred UI standard (US-7.4, #127)
 
 The steps and the decision rules: `tests/manual/M23-ui-standard.md`. Build `0.25.0-m23.1`; the fixture vault for the
 UI, the author's book vault read only for AC-6 (the book compiled by 0.24.0 and by the test build into folders
 outside the vault, compared by SHA-256). Result 2026-11-18 (owner): passed — parts A, B and C;
 AC-6 holds, 68 of 68 files with the same SHA-256 (details in the M23 file).
+
+### Epic 9 — US-9.6 encounter lists (#134, #135, G2 2026-11-25)
+
+Written before the code; 102 tests in five integration files, 22 green before
+the code as guards (setting off, callouts that stay, invariants, absences);
+the suite before them 516 unit and 1031 integration tests, all green.
+Amended after the owner's Q-A to Q-C (three tests) and at the code (#134):
+three tests corrected, the code right (the blank line after the starting
+file's title goes with or without the setting; "no note" names the row's
+line; the expected writer must not use YAML anchors), and three added from
+the mutation round.
+
+- `tests/integration/encounter-callout.test.ts` — US-9.6 AC-1 and the
+  setting: which callouts (type without case, folded, titled, depth 1 only,
+  not in code, lists or inline), the setting `""`, blanks, absent, `foes`.
+- `tests/integration/encounter-lines.test.ts` — US-9.6 AC-3, AC-6, AC-9:
+  every line form of the story's table, titles, unread lines (singular and
+  plural), the exact block text and its parse-back.
+- `tests/integration/encounter-data.test.ts` — US-9.6 AC-2, AC-4, AC-5, AC-9:
+  the data equal to the entry map without asset keys, non-entry and broken
+  targets (also with marker keys empty, Q-B), section links (Q-C), the
+  creature not compiled and still reported `Not compiled` (Q-A), no link
+  warnings from the callout.
+- `tests/integration/encounter-composed.test.ts` — US-9.6 AC-7, AC-8: two
+  callouts, twice embedded, section embed, starting file, containers, fences
+  in a callout, the same creature twice, entry and row of one creature,
+  tricky values, four-backtick fence, a quoted room, a callout without rows.
+- `tests/integration/encounter-invariant.test.ts` — US-9.6 AC-10, AC-11,
+  AC-12: the contract page's example produced exactly, `basic-vault` and the
+  entry and detail books byte for byte, the smoke book equal with and
+  without the setting, the setting's row, strings and wiring.
+- Amended pins: `tests/unit/us-7.4-settings.test.ts` (Entry data keys, the
+  defaults), `tests/unit/detail-settings.test.ts` (narrowed to its
+  criterion).
+- **Green with #134 and #135 (2026-11-25):** 516 unit and 1139 integration
+  tests, typecheck and lint clean (log kept). Mutation check: 15 mutants of
+  the reader, the compiler hook and the wiring; 14 caught after the three
+  added tests, 1 equivalent (a second-marker check the header pattern
+  already excludes; removed from the code).
 
 ### M22 — Detail data from note properties (Epic 9, US-9.5, #118, #122)
 

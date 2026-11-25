@@ -43,6 +43,7 @@ const ROWS: Record<keyof VaultCompilerSettings, { name: string; desc?: string; p
   entryAssetKeys: { name: STRINGS.tab.entryImage, desc: STRINGS.tab.entryImageDesc },
   expectCompiledFolders: { name: STRINGS.tab.expectCompiled, desc: STRINGS.tab.expectCompiledDesc },
   detailMarkerKeys: { name: STRINGS.tab.detailMarker, desc: STRINGS.tab.detailMarkerDesc },
+  encounterCalloutType: { name: STRINGS.tab.encounterCallout, desc: STRINGS.tab.encounterCalloutDesc },
 };
 
 export class VaultCompilerSettingTab extends PluginSettingTab {

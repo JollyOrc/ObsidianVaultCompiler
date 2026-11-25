@@ -204,6 +204,7 @@ export default class VaultCompilerPlugin extends Plugin {
         entryAssetKeys: parseListSetting(this.settings.entryAssetKeys, { lowerCase: true }),
         expectCompiledFolders: parseListSetting(this.settings.expectCompiledFolders, { lowerCase: false }),
         detailMarkerKeys: parseListSetting(this.settings.detailMarkerKeys, { lowerCase: true }),
+        encounterCalloutType: this.settings.encounterCalloutType,
       });
 
       const result = compiler.compile(run.startingFile);

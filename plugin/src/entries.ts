@@ -133,7 +133,29 @@ export interface EntryResult {
  *   text, at least three.
  */
 export function entryBlock(yaml: string, options: EntryOptions): EntryResult {
-  if (options.markerKeys.length === 0) return { block: null, warnings: [] };
+  const result = entryData(yaml, options);
+  return {
+    block: result.data === null ? null : fencedBlock('o2t-entry', stringify(result.data, { nullStr: '' })),
+    warnings: result.warnings,
+  };
+}
+
+/** US-9.1, US-9.6 | AC-4: the data of an entry note's block, or null when the note is no entry note. */
+export interface EntryDataResult {
+  data: Record<string, unknown> | null;
+  warnings: EntryWarning[];
+}
+
+/**
+ * US-9.1 | AC-1 to AC-10; US-9.6 | AC-4: the map an entry block holds — the
+ * note's top-level properties when one key is a marker key; keys lowercased,
+ * first spelling of a key wins (a later one differing in case is warned),
+ * `excludeKeys` left out, `assetKeys` handed to `options.asset` (left out
+ * when it returns `undefined`), every other value's links flattened. Null
+ * when the YAML is invalid (warned), not a map, or has no marker key.
+ */
+export function entryData(yaml: string, options: EntryOptions): EntryDataResult {
+  if (options.markerKeys.length === 0) return { data: null, warnings: [] };
   const lineCounter = new LineCounter();
   const doc = parseDocument(yaml, { lineCounter, version: '1.2' });
   const lineOf = (offset: number) => 1 + lineCounter.linePos(offset).line;
@@ -141,11 +163,11 @@ export function entryBlock(yaml: string, options: EntryOptions): EntryResult {
   if (doc.errors.length > 0) {
     const error = doc.errors[0];
     return {
-      block: null,
+      data: null,
       warnings: [{ message: 'Frontmatter is not valid YAML', link: '', line: lineOf(error.pos[0]) }],
     };
   }
-  if (!isMap(doc.contents)) return { block: null, warnings: [] };
+  if (!isMap(doc.contents)) return { data: null, warnings: [] };
 
   const pairs = doc.contents.items.map(pair => {
     const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
@@ -153,7 +175,7 @@ export function entryBlock(yaml: string, options: EntryOptions): EntryResult {
     return { key, lower: key.toLowerCase(), offset, value: pair.value };
   });
   const markers = new Set(options.markerKeys);
-  if (!pairs.some(pair => markers.has(pair.lower))) return { block: null, warnings: [] };
+  if (!pairs.some(pair => markers.has(pair.lower))) return { data: null, warnings: [] };
 
   const excluded = new Set(options.excludeKeys);
   const assetKeys = new Set(options.assetKeys ?? []);
@@ -184,14 +206,14 @@ export function entryBlock(yaml: string, options: EntryOptions): EntryResult {
     data[pair.lower] = flattenValue(value);
   }
 
-  return { block: fencedBlock('o2t-entry', stringify(data, { nullStr: '' })), warnings };
+  return { data, warnings };
 }
 
 /**
  * US-9.1 | AC-7, US-9.5 | AC-7: `text` in a fence of `language` — backticks,
  * one more than the longest backtick run in the text, at least three.
  */
-function fencedBlock(language: string, text: string): string {
+export function fencedBlock(language: string, text: string): string {
   const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map(run => run[0].length));
   const fence = '`'.repeat(Math.max(3, longest + 1));
   return `${fence}${language}\n${text}${fence}`;

@@ -63,3 +63,9 @@ unpushed commit amended.
   integration files failed once each in full runs and passed alone; three
   outputs were not kept and had no message. Logged, the next one showed an
   assertion in a byte comparison, whose cause was then measured (#183).
+- Temporary instrumentation (a debug print, a timing log) carries a fixed
+  marker; it is removed by reading the code, not by a pattern over lines a
+  formatter may have split, and the gate searches the sources for the marker
+  before a commit. Example (2026-11-23, roa-character-sheets US-003 #22): a
+  debug print was removed with a one-line pattern after formatting; one loop
+  survived in the core and printed during a build.
