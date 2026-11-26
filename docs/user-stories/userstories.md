@@ -2467,9 +2467,76 @@ tab (VC-5) on these numbers.
 **Found while writing (not changed by this story):** US-0.2 says the starting file is chosen in Obsidian's
 quick-switcher picker; the plugin has a text field since its first release. Recorded, not part of this story.
 
+### US-7.5 The starting note names its compile target and carries its preset
+*(Released in 0.27.0, 2026-11-26; M25 passed with Obsidian2Typst M36. Ready 2026-11-26, G1 2026-11-26. Cross-plugin: control project `spec/Note Settings Questions.md`, NS-1 to NS-9, answered by
+the user 2026-11-26: "Yes, all proposals". Partner: Obsidian2Typst US-045, release 0.19.0, reads the carried key.
+Amends US-7.4 (the dialog saves its choices) and US-8.1 (the one write outside a compile). Tickets
+[#137](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/137),
+[#138](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/138),
+[#139](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/139),
+[#140](https://github.com/JollyOrc/ObsidianVaultCompiler/issues/140).)*
+
+**As a** writer who compiles more than one book from one vault (a rulebook, an adventure's encounter sheets)
+**I want** the starting note to say where its compile goes and which Obsidian2Typst preset prints it
+**So that** compiling one never overwrites the other's target, and the export picks the right preset by itself.
+
+**Today (measured 2026-11-26, v0.26.0):**
+- Entry points: command `compile-vault` (no dialog, the saved settings), command `compile-vault-dialog` and the
+  ribbon (dialog, origin `settings`), the file menu (dialog with that note as starting file, origin `file-menu`)
+  (`main.ts:48-76`).
+- On Compile the dialog **always saves the output folder and file name** into the settings
+  (`settingsAfterCompile`, `compile-dialog-rules.ts:51-55`); the starting file only for origin `settings`. At the
+  Keep run (2026-11-25) this replaced the book's target with the encounter sheets'.
+- `resolveOutputLocation` (`output-location.ts:144-183`) checks the file name and the folder.
+- Every note's frontmatter is split off (`splitFrontmatter`, `utils.ts:56-63`); the starting note's is read by nothing
+  and dropped; **the output has no frontmatter** (`compiler.ts:389-394`).
+
+**Properties** (top-level text keys of the starting note; trimmed; empty or absent = not set; another type is
+refused: `Property compile-folder must be text`):
+`compile-folder` (the output folder, as the setting), `compile-file` (the output file name, as the setting),
+`typst-preset` (carried, not read: its reader is Obsidian2Typst US-045).
+
+**Acceptance criteria**
+
+- **AC-1 Which target.** When a compile starts, the starting note's `compile-folder` and `compile-file`, where set,
+  replace the settings' output folder and file name for that compile; an unset one falls back to its setting. The
+  same for all three entry points. Only the starting note counts: the keys in an embedded note are dropped as any
+  frontmatter is. The starting note is read when the compile starts (SCAR-022). Examples (settings `Exports` /
+  `Book.md`): `compile-folder: Sheets`, `compile-file: Keep.md` → `Sheets/Keep.md`; only `compile-file: Keep.md` →
+  `Exports/Keep.md`; neither → `Exports/Book.md` (as today).
+- **AC-2 Same rules as the settings (SCAR-033).** The values go through `resolveOutputLocation` unchanged in its
+  rules; a refusal names the property: `Property compile-folder: ` followed by the existing reason (for `../out`:
+  `STRINGS.reasons.dotDot`, unchanged). A relative folder is relative to the vault, not to the note. An absolute folder
+  outside the vault works as the setting does (desktop only).
+- **AC-3 The settings stay untouched (amends US-7.4).** A compile whose target comes from the note (either key set)
+  saves neither output folder nor file name into the settings, from any entry point. The dialog fills its output
+  fields from the note and says in its info line `Output from the note's properties`; changing them there applies to
+  this run only and saves nothing. Changing the starting-file field to another note refills the output fields from
+  that note (or from the settings when it has no keys) when the field is left. Without the keys: as today.
+- **AC-4 The preset travels.** When the starting note has a non-empty `typst-preset`, the output file starts with a
+  frontmatter of that one key (`---` / `typst-preset: <value>` / `---`, the value quoted when YAML needs it); no other
+  key is copied. Without it the output has no frontmatter (byte-identical to 0.26.0).
+- **AC-5 The menu "Compile target…".** The file menu of a `.md` note gets `Compile target…`, opening a small dialog:
+  output folder (with Choose folder…), output file name, `Save`, `Clear`, `Cancel`; filled with the note's values
+  or empty. `Save` checks both with AC-2's rules first (a refusal is shown in the dialog, nothing is written), then
+  sets the two keys; an empty field removes its key. `Clear` removes both. Enter saves, Escape cancels (SCAR-013).
+  Notice: `✅ Compile target of "<note>": <folder>/<file>` or `✅ Compile target of "<note>": the settings`.
+- **AC-6 The write.** Only `compile-folder` and `compile-file` change; other keys keep their order, values and
+  comments (the `yaml` Document API); every byte outside the frontmatter stays; a note without frontmatter gets one;
+  a frontmatter left empty is removed with its `---` lines; an unclosed or non-mapping frontmatter is not changed:
+  `Could not set the compile target: <reason>`. One `vault.process` (atomic).
+- **AC-7 The one write outside a compile (amends US-8.1).** A compile still writes nothing outside its output
+  location (AC-8.1-W unchanged). Outside a compile, the plugin writes to a source note only through AC-5, on the
+  user's action, and only the two keys of that note.
+- **AC-8 Nothing else changes.** A starting note without these keys gives the same output and the same saved
+  settings as 0.26.0; the other notes' frontmatter is handled as before.
+- **AC-9 Release 0.27.0.** Versions, notes, the manual (`starting-note.md`, `output-location.md`), and the manual
+  check M25 run with Obsidian2Typst's M36 (the compiled note carries `typst-preset`; its export uses that preset).
+
 ## Epic 8 — Data safety and failsafes
 
 ### US-8.1 Never alter source vault files
+*(Amended 2026-11-26 by US-7.5 AC-7: compiles are unchanged; outside a compile the plugin writes to a source note only through `Compile target…`, on the user's action, and only `compile-folder` and `compile-file`.)*
 **As a** vault owner  
 **I want** compilation to be strictly read-only with respect to the source vault  
 **So that** running the plugin can never damage or modify my original files.

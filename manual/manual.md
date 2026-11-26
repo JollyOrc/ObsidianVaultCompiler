@@ -8,7 +8,7 @@ heading, copies the pictures and files once, turns links between notes into
 jump links inside the document, and draws hex maps of the Text Mapper plugin
 as pictures. Your notes are only read, never changed.
 
-This manual describes version 0.26.0.
+This manual describes version 0.27.0.
 
 ## Contents
 
@@ -86,6 +86,11 @@ Right-click a markdown note in the file explorer (or use the **⋯** menu of an
 open note) and choose **Compile vault from this file**. The compile window
 opens with that note as the starting file. The note is used for this run
 only; the starting file in the settings stays as it is.
+
+The same menu has **Compile target…**: it saves an output folder and file
+name in the note's properties, so compiling from that note always goes there
+and leaves your settings alone (see
+[A compile target in the starting note](output-location.md#a-compile-target-in-the-starting-note)).
 
 ### The compile window
 
@@ -179,7 +184,7 @@ Open **Settings → Obsidian Vault Compiler**, or click the gear of **More
 options** in the compile window.
 
 The first line shows the installed version, for example `Vault Compiler
-0.26.0`, with a bug icon at its right: **Copy debug info**. It copies the
+0.27.0`, with a bug icon at its right: **Copy debug info**. It copies the
 plugin's and Obsidian's versions, your enabled plugins and the plugin's
 settings as plain text for a bug report; nothing is sent anywhere.
 

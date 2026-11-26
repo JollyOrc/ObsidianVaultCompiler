@@ -285,10 +285,16 @@ describe('US-8.1 AC-8.1-W — no write call bypasses the output writer', () => {
     // 7 in output-writer.ts (create, modify, createBinary, createFolder,
     // writeFileSync for text and for binary, mkdirSync). The 5 TextMapper
     // temp-folder writes are gone since v0.14.0 (US-4.4 AC-1, T-4.2-B).
-    assert.equal(count, 7);
+    // Amended 2026-11-26 (US-7.5 AC-7, US-8.1 amended): + 1, the user's
+    // "Compile target…" write of two keys of a note, outside any compile.
+    assert.equal(count, 8);
   });
 
-  it('outside output-writer.ts there is no write call at all (US-4.4 AC-1 since v0.14.0)', () => {
+  // Amended 2026-11-26 (US-7.5 AC-7, US-8.1 amended): the one write outside
+  // a compile is the "Compile target…" save (one `vault.process` of the
+  // chosen note, through `setNoteProperties`); nothing else, and never in the
+  // compile path.
+  it('outside output-writer.ts the only write call is the Compile target… save (US-4.4 AC-1; US-7.5 AC-7)', () => {
     const found: string[] = [];
     for (const { name, text } of sources) {
       if (name === 'output-writer.ts') continue;
@@ -296,7 +302,10 @@ describe('US-8.1 AC-8.1-W — no write call bypasses the output writer', () => {
         found.push(`${name}: ${lineOf(text, match.index ?? 0)}`);
       }
     }
-    assert.deepEqual(found, []);
+    assert.equal(found.length, 1, found.join(' | '));
+    assert.match(found[0]!, /^compile-target-dialog\.ts: .*vault\.process\(/);
+    const dialog = sources.find(s => s.name === 'compile-target-dialog.ts')!.text;
+    assert.match(dialog, /setNoteProperties\(/);
   });
 
   it('in output-writer.ts every write call follows this.assertAllowed(...) in the same method', () => {

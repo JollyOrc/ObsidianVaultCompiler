@@ -1141,6 +1141,11 @@ compile writes below `Export/`, which git ignores.
 `tests/manual/M24-encounters.md`: the setting's row, the compile of an invented adventure and its warnings, run with
 Obsidian2Typst's M34 in its scratch vault (test build `0.26.0-m24.1`).
 
+### M25 — The starting note's compile target in Obsidian (US-7.5, #140)
+
+`tests/manual/M25-note-target.md`: `Compile target…`, the compile from the note (target, info line, settings unchanged)
+and the carried `typst-preset`, run with Obsidian2Typst's M36 in its scratch vault (test build `0.27.0-m25.1`).
+
 ### M23 — The preferred UI standard (US-7.4, #127)
 
 The steps and the decision rules: `tests/manual/M23-ui-standard.md`. Build `0.25.0-m23.1`; the fixture vault for the

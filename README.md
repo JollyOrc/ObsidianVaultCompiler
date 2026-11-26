@@ -33,6 +33,10 @@ at your own discretion.
   Obsidian2Typst; notes that never made it into the book are listed.
 - **Encounter lists:** an `[!encounter]` callout naming creatures becomes an
   `o2t-encounter` block with their properties, for prefilled encounter rows.
+- **A compile target per starting note:** `compile-folder` and `compile-file`
+  in the starting note (set with **Compile target…**) override the output for
+  that note without touching the settings; `typst-preset` travels into the
+  compiled note for Obsidian2Typst.
 - **Safe:** the plugin only reads your notes; it writes only the output file,
   its `assets/` folder and a warnings file. The compile window says
   beforehand when an earlier output of the same name will be replaced.

@@ -71,5 +71,13 @@ test; the rest was taken from expectation, not from the tool.
   and a document ID derived from them into every PDF; a "same bytes twice"
   test failed whenever its two compiles fell on two sides of a second. The
   test now compiles 1.1 s apart and compares with those seven fields blanked.
+- A manual check's expectation about another program's behaviour (a sibling plugin's
+  rule, an app's default) cites that program's manual or a measurement, and a
+  measurement taken for it is reported whole (every value, not its maximum or
+  its mean). Example (2026-11-26, Obsidian2Typst M35): step 6 promised that a
+  wrapped creature band makes every band on the cards as tall; Game Card
+  Creator's manual says only the wrapped band is taller. The G2 measurement had
+  shown per-card heights 7.55 / 7.55 / 11.34 mm and was reported as "the common
+  height +1.6 mm". The tester found the difference; the step was corrected.
 - Applies next to: compiler and renderer behaviour, Obsidian API timing and
   events, file formats, library defaults.

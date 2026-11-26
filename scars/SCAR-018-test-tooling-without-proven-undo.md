@@ -167,6 +167,13 @@ the restore is wrong, every later mutant tests something else, and the report
   (2026-11-16, Game Card Creator US-011 #40): a backup loop over `FILES="a b c"` in zsh copied nothing (zsh does
   not split the word), so the restores after the mutants restored nothing; found when the file count of the list
   was read.
+  Recurrence (2026-11-26, Obsidian2Typst US-044): the backup loop again took `FILES="a b c"` in zsh and copied
+  nothing; the mutation script (Python) then crashed on its first restore and left mutant M2 in `entry.ts`. Found
+  from the traceback; the file was restored by hand, its whole diff read against the intended change, and the round
+  repeated. The rule above was known and not applied: the script started without the file-count check.
+- A mutation script restores each mutant in a `finally` block (or a trap), so a crash between the change and the
+  restore never leaves the mutant in the tree; after a crash, `git diff` of the touched files is read against the
+  intended change before anything else runs. Example: the recurrence above.
 - For a manual check in a small fixture (a scratch vault of a few hundred
   MB), the backup is a full copy of the fixture, proven against the checksum
   list, rather than a list of the files the checked actions write: the undo
@@ -198,7 +205,7 @@ the restore is wrong, every later mutant tests something else, and the report
   (`od -c`, Python `repr`) and build the match string from that output, not
   from the rendered or retyped text; check every match of every file before
   the first write. Notes typed on a Mac carry non-breaking spaces (U+00A0)
-  that look like spaces. Example (2026-11-20, roa-bestiary palette script,
+  that look like spaces. Example (2026-11-20, the control project's palette script,
   the one-time edits of a vault): the match for a colour list in a vault note
   was found 0 times because two of its spaces were U+00A0; the match count
   stopped the edit before any write, `od -c` showed the two characters, and the

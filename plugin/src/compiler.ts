@@ -22,6 +22,8 @@ import {
   encodeAssetPath,
   normalizeAssetFilename,
 } from './utils.ts';
+import { stringify } from 'yaml';
+import { readNoteTarget } from './note-target.ts';
 import { buildPlaceholder, mapAlt, mapAssetName, parseMapAssetRef, parseMapDirectives } from './textmapper.ts';
 import { Outline, anchorText, encodeAnchor, headingKey, linkKey } from './anchors.ts';
 import { detailBlockText, detailPlan, entryBlock, entryData, flattenLinks, headingForm, imageLink } from './entries.ts';
@@ -387,11 +389,20 @@ export class InMemoryVaultCompiler {
     this.reportEncounters(converted);
     this.reportNotCompiled();
     return {
-      content: this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(converted))),
+      content: this.presetFrontmatter() + this.insertEntryBlocks(tidyBlankLines(this.stripSentinels(converted))),
       warnings: this.warnings,
       warningDetails: [...this.warningDetails],
       stats: { ...this.stats },
     };
+  }
+
+  /**
+   * US-7.5 | AC-4: the output's frontmatter, `typst-preset` of the starting
+   * note only, or nothing when the note has none (0.26.0 output).
+   */
+  private presetFrontmatter(): string {
+    const { preset } = readNoteTarget(this.readNote(this.root).yaml);
+    return preset === undefined ? '' : `---\n${stringify({ 'typst-preset': preset }, { lineWidth: 0 })}---\n`;
   }
 
   /**
@@ -459,7 +470,7 @@ export class InMemoryVaultCompiler {
     // US-9.4 | AC-4: after every other row, as in `compile`.
     this.reportNotCompiled();
     return {
-      content: sanitized,
+      content: this.presetFrontmatter() + sanitized,
       warnings: this.warnings,
       warningDetails: [...this.warningDetails],
       stats: { ...this.stats, mapsRendered, mapsDeduplicated },

@@ -4,7 +4,7 @@ import { InMemoryVaultCompiler } from './compiler.ts';
 import { completionNotice, parseListSetting } from './entries.ts';
 import { ObsidianLinkResolver } from './resolver.ts';
 import { ObsidianAssetManager } from './assets.ts';
-import { computeContentHash } from './utils.ts';
+import { computeContentHash, splitFrontmatter } from './utils.ts';
 import {
   joinOutputPath,
   outputPathText,
@@ -15,6 +15,8 @@ import {
 } from './output-location.ts';
 import { OutputWriter, type WriterFs } from './output-writer.ts';
 import { CompileDialog } from './compile-dialog.ts';
+import { CompileTargetDialog } from './compile-target-dialog.ts';
+import { effectiveTarget, noteTargetRefusal, readNoteTarget, type NoteTarget, type NoteTargetRequest } from './note-target.ts';
 import type { CompileRun } from './compile-dialog-rules.ts';
 import { debugInfo } from './debug-info.ts';
 import { failedNotice } from './notices.ts';
@@ -70,6 +72,13 @@ export default class VaultCompilerPlugin extends Plugin {
                 // US-7.2 | AC-3, US-7.4 AC-1: the dialog; the note is this run's starting file.
                 new CompileDialog(this.app, this, { ...this.settingsRun(), startingFile: file.path }, 'file-menu').open();
               });
+          });
+          // US-7.5 | AC-5: sets the note's compile-folder and compile-file.
+          menu.addItem(item => {
+            item
+              .setTitle(STRINGS.menus.compileTarget)
+              .setIcon('target')
+              .onClick(() => new CompileTargetDialog(this.app, this, file).open());
           });
         }
       })
@@ -131,30 +140,71 @@ export default class VaultCompilerPlugin extends Plugin {
   }
 
   /**
+   * US-0.3, US-7.5 | AC-OL-1 to AC-OL-6: What the output location check needs
+   * besides the folder and the file name.
+   */
+  locationRequest(startingFile: string): NoteTargetRequest {
+    const fs = this.getNodeFs();
+    return {
+      startingFile,
+      configDir: this.app.vault.configDir,
+      vaultRoot: fs ? this.getVaultRoot() : null,
+      folderExists: absolute => fs !== null && fs.existsSync(absolute),
+    };
+  }
+
+  /**
    * US-0.3 | AC-OL-1 to AC-OL-6: Resolves the configured folder and filename
    * into the output location of this compile, or the reason to refuse it.
    */
   resolveOutputLocation(run: CompileRun = this.settingsRun()): OutputLocationResult {
-    const fs = this.getNodeFs();
     return resolveOutputLocation({
+      ...this.locationRequest(run.startingFile),
       folder: run.outputFolder,
       file: run.outputFile,
-      startingFile: run.startingFile,
-      configDir: this.app.vault.configDir,
-      vaultRoot: fs ? this.getVaultRoot() : null,
-      folderExists: absolute => fs !== null && fs.existsSync(absolute),
     });
   }
 
   /**
-   * US-0.3, US-8.1 | AC-OL-1 to AC-OL-6, AC-8.1-W: Compiles the vault into the
-   * resolved output location. A refused location stops before anything is
+   * US-7.5 | AC-1: The starting note's compile keys, read from the file now
+   * (SCAR-022: not from Obsidian's cache). No such note: nothing set.
+   */
+  async readStartingNoteTarget(path: string): Promise<NoteTarget> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return { problems: [] };
+    return readNoteTarget(splitFrontmatter(await this.app.vault.read(file)).yaml);
+  }
+
+  /**
+   * US-7.5 | AC-1, AC-2: The run of the command `Compile vault` (no dialog):
+   * the saved settings, the starting note's `compile-folder` and
+   * `compile-file` in front of them; `refusal` names the property whose value
+   * the settings' rules refuse (or whose type is wrong).
+   */
+  private async runFromNote(): Promise<{ run: CompileRun; refusal: string | null }> {
+    const saved = this.settingsRun();
+    const target = await this.readStartingNoteTarget(saved.startingFile);
+    const { outputFolder, outputFile } = effectiveTarget(saved, target);
+    return {
+      run: { ...saved, outputFolder, outputFile },
+      refusal: noteTargetRefusal(target, this.locationRequest(saved.startingFile)),
+    };
+  }
+
+  /**
+   * US-0.3, US-8.1, US-7.5 | AC-OL-1 to AC-OL-6, AC-8.1-W: Compiles the vault
+   * into the resolved output location. A refused location stops before anything is
    * read, confirmed or written; every write goes through `OutputWriter`.
    */
-  async compileVault(run: CompileRun = this.settingsRun()) {
+  async compileVault(run: CompileRun | undefined = undefined) {
+    // US-7.5 | AC-1: no run (the plain command) takes the settings and the
+    // note's keys; the dialog passes the values it shows.
+    let refusal: string | null = null;
+    if (run === undefined) ({ run, refusal } = await this.runFromNote());
     const resolved = this.resolveOutputLocation(run);
-    if (!resolved.ok) {
-      new Notice(STRINGS.notices.notStarted(resolved.reason), 5000);
+    if (refusal === null && !resolved.ok) refusal = resolved.reason;
+    if (refusal !== null || !resolved.ok) {
+      new Notice(STRINGS.notices.notStarted(refusal ?? ''), 5000);
       return;
     }
     const location = resolved.location;

@@ -44,12 +44,21 @@ export function dialogKey(
 }
 
 /**
- * US-7.4 | AC-4 (P1): What Compile saves: folder and filename always; the
- * starting file only when the dialog came from the settings' values (ribbon,
+ * US-7.4 | AC-4 (P1), US-7.5 | AC-3: What Compile saves: folder and filename
+ * always, unless the note gave them (`fromNote`: this run only); the starting
+ * file only when the dialog came from the settings' values (ribbon,
  * `Compile vault…`), not from the file menu (US-7.2 AC-3). A new object.
  */
-export function settingsAfterCompile(run: CompileRun, origin: 'settings' | 'file-menu'): Partial<CompileRun> {
-  return origin === 'settings'
-    ? { startingFile: run.startingFile, outputFolder: run.outputFolder, outputFile: run.outputFile }
-    : { outputFolder: run.outputFolder, outputFile: run.outputFile };
+export function settingsAfterCompile(
+  run: CompileRun,
+  origin: 'settings' | 'file-menu',
+  fromNote: boolean,
+): Partial<CompileRun> {
+  const saved: Partial<CompileRun> = {};
+  if (origin === 'settings') saved.startingFile = run.startingFile;
+  if (!fromNote) {
+    saved.outputFolder = run.outputFolder;
+    saved.outputFile = run.outputFile;
+  }
+  return saved;
 }

@@ -14,6 +14,7 @@ why the choice cannot be used.
 - [The file name](#the-file-name)
 - [Choices that are refused](#choices-that-are-refused)
 - [The output folder is never read](#the-output-folder-is-never-read)
+- [A compile target in the starting note](#a-compile-target-in-the-starting-note)
 
 ## The output folder
 
@@ -59,3 +60,36 @@ So a picture copied to `Exports/assets/` by an earlier run is never mistaken
 for the original, and never makes a picture name ambiguous. This holds for
 the folder in the settings and for a folder you type for one run. When the
 output folder is the top level of the vault (empty), nothing is left out.
+
+## A compile target in the starting note
+
+A starting note can say where its own compile goes, in two properties:
+
+```yaml
+---
+compile-folder: Sheets
+compile-file: keep-sheets.md
+---
+```
+
+When you compile from that note (from the file menu, the compile dialog or
+**Compile vault**), the output goes there, and your settings' output folder
+and file name stay as they are, so a rulebook and an adventure's sheets can
+each keep their own target. A property you leave out falls back to the
+setting. The same rules as above apply; a refusal names the property, for
+example `Property compile-folder: Output folder "../out" must not contain "..".`
+The compile dialog shows the note's values and says `Output from the note's
+properties`; a change there applies to that compile only.
+
+Set or clear the two properties with **Compile target…** in the file menu of
+a note: a small dialog with the folder (and **Choose folder…**) and the file
+name; **Save** checks them first, an empty field removes its property,
+**Clear** removes both. Only these two properties are written; the note's
+other properties and text stay as they are. This is the one change the plugin
+makes to a note of yours, and only when you ask for it; a compile still only
+reads your vault.
+
+If the starting note has the property `typst-preset`, the compiled file starts
+with that one property, so Obsidian2Typst (0.19.0 or newer) exports it with
+that preset.
+

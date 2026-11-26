@@ -12,6 +12,7 @@ export const STRINGS = {
   },
   menus: {
     compileFromFile: 'Compile vault from this file',
+    compileTarget: 'Compile target…',
   },
   dialog: {
     title: 'Compile vault',
@@ -21,12 +22,22 @@ export const STRINGS = {
     chooseFolder: 'Choose folder…',
     pickerTitle: 'Choose output folder',
     compile: 'Compile',
+    outputFromNote: "Output from the note's properties",
     moreOptions: 'More options',
     willWrite: (path: string): string => `${path} will be written.`,
     willReplace: (path: string, when: string): string =>
       `${path} exists (from ${when}) and will be replaced.`,
   },
+  targetDialog: {
+    title: 'Compile target',
+    save: 'Save',
+    clear: 'Clear',
+    cancel: 'Cancel',
+  },
   notices: {
+    compileTargetSet: (note: string, path: string): string => `✅ Compile target of "${note}": ${path}`,
+    compileTargetSettings: (note: string): string => `✅ Compile target of "${note}": the settings`,
+    compileTargetFailed: (reason: string): string => `Could not set the compile target: ${reason}`,
     notStarted: (reason: string): string => `Compilation not started: ${reason}`,
     noStartingFile: 'Starting file not found.',
     compiled: (path: string, files: number, assets: number, deduplicated: number): string =>
@@ -88,6 +99,10 @@ export const STRINGS = {
     vaultFileModified: (path: string): string => `Source vault file was modified during compilation: ${path}`,
   },
   reasons: {
+    property: (key: string, reason: string): string => `Property ${key}: ${reason}`,
+    propertyNotText: (key: string): string => `Property ${key} must be text`,
+    frontmatterUnclosed: 'the frontmatter has no closing "---" line.',
+    frontmatterNotMapping: 'the frontmatter is not a list of properties.',
     fileEmpty: 'Output filename is empty.',
     fileHasFolder: (file: string): string =>
       `Output filename "${file}" must be a file name without "/" or "\\". Put folders into the output folder.`,

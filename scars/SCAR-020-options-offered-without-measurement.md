@@ -39,7 +39,7 @@ on the result.
 - A picture of an option (a mockup, a comparison page, a rendered example)
   is an option too: everything it draws is checked against what the real
   consumer can draw before it is shown, or the picture names what it assumes.
-  Example (2026-11-20, roa-bestiary, colour palette proposals): the comparison
+  Example (2026-11-20, the control project, colour palette proposals): the comparison
   page drew creature cards with a filled, coloured name band; Obsidian2Typst's
   statblock draws the name as text in the frame colour and has no filled band.
   Found at the inventory after the owner had chosen a proposal; the band became
